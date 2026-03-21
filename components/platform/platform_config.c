@@ -34,7 +34,7 @@ void platform_config_apply_defaults(device_config_t *config, const char *device_
     config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     config->scd41_asc_enabled = true;
     config->scd41_altitude_m = 0;
-    config->scd41_temp_offset_c = 0.0f;
+    config->scd41_temp_offset_c = 4.0f;
     config->pms_control_pins_enabled = true;
 }
 
