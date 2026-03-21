@@ -13,6 +13,31 @@
 
 static const char *TAG = "platform_config";
 
+static void platform_config_sanitize(device_config_t *config, const char *device_id)
+{
+    if (config->device_name[0] == '\0' && device_id != NULL) {
+        snprintf(config->device_name, sizeof(config->device_name), "air-monitor-%.20s", device_id);
+    }
+    if (config->discovery_prefix[0] == '\0') {
+        snprintf(config->discovery_prefix, sizeof(config->discovery_prefix), "homeassistant");
+    }
+    if (config->topic_root[0] == '\0' && device_id != NULL) {
+        snprintf(config->topic_root, sizeof(config->topic_root), "air_monitor/%s", device_id);
+    }
+    if (config->mqtt_port == 0) {
+        config->mqtt_port = 1883;
+    }
+    if (config->publish_interval_sec < 5 || config->publish_interval_sec > 60) {
+        config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
+    }
+    if (config->scd41_temp_offset_c < 0.0f || config->scd41_temp_offset_c > 20.0f) {
+        config->scd41_temp_offset_c = 4.0f;
+    }
+    if (config->scd41_altitude_m > 3000) {
+        config->scd41_altitude_m = 0;
+    }
+}
+
 esp_err_t platform_config_init(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -27,15 +52,13 @@ void platform_config_apply_defaults(device_config_t *config, const char *device_
 {
     memset(config, 0, sizeof(*config));
     config->version = DEVICE_CONFIG_VERSION;
-    snprintf(config->device_name, sizeof(config->device_name), "air-monitor-%s", device_id);
-    snprintf(config->discovery_prefix, sizeof(config->discovery_prefix), "homeassistant");
-    snprintf(config->topic_root, sizeof(config->topic_root), "air_monitor/%s", device_id);
     config->mqtt_port = 1883;
     config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     config->scd41_asc_enabled = true;
     config->scd41_altitude_m = 0;
     config->scd41_temp_offset_c = 4.0f;
     config->pms_control_pins_enabled = true;
+    platform_config_sanitize(config, device_id);
 }
 
 bool platform_config_is_complete(const device_config_t *config)
@@ -71,18 +94,7 @@ esp_err_t platform_config_load(device_config_t *config, const char *device_id)
         return ESP_ERR_NOT_FOUND;
     }
 
-    if (config->device_name[0] == '\0') {
-        snprintf(config->device_name, sizeof(config->device_name), "air-monitor-%s", device_id);
-    }
-    if (config->discovery_prefix[0] == '\0') {
-        snprintf(config->discovery_prefix, sizeof(config->discovery_prefix), "homeassistant");
-    }
-    if (config->topic_root[0] == '\0') {
-        snprintf(config->topic_root, sizeof(config->topic_root), "air_monitor/%s", device_id);
-    }
-    if (config->publish_interval_sec == 0) {
-        config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
-    }
+    platform_config_sanitize(config, device_id);
 
     return ESP_OK;
 }
