@@ -1,5 +1,6 @@
 #include "provisioning_web.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,15 @@
 #include "esp_ota_ops.h"
 
 static const char *TAG = "provisioning_web";
+
+#define MQTT_PORT_MIN 1
+#define MQTT_PORT_MAX 65535
+#define PUBLISH_INTERVAL_MIN 5
+#define PUBLISH_INTERVAL_MAX 60
+#define SCD41_ALTITUDE_MIN 0
+#define SCD41_ALTITUDE_MAX 3000
+#define SCD41_TEMP_OFFSET_MIN 0.0
+#define SCD41_TEMP_OFFSET_MAX 20.0
 
 typedef struct {
     httpd_handle_t server;
@@ -68,7 +78,10 @@ static const char INDEX_HTML[] =
     "<div class='footer'>The local admin page is intentionally unauthenticated on the trusted LAN selected for this project.</div></section>"
     "<section class='card'><h2>Device Actions</h2><button onclick='restartDevice()'>Restart Device</button><button class='ghost' onclick='factoryReset()'>Factory Reset</button></section>"
     "</div></div><script>"
-    "async function fetchStatus(){const r=await fetch('/api/status');const d=await r.json();"
+    "const configFields=['device_name','wifi_ssid','wifi_password','mqtt_host','mqtt_port','mqtt_username','mqtt_password','discovery_prefix','topic_root','publish_interval_sec','scd41_altitude_m','scd41_temp_offset_c'];"
+    "let configDirty=false;"
+    "for(const k of configFields){const el=document.getElementById(k);if(el){el.addEventListener('input',()=>{configDirty=true;});}}"
+    "async function fetchStatus(){const r=await fetch('/api/status');if(!r.ok)return;const d=await r.json();"
     "status.innerHTML=`<div class='pill'>${d.diag.provisioning_mode?'AP mode':'Station mode'}</div>`+"
     "`<div class='kv'><span>Device ID</span><strong>${d.diag.device_id}</strong></div>`+"
     "`<div class='kv'><span>IP</span><strong>${d.diag.ip_addr||'n/a'}</strong></div>`+"
@@ -85,13 +98,13 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>PM10</span><strong>${d.snapshot.pm10_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Typical Particle Size</span><strong>${d.snapshot.typical_particle_size_um ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>SPS30 Sleep</span><strong>${d.snapshot.sps30_sleeping}</strong></div>`;"
-    "for(const k of ['device_name','wifi_ssid','wifi_password','mqtt_host','mqtt_port','mqtt_username','mqtt_password','discovery_prefix','topic_root','publish_interval_sec','scd41_altitude_m','scd41_temp_offset_c']){"
-    "if(document.getElementById(k)) document.getElementById(k).value=d.config[k] ?? '';}"
-    "frc_reference_ppm.value=d.frc_reference_ppm;}"
-    "async function saveConfig(){await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({"
+    "if(!configDirty){for(const k of configFields){const el=document.getElementById(k);if(el)el.value=d.config[k] ?? '';}}"
+    "if(document.activeElement!==frc_reference_ppm){frc_reference_ppm.value=d.frc_reference_ppm;}}"
+    "async function saveConfig(){const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({"
     "device_name:device_name.value,wifi_ssid:wifi_ssid.value,wifi_password:wifi_password.value,mqtt_host:mqtt_host.value,mqtt_port:Number(mqtt_port.value),"
     "mqtt_username:mqtt_username.value,mqtt_password:mqtt_password.value,discovery_prefix:discovery_prefix.value,topic_root:topic_root.value,publish_interval_sec:Number(publish_interval_sec.value),"
-    "scd41_altitude_m:Number(scd41_altitude_m.value),scd41_temp_offset_c:Number(scd41_temp_offset_c.value)})});alert('Config saved. Device will restart.');}"
+    "scd41_altitude_m:Number(scd41_altitude_m.value),scd41_temp_offset_c:Number(scd41_temp_offset_c.value)})});"
+    "if(!r.ok){alert(await r.text()||'Config rejected');return;}configDirty=false;alert('Config saved. Device will restart.');fetchStatus();}"
     "async function toggleAsc(enabled){await fetch('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});fetchStatus();}"
     "async function toggleSps30(sleep){await fetch('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});fetchStatus();}"
     "async function applyFrc(){const r=await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});if(!r.ok){const t=await r.text();alert(t||'FRC rejected');}fetchStatus();}"
@@ -130,6 +143,31 @@ static char *read_body(httpd_req_t *req)
     }
     body[received] = '\0';
     return body;
+}
+
+static esp_err_t send_error_json(httpd_req_t *req, const char *status, const char *message)
+{
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    ESP_RETURN_ON_FALSE(root != NULL, ESP_ERR_NO_MEM, TAG, "json alloc failed");
+    cJSON_AddStringToObject(root, "status", "error");
+    cJSON_AddStringToObject(root, "message", message);
+    esp_err_t err = send_json(req, root);
+    cJSON_Delete(root);
+    return err;
+}
+
+static bool number_in_range(cJSON *item, double min, double max)
+{
+    return cJSON_IsNumber(item) && !isnan(item->valuedouble) &&
+           item->valuedouble >= min && item->valuedouble <= max;
+}
+
+static bool whole_number_in_range(cJSON *item, long min, long max)
+{
+    return number_in_range(item, (double)min, (double)max) &&
+           floor(item->valuedouble) == item->valuedouble;
 }
 
 static void fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, device_config_t *config, uint16_t *frc_ppm)
@@ -210,7 +248,9 @@ static esp_err_t status_handler(httpd_req_t *req)
 static esp_err_t config_handler(httpd_req_t *req)
 {
     char *body = read_body(req);
-    ESP_RETURN_ON_FALSE(body != NULL, ESP_ERR_NO_MEM, TAG, "body alloc failed");
+    if (body == NULL) {
+        return send_error_json(req, "400 Bad Request", "request body missing or truncated");
+    }
 
     sensor_snapshot_t snapshot;
     device_diag_t diag;
@@ -220,7 +260,9 @@ static esp_err_t config_handler(httpd_req_t *req)
 
     cJSON *json = cJSON_Parse(body);
     free(body);
-    ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
+    if (json == NULL) {
+        return send_error_json(req, "400 Bad Request", "invalid json");
+    }
 
     cJSON *item = NULL;
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "device_name")) && cJSON_IsString(item)) {
@@ -235,7 +277,11 @@ static esp_err_t config_handler(httpd_req_t *req)
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_host")) && cJSON_IsString(item)) {
         strlcpy(config.mqtt_host, item->valuestring, sizeof(config.mqtt_host));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port")) != NULL) {
+        if (!whole_number_in_range(item, MQTT_PORT_MIN, MQTT_PORT_MAX)) {
+            cJSON_Delete(json);
+            return send_error_json(req, "400 Bad Request", "mqtt_port must be 1-65535");
+        }
         config.mqtt_port = (uint16_t)item->valuedouble;
     }
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_username")) && cJSON_IsString(item)) {
@@ -250,13 +296,25 @@ static esp_err_t config_handler(httpd_req_t *req)
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "topic_root")) && cJSON_IsString(item)) {
         strlcpy(config.topic_root, item->valuestring, sizeof(config.topic_root));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "publish_interval_sec")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItemCaseSensitive(json, "publish_interval_sec")) != NULL) {
+        if (!whole_number_in_range(item, PUBLISH_INTERVAL_MIN, PUBLISH_INTERVAL_MAX)) {
+            cJSON_Delete(json);
+            return send_error_json(req, "400 Bad Request", "publish_interval_sec must be 5-60");
+        }
         config.publish_interval_sec = (uint16_t)item->valuedouble;
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_altitude_m")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_altitude_m")) != NULL) {
+        if (!whole_number_in_range(item, SCD41_ALTITUDE_MIN, SCD41_ALTITUDE_MAX)) {
+            cJSON_Delete(json);
+            return send_error_json(req, "400 Bad Request", "scd41_altitude_m must be 0-3000");
+        }
         config.scd41_altitude_m = (uint16_t)item->valuedouble;
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_temp_offset_c")) && cJSON_IsNumber(item)) {
+    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_temp_offset_c")) != NULL) {
+        if (!number_in_range(item, SCD41_TEMP_OFFSET_MIN, SCD41_TEMP_OFFSET_MAX)) {
+            cJSON_Delete(json);
+            return send_error_json(req, "400 Bad Request", "scd41_temp_offset_c must be 0-20");
+        }
         config.scd41_temp_offset_c = (float)item->valuedouble;
     }
     cJSON_Delete(json);
@@ -326,17 +384,24 @@ static esp_err_t sps30_sleep_handler(httpd_req_t *req)
 static esp_err_t frc_handler(httpd_req_t *req)
 {
     char *body = read_body(req);
-    ESP_RETURN_ON_FALSE(body != NULL, ESP_ERR_NO_MEM, TAG, "body alloc failed");
+    if (body == NULL) {
+        return send_error_json(req, "400 Bad Request", "request body missing or truncated");
+    }
     cJSON *json = cJSON_Parse(body);
     free(body);
-    ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
+    if (json == NULL) {
+        return send_error_json(req, "400 Bad Request", "invalid json");
+    }
     cJSON *ppm = cJSON_GetObjectItemCaseSensitive(json, "ppm");
-    if (s_ctx.callbacks.request_apply_frc != NULL && cJSON_IsNumber(ppm)) {
+    if (!whole_number_in_range(ppm, 400, 2000)) {
+        cJSON_Delete(json);
+        return send_error_json(req, "400 Bad Request", "ppm must be 400-2000");
+    }
+    if (s_ctx.callbacks.request_apply_frc != NULL) {
         esp_err_t err = s_ctx.callbacks.request_apply_frc((uint16_t)ppm->valuedouble, s_ctx.user_ctx);
         if (err != ESP_OK) {
             cJSON_Delete(json);
-            httpd_resp_set_status(req, "409 Conflict");
-            return httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"SCD41 FRC rejected by datasheet preconditions\"}");
+            return send_error_json(req, "409 Conflict", "SCD41 FRC rejected by datasheet preconditions");
         }
     }
     cJSON_Delete(json);

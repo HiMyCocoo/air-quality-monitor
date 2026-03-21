@@ -20,7 +20,6 @@ static const char *TAG = "sensors";
 
 typedef struct {
     bool running;
-    bool i2c_initialized;
     bool scd41_initialized;
     bool sps30_initialized;
     bool sps30_sleeping;
@@ -29,7 +28,6 @@ typedef struct {
     sensor_snapshot_t snapshot;
     char last_error[LAST_ERROR_LEN];
     device_config_t config;
-    i2c_master_bus_handle_t i2c_bus;
     scd41_t scd41;
     sps30_t sps30;
     sps30_measurement_t pm_history[PM_HISTORY_LEN];
@@ -55,33 +53,17 @@ static void sensors_clear_error(void)
     xSemaphoreGive(s_ctx.lock);
 }
 
-static esp_err_t sensors_init_i2c_bus(void)
-{
-    if (s_ctx.i2c_initialized) {
-        return ESP_OK;
-    }
-
-    i2c_master_bus_config_t bus_config = {
-        .i2c_port = CONFIG_AIRMON_I2C_PORT_NUM,
-        .sda_io_num = CONFIG_AIRMON_I2C_SDA_GPIO,
-        .scl_io_num = CONFIG_AIRMON_I2C_SCL_GPIO,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_config, &s_ctx.i2c_bus), TAG, "i2c bus init failed");
-    s_ctx.i2c_initialized = true;
-    return ESP_OK;
-}
-
 static esp_err_t sensors_init_scd41(void)
 {
     if (s_ctx.scd41_initialized) {
         return ESP_OK;
     }
 
-    ESP_RETURN_ON_ERROR(sensors_init_i2c_bus(), TAG, "i2c bus init failed");
-    ESP_RETURN_ON_ERROR(scd41_init_on_bus(&s_ctx.scd41, s_ctx.i2c_bus), TAG, "scd41 init failed");
+    ESP_RETURN_ON_ERROR(scd41_init(&s_ctx.scd41,
+                                   CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
+                                   CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
+                                   CONFIG_AIRMON_SCD41_I2C_SCL_GPIO),
+                        TAG, "scd41 init failed");
     ESP_RETURN_ON_ERROR(scd41_stop_periodic_measurement(&s_ctx.scd41), TAG, "scd41 stop failed");
     ESP_RETURN_ON_ERROR(scd41_set_temperature_offset(&s_ctx.scd41, s_ctx.config.scd41_temp_offset_c), TAG, "temp offset failed");
     ESP_RETURN_ON_ERROR(scd41_set_sensor_altitude(&s_ctx.scd41, s_ctx.config.scd41_altitude_m), TAG, "altitude failed");
@@ -98,8 +80,11 @@ static esp_err_t sensors_init_sps30(void)
         return ESP_OK;
     }
 
-    ESP_RETURN_ON_ERROR(sensors_init_i2c_bus(), TAG, "i2c bus init failed");
-    ESP_RETURN_ON_ERROR(sps30_init_on_bus(&s_ctx.sps30, s_ctx.i2c_bus), TAG, "sps30 init failed");
+    ESP_RETURN_ON_ERROR(sps30_init(&s_ctx.sps30,
+                                   CONFIG_AIRMON_SPS30_I2C_PORT_NUM,
+                                   CONFIG_AIRMON_SPS30_I2C_SDA_GPIO,
+                                   CONFIG_AIRMON_SPS30_I2C_SCL_GPIO),
+                        TAG, "sps30 init failed");
     ESP_RETURN_ON_ERROR(sps30_start_measurement(&s_ctx.sps30), TAG, "sps30 start failed");
     s_ctx.sps30_initialized = true;
     s_ctx.sps30_sleeping = false;
@@ -195,7 +180,8 @@ static void sensor_task(void *arg)
         if (s_ctx.scd41_initialized && now_ms - last_scd_check_ms >= 1000) {
             bool ready = false;
             last_scd_check_ms = now_ms;
-            if (scd41_data_ready(&s_ctx.scd41, &ready) == ESP_OK && ready) {
+            esp_err_t err = scd41_data_ready(&s_ctx.scd41, &ready);
+            if (err == ESP_OK && ready) {
                 uint16_t co2 = 0;
                 float temperature = 0.0f;
                 float humidity = 0.0f;
@@ -211,12 +197,15 @@ static void sensor_task(void *arg)
                 } else {
                     sensors_set_error("SCD41 read failed");
                 }
+            } else if (err != ESP_OK) {
+                sensors_set_error("SCD41 ready check failed");
             }
         }
 
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 
+    s_ctx.task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -248,7 +237,14 @@ void sensors_stop(void)
 {
     if (s_ctx.running) {
         s_ctx.running = false;
-        vTaskDelay(pdMS_TO_TICKS(50));
+        for (int i = 0; i < 150 && s_ctx.task_handle != NULL; ++i) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+    if (s_ctx.task_handle != NULL) {
+        ESP_LOGW(TAG, "sensor task did not exit cleanly, forcing delete");
+        vTaskDelete(s_ctx.task_handle);
+        s_ctx.task_handle = NULL;
     }
     if (s_ctx.scd41_initialized) {
         scd41_stop_periodic_measurement(&s_ctx.scd41);
@@ -258,11 +254,6 @@ void sensors_stop(void)
     if (s_ctx.sps30_initialized) {
         sps30_deinit(&s_ctx.sps30);
         s_ctx.sps30_initialized = false;
-    }
-    if (s_ctx.i2c_initialized && s_ctx.i2c_bus != NULL) {
-        i2c_del_master_bus(s_ctx.i2c_bus);
-        s_ctx.i2c_bus = NULL;
-        s_ctx.i2c_initialized = false;
     }
     if (s_ctx.lock != NULL) {
         vSemaphoreDelete(s_ctx.lock);
@@ -357,11 +348,13 @@ esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
     }
     if (err == ESP_OK) {
         s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
+    }
+    xSemaphoreGive(s_ctx.lock);
+    if (err == ESP_OK) {
         sensors_clear_error();
     } else {
         sensors_set_error("SCD41 FRC failed");
     }
-    xSemaphoreGive(s_ctx.lock);
     return err;
 }
 

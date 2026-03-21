@@ -160,8 +160,8 @@ static esp_err_t publish_switch_discovery(const char *object_id, const char *nam
     cJSON_AddStringToObject(root, "val_tpl", value_template);
     cJSON_AddStringToObject(root, "pl_on", "ON");
     cJSON_AddStringToObject(root, "pl_off", "OFF");
-    cJSON_AddStringToObject(root, "stat_on", "true");
-    cJSON_AddStringToObject(root, "stat_off", "false");
+    cJSON_AddStringToObject(root, "stat_on", "ON");
+    cJSON_AddStringToObject(root, "stat_off", "OFF");
     cJSON_AddStringToObject(root, "avty_t", s_ctx.availability_topic);
     cJSON_AddStringToObject(root, "pl_avail", "online");
     cJSON_AddStringToObject(root, "pl_not_avail", "offline");

@@ -82,11 +82,26 @@ static esp_err_t app_save_config(const device_config_t *config, void *user_ctx)
     (void)user_ctx;
     device_config_t updated = *config;
     updated.version = DEVICE_CONFIG_VERSION;
+    if (updated.device_name[0] == '\0') {
+        snprintf(updated.device_name, sizeof(updated.device_name), "air-monitor-%.20s", s_app.device_id);
+    }
+    if (updated.discovery_prefix[0] == '\0') {
+        strlcpy(updated.discovery_prefix, "homeassistant", sizeof(updated.discovery_prefix));
+    }
+    if (updated.topic_root[0] == '\0') {
+        snprintf(updated.topic_root, sizeof(updated.topic_root), "air_monitor/%s", s_app.device_id);
+    }
     if (updated.publish_interval_sec < 5 || updated.publish_interval_sec > 60) {
         updated.publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     }
     if (updated.mqtt_port == 0) {
         updated.mqtt_port = 1883;
+    }
+    if (updated.scd41_altitude_m > 3000) {
+        updated.scd41_altitude_m = 0;
+    }
+    if (updated.scd41_temp_offset_c < 0.0f || updated.scd41_temp_offset_c > 20.0f) {
+        updated.scd41_temp_offset_c = 4.0f;
     }
 
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
@@ -146,11 +161,16 @@ static void app_request_set_sps30_sleep(bool sleep, void *user_ctx)
 static esp_err_t app_request_apply_frc(uint16_t ppm, void *user_ctx)
 {
     (void)user_ctx;
+    esp_err_t err = sensors_set_scd41_forced_recalibration(ppm);
+    if (err != ESP_OK) {
+        return err;
+    }
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     s_app.frc_reference_ppm = ppm;
     mqtt_ha_set_control_state(s_app.config.scd41_asc_enabled, s_app.frc_reference_ppm);
+    s_app.publish_now = true;
     xSemaphoreGive(s_app.lock);
-    return sensors_set_scd41_forced_recalibration(ppm);
+    return ESP_OK;
 }
 
 static void app_mqtt_connected(void *user_ctx)

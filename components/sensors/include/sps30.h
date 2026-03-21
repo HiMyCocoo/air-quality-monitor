@@ -19,11 +19,14 @@ typedef struct {
 } sps30_measurement_t;
 
 typedef struct {
+    i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
+    bool owns_bus;
     bool measuring;
     bool sleeping;
 } sps30_t;
 
+esp_err_t sps30_init(sps30_t *sensor, int i2c_port, int sda_gpio, int scl_gpio);
 esp_err_t sps30_init_on_bus(sps30_t *sensor, i2c_master_bus_handle_t bus_handle);
 void sps30_deinit(sps30_t *sensor);
 esp_err_t sps30_start_measurement(sps30_t *sensor);
