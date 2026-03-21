@@ -1,0 +1,17 @@
+# ESP-IDF build output
+build/
+managed_components/
+cmake-build-*/
+
+# Generated local configuration backup
+sdkconfig.old
+
+# Local IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS-generated files
+.DS_Store
+Thumbs.db
