@@ -36,6 +36,11 @@
 
 - `YD-ESP32-S3` 开发板
 - `ESP-IDF v5.5.3`
+- 板上有两个 `Type-C`
+  - 左侧是 `USB&OTG`，直连 ESP32-S3 原生 USB
+  - 右侧是 `USB to UART`，通过 `CH343P` 接到串口
+- 板载 `WS2812 RGB LED` 固定占用 `GPIO48`
+- 当前工程没有使用 `GPIO48`，避免和板载 RGB 灯冲突
 
 ### 2.2 传感器
 
@@ -43,13 +48,15 @@
   - I2C 接口
   - 读取 `CO2 / 温度 / 湿度`
   - 使用 `3.3V`
+  - 默认温度偏移按 Sensirion 数据手册采用 `4.0°C`
 
 - `SPS30`
   - I2C 接口
   - 读取 `PM1.0 / PM2.5 / PM4.0 / PM10.0`
   - 读取 `0.5 / 1.0 / 2.5 / 4.0 / 10um` 数浓度
   - 读取 `Typical Particle Size`
-  - 推荐使用 `5V`
+  - 供电采用 `5V`
+  - `SEL` 拉低进入 I2C 模式
 
 ### 2.3 为什么改成 SPS30
 
@@ -86,6 +93,23 @@
 - `SCD41 -> 3.3V`
 - `SPS30 -> 5V`
 
+补充说明：
+
+- `SCD41` 数据手册要求电源噪声尽量低，最好来自稳定的 `LDO`
+- `YD-ESP32-S3` 板上有独立 `3V3` LDO，适合作为 `SCD41` 供电
+- `SPS30` 的供电按数据手册采用 `5V`
+
+### 4.1.1 I2C 上拉必须按 3.3V 逻辑处理
+
+`SCD41` 和 `SPS30` 都要求 I2C 总线有上拉，但你这套系统的 I2C 主机是 `ESP32-S3 3.3V GPIO`，所以总线高电平必须落在 `3.3V` 域。
+
+- 共享总线的 `SDA/SCL` 上拉应接到 `3.3V`
+- 如果你用的是传感器模块，很多模块已经自带上拉
+- 如果模块没有上拉，按 Sensirion 资料可补 `4.7kΩ ~ 10kΩ` 到 `3.3V`
+- 不要把 I2C 上拉接到 `5V`，否则会把 `ESP32-S3` 的 `GPIO8/GPIO9` 拉到 5V
+
+当前固件里开启了 ESP32 内部上拉，主要用于开发阶段兜底；正式接线时仍应保证总线上存在符合资料要求的外部上拉或模块自带上拉。
+
 ### 4.2 共地
 
 `ESP32-S3`、`SCD41`、`SPS30` 的 `GND` 必须互相连通。
@@ -110,6 +134,12 @@
 - 接线端子中转
 - 洞洞板焊接分线
 - 先把 `GPIO8` 和 `GPIO9` 拉到公共排，再分别分给两颗传感器
+
+按 `SPS30` 数据手册，I2C 更适合短距离板内或近距离连线：
+
+- 线长尽量控制在 `< 10 cm`
+- 如果无法很短，至少要尽量屏蔽并减小串扰
+- 如果未来传感器必须离主板更远，Sensirion 更推荐改用 `UART/SHDLC`
 
 ### 4.4 SPS30 的 SEL 脚必须拉低
 
@@ -200,6 +230,7 @@
 
 - 上电后进入周期测量模式
 - 固件每秒检查一次是否有新数据
+- 周期测量的默认数据节奏约 `5 秒`
 - 拿到数据后更新：
   - `co2`
   - `temperature`
@@ -212,6 +243,29 @@
 - ASC 开关
 - FRC 强制校准
 
+设计细节：
+
+- `SCD41` 默认 I2C 地址是 `0x62`
+- 固件默认把温度偏移初始化为 `4.0°C`
+  - 这是 Sensirion 手册给出的默认值
+  - 真正最合适的偏移量仍应在最终整机结构、典型风道和热平衡状态下标定
+- 当前工程不调用 `persist_settings` 把这些参数永久写进传感器 EEPROM
+  - 配置保存在 `ESP32 NVS`
+  - 每次启动时重新下发到 `SCD41`
+  - 这样可以避免频繁写传感器内部 EEPROM
+
+### 8.1.1 SCD41 校准前提
+
+按 Sensirion 数据手册：
+
+- `FRC` 前，传感器必须在未来正常使用的测量模式下运行至少 `3 分钟`
+- 环境中的 `CO2` 必须均匀且稳定
+- `ASC` 若保持启用，需要设备每周有机会暴露在大约 `400 ppm` 的新鲜空气环境中
+
+当前固件已经做了其中一条硬约束：
+
+- 若 `SCD41` 进入周期测量后还不到 `3 分钟`，会拒绝执行 `FRC`
+
 ### 8.2 SPS30
 
 - 上电后通过 I2C 启动测量
@@ -223,6 +277,14 @@
   - `PM10.0`
   - `0.5 / 1.0 / 2.5 / 4.0 / 10um` 数浓度
   - `Typical Particle Size`
+
+设计细节：
+
+- `SPS30` 默认 I2C 地址是 `0x69`
+- 共享总线速率固定为 `100kHz`
+  - 这符合 `SPS30` I2C 的上限要求
+- `Typical Particle Size` 使用的是 `I2C float 输出格式`
+  - 单位是 `µm`
 
 ### 8.3 SPS30 预热逻辑
 
@@ -239,6 +301,12 @@
 - 30 秒后才开始更新 `pm_valid`
 
 这样做是为了避免风扇刚启动、流量和颗粒统计尚未稳定时就把数据推给 Home Assistant。
+
+这个 `30 秒` 预热窗口是按 Sensirion 数据手册的最慢稳定场景取保守值：
+
+- `200–3000 #/cm³` 典型启动时间约 `8 秒`
+- `100–200 #/cm³` 典型启动时间约 `16 秒`
+- `50–100 #/cm³` 典型启动时间约 `30 秒`
 
 ---
 
@@ -460,21 +528,27 @@ cmake --build /tmp/airmon-build
 ### 13.4 烧录
 
 ```bash
-python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/tty.usbmodemXXXX flash
+python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/cu.wchusbserialXXXX flash
 ```
 
 ### 13.5 串口监视
 
 ```bash
-python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/tty.usbmodemXXXX monitor
+python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/cu.wchusbserialXXXX monitor
 ```
+
+对这块 `YD-ESP32-S3`，当前工程更推荐这样用口：
+
+- 烧录和看日志优先接右侧 `USB to UART` 口
+- 这个口走 `CH343P`，在 macOS 上通常会枚举成 `/dev/cu.wchusbserial*` 或近似名称
+- 左侧 `USB&OTG` 是 ESP32-S3 原生 USB，当前工程没有把它作为主要串口说明口来依赖
 
 ### 13.6 当前构建结果
 
-当前固件已经成功编译：
+最近一次验证构建已经成功通过：
 
-- 输出文件：`/tmp/airmon-build4/air_monitor.bin`
-- 固件大小约：`0xdbf40`
+- 输出文件：`/tmp/airmon-build-check/air_monitor.bin`
+- 固件大小约：`0xdc110`
 - OTA 分区剩余空间约：`43%`
 
 ---
@@ -521,10 +595,11 @@ python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/tt
 
 优先检查：
 
-- I2C 线是不是过长
+- I2C 线是不是超过 `10 cm`
 - 分线是否接触不良
 - `GPIO8 / GPIO9` 是否被别的外设占用
 - 供电是否稳定
+- 总线上是否真的有拉到 `3.3V` 的 I2C 上拉
 
 ### Q3：SPS30 明明上电了，但 Home Assistant 一直是空值
 
@@ -559,6 +634,7 @@ I2C 本来就允许多设备并联在同一条 SDA/SCL 上。
 - 当前没有把 `SPS30 风扇清洁` 暴露为网页或 MQTT 控件
 - 当前没有做公网部署、安全加固和权限体系
 - 当前假设 `SCD41` 与 `SPS30` 距离主板较近，I2C 线不宜太长
+- 当前 `ASC` 的效果仍取决于设备是否真的能周期性暴露在约 `400 ppm` 新鲜空气环境
 
 ---
 

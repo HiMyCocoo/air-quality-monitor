@@ -94,7 +94,7 @@ static const char INDEX_HTML[] =
     "scd41_altitude_m:Number(scd41_altitude_m.value),scd41_temp_offset_c:Number(scd41_temp_offset_c.value)})});alert('Config saved. Device will restart.');}"
     "async function toggleAsc(enabled){await fetch('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});fetchStatus();}"
     "async function toggleSps30(sleep){await fetch('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});fetchStatus();}"
-    "async function applyFrc(){await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});fetchStatus();}"
+    "async function applyFrc(){const r=await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});if(!r.ok){const t=await r.text();alert(t||'FRC rejected');}fetchStatus();}"
     "async function republishDiscovery(){await fetch('/api/action/republish-discovery',{method:'POST'});}"
     "async function restartDevice(){await fetch('/api/action/restart',{method:'POST'});}"
     "async function factoryReset(){if(confirm('Erase saved config and restart?')) await fetch('/api/action/factory-reset',{method:'POST'});}"
@@ -332,7 +332,12 @@ static esp_err_t frc_handler(httpd_req_t *req)
     ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
     cJSON *ppm = cJSON_GetObjectItemCaseSensitive(json, "ppm");
     if (s_ctx.callbacks.request_apply_frc != NULL && cJSON_IsNumber(ppm)) {
-        s_ctx.callbacks.request_apply_frc((uint16_t)ppm->valuedouble, s_ctx.user_ctx);
+        esp_err_t err = s_ctx.callbacks.request_apply_frc((uint16_t)ppm->valuedouble, s_ctx.user_ctx);
+        if (err != ESP_OK) {
+            cJSON_Delete(json);
+            httpd_resp_set_status(req, "409 Conflict");
+            return httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"SCD41 FRC rejected by datasheet preconditions\"}");
+        }
     }
     cJSON_Delete(json);
     return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");

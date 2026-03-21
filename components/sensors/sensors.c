@@ -14,6 +14,7 @@
 #include "sps30.h"
 
 #define PM_HISTORY_LEN 6
+#define SCD41_FRC_STABILIZATION_MS (180000LL)
 
 static const char *TAG = "sensors";
 
@@ -34,6 +35,7 @@ typedef struct {
     sps30_measurement_t pm_history[PM_HISTORY_LEN];
     size_t pm_history_count;
     size_t pm_history_index;
+    int64_t scd41_measurement_started_ms;
     int64_t sps30_warmup_until_ms;
 } sensors_ctx_t;
 
@@ -85,6 +87,7 @@ static esp_err_t sensors_init_scd41(void)
     ESP_RETURN_ON_ERROR(scd41_set_sensor_altitude(&s_ctx.scd41, s_ctx.config.scd41_altitude_m), TAG, "altitude failed");
     ESP_RETURN_ON_ERROR(scd41_set_automatic_self_calibration(&s_ctx.scd41, s_ctx.config.scd41_asc_enabled), TAG, "asc failed");
     ESP_RETURN_ON_ERROR(scd41_start_periodic_measurement(&s_ctx.scd41), TAG, "scd41 start failed");
+    s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
     s_ctx.scd41_initialized = true;
     return ESP_OK;
 }
@@ -320,6 +323,7 @@ esp_err_t sensors_set_scd41_asc(bool enabled)
     }
     if (err == ESP_OK) {
         s_ctx.config.scd41_asc_enabled = enabled;
+        s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
     }
     xSemaphoreGive(s_ctx.lock);
     return err;
@@ -331,7 +335,15 @@ esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
         return ESP_ERR_INVALID_STATE;
     }
     if (reference_ppm < 400 || reference_ppm > 2000) {
+        sensors_set_error("SCD41 FRC ppm must be 400-2000");
         return ESP_ERR_INVALID_ARG;
+    }
+
+    int64_t now_ms = esp_timer_get_time() / 1000;
+    if (s_ctx.scd41_measurement_started_ms == 0 ||
+        (now_ms - s_ctx.scd41_measurement_started_ms) < SCD41_FRC_STABILIZATION_MS) {
+        sensors_set_error("SCD41 FRC requires >=3 min in stable target CO2");
+        return ESP_ERR_INVALID_STATE;
     }
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
@@ -342,6 +354,12 @@ esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
     }
     if (err == ESP_OK) {
         err = scd41_start_periodic_measurement(&s_ctx.scd41);
+    }
+    if (err == ESP_OK) {
+        s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
+        sensors_clear_error();
+    } else {
+        sensors_set_error("SCD41 FRC failed");
     }
     xSemaphoreGive(s_ctx.lock);
     return err;
