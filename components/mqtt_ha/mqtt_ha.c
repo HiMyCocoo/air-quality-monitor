@@ -48,13 +48,14 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
+    {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
     {"pm10_0", "PM10", "pm10_0", "µg/m³", "pm10", "measurement", NULL, false},
-    {"particles_0_3um", "Particles >0.3µm", "particles_0_3um", "counts/0.1L", NULL, "measurement", NULL, false},
-    {"particles_0_5um", "Particles >0.5µm", "particles_0_5um", "counts/0.1L", NULL, "measurement", NULL, false},
-    {"particles_1_0um", "Particles >1.0µm", "particles_1_0um", "counts/0.1L", NULL, "measurement", NULL, false},
-    {"particles_2_5um", "Particles >2.5µm", "particles_2_5um", "counts/0.1L", NULL, "measurement", NULL, false},
-    {"particles_5_0um", "Particles >5.0µm", "particles_5_0um", "counts/0.1L", NULL, "measurement", NULL, false},
-    {"particles_10_0um", "Particles >10µm", "particles_10_0um", "counts/0.1L", NULL, "measurement", NULL, false},
+    {"particles_0_5um", "Particles >0.5µm", "particles_0_5um", "#/cm³", NULL, "measurement", NULL, false},
+    {"particles_1_0um", "Particles >1.0µm", "particles_1_0um", "#/cm³", NULL, "measurement", NULL, false},
+    {"particles_2_5um", "Particles >2.5µm", "particles_2_5um", "#/cm³", NULL, "measurement", NULL, false},
+    {"particles_4_0um", "Particles >4.0µm", "particles_4_0um", "#/cm³", NULL, "measurement", NULL, false},
+    {"particles_10_0um", "Particles >10µm", "particles_10_0um", "#/cm³", NULL, "measurement", NULL, false},
+    {"typical_particle_size_um", "Typical Particle Size", "typical_particle_size_um", "µm", NULL, "measurement", NULL, false},
     {"wifi_rssi", "Wi-Fi RSSI", "wifi_rssi", "dBm", "signal_strength", "measurement", "diagnostic", true},
     {"uptime_sec", "Uptime", "uptime_sec", "s", "duration", "measurement", "diagnostic", true},
     {"heap_free", "Heap Free", "heap_free", "B", "data_size", "measurement", "diagnostic", true},
@@ -233,7 +234,7 @@ static void subscribe_commands(void)
         "factory_reset",
         "republish_discovery",
         "scd41_asc",
-        "pms_sleep",
+        "sps30_sleep",
         "scd41_frc_reference_ppm",
         "apply_scd41_frc",
     };
@@ -281,11 +282,11 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
         }
         return;
     }
-    snprintf(expected, sizeof(expected), "%s/pms_sleep", s_ctx.cmd_prefix);
+    snprintf(expected, sizeof(expected), "%s/sps30_sleep", s_ctx.cmd_prefix);
     if (topic_equals(topic, topic_len, expected)) {
         bool sleep = strcasecmp(payload, "ON") == 0;
-        if (s_ctx.callbacks.set_pms_sleep_requested != NULL) {
-            s_ctx.callbacks.set_pms_sleep_requested(sleep, s_ctx.user_ctx);
+        if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
+            s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
         }
         return;
     }
@@ -417,7 +418,7 @@ esp_err_t mqtt_ha_publish_discovery(void)
         ESP_RETURN_ON_ERROR(publish_sensor_discovery(&SENSOR_ENTITIES[i]), TAG, "sensor discovery failed");
     }
     ESP_RETURN_ON_ERROR(publish_switch_discovery("scd41_asc", "SCD41 ASC", "scd41_asc_enabled", "scd41_asc"), TAG, "asc discovery failed");
-    ESP_RETURN_ON_ERROR(publish_switch_discovery("pms_sleep", "PMS7003 Sleep", "pms_sleeping", "pms_sleep"), TAG, "pms discovery failed");
+    ESP_RETURN_ON_ERROR(publish_switch_discovery("sps30_sleep", "SPS30 Sleep", "sps30_sleeping", "sps30_sleep"), TAG, "sps30 discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("restart", "Restart", "restart"), TAG, "restart discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("factory_reset", "Factory Reset", "factory_reset"), TAG, "factory discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("republish_discovery", "Republish Discovery", "republish_discovery"), TAG, "republish discovery failed");
@@ -441,28 +442,30 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "temperature");
         cJSON_AddNullToObject(state, "humidity");
     }
-    if (snapshot->pms_valid) {
+    if (snapshot->pm_valid) {
         cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
         cJSON_AddNumberToObject(state, "pm2_5", snapshot->pm2_5);
+        cJSON_AddNumberToObject(state, "pm4_0", snapshot->pm4_0);
         cJSON_AddNumberToObject(state, "pm10_0", snapshot->pm10_0);
-        cJSON_AddNumberToObject(state, "particles_0_3um", snapshot->particles_0_3um);
         cJSON_AddNumberToObject(state, "particles_0_5um", snapshot->particles_0_5um);
         cJSON_AddNumberToObject(state, "particles_1_0um", snapshot->particles_1_0um);
         cJSON_AddNumberToObject(state, "particles_2_5um", snapshot->particles_2_5um);
-        cJSON_AddNumberToObject(state, "particles_5_0um", snapshot->particles_5_0um);
+        cJSON_AddNumberToObject(state, "particles_4_0um", snapshot->particles_4_0um);
         cJSON_AddNumberToObject(state, "particles_10_0um", snapshot->particles_10_0um);
+        cJSON_AddNumberToObject(state, "typical_particle_size_um", snapshot->typical_particle_size_um);
     } else {
         cJSON_AddNullToObject(state, "pm1_0");
         cJSON_AddNullToObject(state, "pm2_5");
+        cJSON_AddNullToObject(state, "pm4_0");
         cJSON_AddNullToObject(state, "pm10_0");
-        cJSON_AddNullToObject(state, "particles_0_3um");
         cJSON_AddNullToObject(state, "particles_0_5um");
         cJSON_AddNullToObject(state, "particles_1_0um");
         cJSON_AddNullToObject(state, "particles_2_5um");
-        cJSON_AddNullToObject(state, "particles_5_0um");
+        cJSON_AddNullToObject(state, "particles_4_0um");
         cJSON_AddNullToObject(state, "particles_10_0um");
+        cJSON_AddNullToObject(state, "typical_particle_size_um");
     }
-    cJSON_AddBoolToObject(state, "pms_sleeping", snapshot->pms_sleeping);
+    cJSON_AddBoolToObject(state, "sps30_sleeping", snapshot->sps30_sleeping);
     cJSON_AddBoolToObject(state, "scd41_asc_enabled", s_ctx.scd41_asc_enabled);
     cJSON_AddNumberToObject(state, "scd41_frc_reference_ppm", s_ctx.frc_reference_ppm);
 

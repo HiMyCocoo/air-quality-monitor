@@ -59,7 +59,7 @@ static const char INDEX_HTML[] =
     "<label>SCD41 Altitude Compensation (m)</label><input id='scd41_altitude_m' type='number'/>"
     "<label>SCD41 Temperature Offset (°C)</label><input id='scd41_temp_offset_c' type='number' step='0.1'/>"
     "<button onclick='toggleAsc(true)'>Enable ASC</button><button class='ghost' onclick='toggleAsc(false)'>Disable ASC</button>"
-    "<button onclick='togglePms(false)'>Wake PMS7003</button><button class='ghost' onclick='togglePms(true)'>Sleep PMS7003</button>"
+    "<button onclick='toggleSps30(false)'>Wake SPS30</button><button class='ghost' onclick='toggleSps30(true)'>Sleep SPS30</button>"
     "<label>SCD41 FRC Reference (ppm)</label><input id='frc_reference_ppm' type='number'/>"
     "<button onclick='applyFrc()'>Apply Forced Recalibration</button>"
     "<button class='ghost' onclick='republishDiscovery()'>Republish Discovery</button>"
@@ -79,9 +79,12 @@ static const char INDEX_HTML[] =
     "telemetry.innerHTML=`<div class='kv'><span>CO2</span><strong>${d.snapshot.co2_ppm ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Temperature</span><strong>${d.snapshot.temperature_c ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Humidity</span><strong>${d.snapshot.humidity_rh ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>PM1.0</span><strong>${d.snapshot.pm1_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM2.5</span><strong>${d.snapshot.pm2_5 ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>PM4.0</span><strong>${d.snapshot.pm4_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM10</span><strong>${d.snapshot.pm10_0 ?? 'n/a'}</strong></div>`+"
-    "`<div class='kv'><span>PMS Sleep</span><strong>${d.snapshot.pms_sleeping}</strong></div>`;"
+    "`<div class='kv'><span>Typical Particle Size</span><strong>${d.snapshot.typical_particle_size_um ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>SPS30 Sleep</span><strong>${d.snapshot.sps30_sleeping}</strong></div>`;"
     "for(const k of ['device_name','wifi_ssid','wifi_password','mqtt_host','mqtt_port','mqtt_username','mqtt_password','discovery_prefix','topic_root','publish_interval_sec','scd41_altitude_m','scd41_temp_offset_c']){"
     "if(document.getElementById(k)) document.getElementById(k).value=d.config[k] ?? '';}"
     "frc_reference_ppm.value=d.frc_reference_ppm;}"
@@ -90,7 +93,7 @@ static const char INDEX_HTML[] =
     "mqtt_username:mqtt_username.value,mqtt_password:mqtt_password.value,discovery_prefix:discovery_prefix.value,topic_root:topic_root.value,publish_interval_sec:Number(publish_interval_sec.value),"
     "scd41_altitude_m:Number(scd41_altitude_m.value),scd41_temp_offset_c:Number(scd41_temp_offset_c.value)})});alert('Config saved. Device will restart.');}"
     "async function toggleAsc(enabled){await fetch('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});fetchStatus();}"
-    "async function togglePms(sleep){await fetch('/api/action/pms-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});fetchStatus();}"
+    "async function toggleSps30(sleep){await fetch('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});fetchStatus();}"
     "async function applyFrc(){await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});fetchStatus();}"
     "async function republishDiscovery(){await fetch('/api/action/republish-discovery',{method:'POST'});}"
     "async function restartDevice(){await fetch('/api/action/restart',{method:'POST'});}"
@@ -174,8 +177,15 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(snapshot_json, "humidity_rh", snapshot.humidity_rh);
     cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);
     cJSON_AddNumberToObject(snapshot_json, "pm2_5", snapshot.pm2_5);
+    cJSON_AddNumberToObject(snapshot_json, "pm4_0", snapshot.pm4_0);
     cJSON_AddNumberToObject(snapshot_json, "pm10_0", snapshot.pm10_0);
-    cJSON_AddBoolToObject(snapshot_json, "pms_sleeping", snapshot.pms_sleeping);
+    cJSON_AddNumberToObject(snapshot_json, "particles_0_5um", snapshot.particles_0_5um);
+    cJSON_AddNumberToObject(snapshot_json, "particles_1_0um", snapshot.particles_1_0um);
+    cJSON_AddNumberToObject(snapshot_json, "particles_2_5um", snapshot.particles_2_5um);
+    cJSON_AddNumberToObject(snapshot_json, "particles_4_0um", snapshot.particles_4_0um);
+    cJSON_AddNumberToObject(snapshot_json, "particles_10_0um", snapshot.particles_10_0um);
+    cJSON_AddNumberToObject(snapshot_json, "typical_particle_size_um", snapshot.typical_particle_size_um);
+    cJSON_AddBoolToObject(snapshot_json, "sps30_sleeping", snapshot.sps30_sleeping);
 
     cJSON *config_json = cJSON_AddObjectToObject(root, "config");
     cJSON_AddStringToObject(config_json, "device_name", config.device_name);
@@ -298,7 +308,7 @@ static esp_err_t scd41_asc_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
 }
 
-static esp_err_t pms_sleep_handler(httpd_req_t *req)
+static esp_err_t sps30_sleep_handler(httpd_req_t *req)
 {
     char *body = read_body(req);
     ESP_RETURN_ON_FALSE(body != NULL, ESP_ERR_NO_MEM, TAG, "body alloc failed");
@@ -306,8 +316,8 @@ static esp_err_t pms_sleep_handler(httpd_req_t *req)
     free(body);
     ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
     cJSON *sleep = cJSON_GetObjectItemCaseSensitive(json, "sleep");
-    if (s_ctx.callbacks.request_set_pms_sleep != NULL && cJSON_IsBool(sleep)) {
-        s_ctx.callbacks.request_set_pms_sleep(cJSON_IsTrue(sleep), s_ctx.user_ctx);
+    if (s_ctx.callbacks.request_set_sps30_sleep != NULL && cJSON_IsBool(sleep)) {
+        s_ctx.callbacks.request_set_sps30_sleep(cJSON_IsTrue(sleep), s_ctx.user_ctx);
     }
     cJSON_Delete(json);
     return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
@@ -381,7 +391,7 @@ esp_err_t provisioning_web_start(const char *device_id,
         {.uri = "/api/action/factory-reset", .method = HTTP_POST, .handler = factory_reset_handler, .user_ctx = NULL},
         {.uri = "/api/action/republish-discovery", .method = HTTP_POST, .handler = republish_handler, .user_ctx = NULL},
         {.uri = "/api/action/scd41-asc", .method = HTTP_POST, .handler = scd41_asc_handler, .user_ctx = NULL},
-        {.uri = "/api/action/pms-sleep", .method = HTTP_POST, .handler = pms_sleep_handler, .user_ctx = NULL},
+        {.uri = "/api/action/sps30-sleep", .method = HTTP_POST, .handler = sps30_sleep_handler, .user_ctx = NULL},
         {.uri = "/api/action/apply-frc", .method = HTTP_POST, .handler = frc_handler, .user_ctx = NULL},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_handler, .user_ctx = NULL},
     };

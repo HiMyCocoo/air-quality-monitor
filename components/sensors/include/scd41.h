@@ -9,9 +9,11 @@
 typedef struct {
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
+    bool owns_bus;
 } scd41_t;
 
 esp_err_t scd41_init(scd41_t *sensor, int i2c_port, int sda_gpio, int scl_gpio);
+esp_err_t scd41_init_on_bus(scd41_t *sensor, i2c_master_bus_handle_t bus_handle);
 void scd41_deinit(scd41_t *sensor);
 esp_err_t scd41_stop_periodic_measurement(scd41_t *sensor);
 esp_err_t scd41_start_periodic_measurement(scd41_t *sensor);

@@ -13,7 +13,7 @@ typedef struct {
     void (*request_factory_reset)(void *user_ctx);
     void (*request_republish_discovery)(void *user_ctx);
     void (*request_set_scd41_asc)(bool enabled, void *user_ctx);
-    void (*request_set_pms_sleep)(bool sleep, void *user_ctx);
+    void (*request_set_sps30_sleep)(bool sleep, void *user_ctx);
     esp_err_t (*request_apply_frc)(uint16_t ppm, void *user_ctx);
 } provisioning_web_callbacks_t;
 

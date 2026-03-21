@@ -77,6 +77,20 @@ static esp_err_t scd41_read_words(scd41_t *sensor, uint16_t command, uint16_t *w
     return ESP_OK;
 }
 
+esp_err_t scd41_init_on_bus(scd41_t *sensor, i2c_master_bus_handle_t bus_handle)
+{
+    memset(sensor, 0, sizeof(*sensor));
+    sensor->bus_handle = bus_handle;
+    sensor->owns_bus = false;
+
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = SCD41_I2C_ADDR,
+        .scl_speed_hz = 100000,
+    };
+    return i2c_master_bus_add_device(sensor->bus_handle, &dev_config, &sensor->dev_handle);
+}
+
 esp_err_t scd41_init(scd41_t *sensor, int i2c_port, int sda_gpio, int scl_gpio)
 {
     memset(sensor, 0, sizeof(*sensor));
@@ -90,6 +104,7 @@ esp_err_t scd41_init(scd41_t *sensor, int i2c_port, int sda_gpio, int scl_gpio)
         .flags.enable_internal_pullup = true,
     };
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_config, &sensor->bus_handle), "scd41", "new bus failed");
+    sensor->owns_bus = true;
 
     i2c_device_config_t dev_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
@@ -100,6 +115,7 @@ esp_err_t scd41_init(scd41_t *sensor, int i2c_port, int sda_gpio, int scl_gpio)
     if (err != ESP_OK) {
         i2c_del_master_bus(sensor->bus_handle);
         sensor->bus_handle = NULL;
+        sensor->owns_bus = false;
     }
     return err;
 }
@@ -110,10 +126,11 @@ void scd41_deinit(scd41_t *sensor)
         i2c_master_bus_rm_device(sensor->dev_handle);
         sensor->dev_handle = NULL;
     }
-    if (sensor->bus_handle != NULL) {
+    if (sensor->owns_bus && sensor->bus_handle != NULL) {
         i2c_del_master_bus(sensor->bus_handle);
         sensor->bus_handle = NULL;
     }
+    sensor->owns_bus = false;
 }
 
 esp_err_t scd41_stop_periodic_measurement(scd41_t *sensor)

@@ -133,10 +133,10 @@ static void app_request_set_scd41_asc(bool enabled, void *user_ctx)
     }
 }
 
-static void app_request_set_pms_sleep(bool sleep, void *user_ctx)
+static void app_request_set_sps30_sleep(bool sleep, void *user_ctx)
 {
     (void)user_ctx;
-    if (sensors_set_pms_sleep(sleep) == ESP_OK) {
+    if (sensors_set_sps30_sleep(sleep) == ESP_OK) {
         xSemaphoreTake(s_app.lock, portMAX_DELAY);
         s_app.publish_now = true;
         xSemaphoreGive(s_app.lock);
@@ -181,7 +181,7 @@ static esp_err_t app_start_web(void)
         .request_factory_reset = app_request_factory_reset,
         .request_republish_discovery = app_request_republish,
         .request_set_scd41_asc = app_request_set_scd41_asc,
-        .request_set_pms_sleep = app_request_set_pms_sleep,
+        .request_set_sps30_sleep = app_request_set_sps30_sleep,
         .request_apply_frc = app_request_apply_frc,
     };
     return provisioning_web_start(s_app.device_id, &callbacks, NULL);
@@ -194,7 +194,7 @@ static esp_err_t app_start_mqtt(void)
         .factory_reset_requested = app_request_factory_reset,
         .republish_requested = app_request_republish,
         .set_scd41_asc_requested = app_request_set_scd41_asc,
-        .set_pms_sleep_requested = app_request_set_pms_sleep,
+        .set_sps30_sleep_requested = app_request_set_sps30_sleep,
         .apply_scd41_frc_requested = app_request_apply_frc,
         .connected = app_mqtt_connected,
     };

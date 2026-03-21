@@ -39,20 +39,21 @@ typedef struct {
 
 typedef struct {
     bool scd41_valid;
-    bool pms_valid;
-    bool pms_sleeping;
+    bool pm_valid;
+    bool sps30_sleeping;
     uint16_t co2_ppm;
     float temperature_c;
     float humidity_rh;
-    uint16_t pm1_0;
-    uint16_t pm2_5;
-    uint16_t pm10_0;
-    uint16_t particles_0_3um;
-    uint16_t particles_0_5um;
-    uint16_t particles_1_0um;
-    uint16_t particles_2_5um;
-    uint16_t particles_5_0um;
-    uint16_t particles_10_0um;
+    float pm1_0;
+    float pm2_5;
+    float pm4_0;
+    float pm10_0;
+    float particles_0_5um;
+    float particles_1_0um;
+    float particles_2_5um;
+    float particles_4_0um;
+    float particles_10_0um;
+    float typical_particle_size_um;
     int64_t updated_at_ms;
 } sensor_snapshot_t;
 
