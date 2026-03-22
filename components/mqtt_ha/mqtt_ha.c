@@ -5,6 +5,7 @@
 #include <string.h>
 #include <strings.h>
 
+#include "air_quality.h"
 #include "cJSON.h"
 #include "esp_check.h"
 #include "esp_log.h"
@@ -50,6 +51,9 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
     {"pm10_0", "PM10", "pm10_0", "µg/m³", "pm10", "measurement", NULL, false},
+    {"us_aqi", "US AQI", "us_aqi", "AQI", NULL, "measurement", NULL, false},
+    {"us_aqi_level", "US AQI Level", "us_aqi_level", NULL, NULL, NULL, NULL, false},
+    {"us_aqi_primary_pollutant", "US AQI Primary Pollutant", "us_aqi_primary_pollutant", NULL, NULL, NULL, NULL, false},
     {"particles_0_5um", "Particles >0.5µm", "particles_0_5um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_1_0um", "Particles >1.0µm", "particles_1_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_2_5um", "Particles >2.5µm", "particles_2_5um", "#/cm³", NULL, "measurement", NULL, false},
@@ -432,6 +436,9 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         return ESP_ERR_INVALID_ARG;
     }
 
+    air_quality_us_aqi_t us_aqi = {0};
+    air_quality_compute_us_aqi(snapshot, &us_aqi);
+
     cJSON *state = cJSON_CreateObject();
     if (snapshot->scd41_valid) {
         cJSON_AddNumberToObject(state, "co2", snapshot->co2_ppm);
@@ -464,6 +471,15 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "particles_4_0um");
         cJSON_AddNullToObject(state, "particles_10_0um");
         cJSON_AddNullToObject(state, "typical_particle_size_um");
+    }
+    if (us_aqi.valid) {
+        cJSON_AddNumberToObject(state, "us_aqi", us_aqi.aqi);
+        cJSON_AddStringToObject(state, "us_aqi_level", air_quality_category_label(us_aqi.category));
+        cJSON_AddStringToObject(state, "us_aqi_primary_pollutant", air_quality_pollutant_label(us_aqi.dominant_pollutant));
+    } else {
+        cJSON_AddNullToObject(state, "us_aqi");
+        cJSON_AddNullToObject(state, "us_aqi_level");
+        cJSON_AddNullToObject(state, "us_aqi_primary_pollutant");
     }
     cJSON_AddBoolToObject(state, "sps30_sleeping", snapshot->sps30_sleeping);
     cJSON_AddBoolToObject(state, "scd41_asc_enabled", s_ctx.scd41_asc_enabled);
