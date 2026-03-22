@@ -1,8 +1,9 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
-#include "driver/i2c_master.h"
+#include "driver/uart.h"
 #include "esp_err.h"
 
 typedef struct {
@@ -19,15 +20,17 @@ typedef struct {
 } sps30_measurement_t;
 
 typedef struct {
-    i2c_master_bus_handle_t bus_handle;
-    i2c_master_dev_handle_t dev_handle;
-    bool owns_bus;
+    uart_port_t uart_port;
+    int tx_gpio;
+    int rx_gpio;
+    uint32_t baud_rate;
+    bool initialized;
     bool measuring;
     bool sleeping;
+    int64_t last_measurement_request_ms;
 } sps30_t;
 
-esp_err_t sps30_init(sps30_t *sensor, int i2c_port, int sda_gpio, int scl_gpio);
-esp_err_t sps30_init_on_bus(sps30_t *sensor, i2c_master_bus_handle_t bus_handle);
+esp_err_t sps30_init(sps30_t *sensor, int uart_port, int tx_gpio, int rx_gpio, uint32_t baud_rate);
 void sps30_deinit(sps30_t *sensor);
 esp_err_t sps30_start_measurement(sps30_t *sensor);
 esp_err_t sps30_stop_measurement(sps30_t *sensor);

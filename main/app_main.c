@@ -28,7 +28,7 @@
 
 static const char *TAG = "app_main";
 
-#define STATUS_LED_GPIO 47
+#define STATUS_LED_GPIO 48
 #define STATUS_LED_RESOLUTION_HZ 10000000
 #define STATUS_LED_BRIGHTNESS 24
 #define STATUS_LED_UPDATE_MS 500
@@ -195,6 +195,23 @@ static void app_status_led_update(void)
         return;
     }
 
+    if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
+        int32_t gas_index = snapshot.voc_index > snapshot.nox_index ? snapshot.voc_index : snapshot.nox_index;
+        if (gas_index <= 100) {
+            green = 255;
+        } else if (gas_index <= 150) {
+            red = 255;
+            green = 180;
+        } else if (gas_index <= 250) {
+            red = 255;
+            green = 80;
+        } else {
+            red = 255;
+        }
+        app_status_led_set_rgb(red, green, blue);
+        return;
+    }
+
     bool blink_on = ((esp_timer_get_time() / 1000 / STATUS_LED_UPDATE_MS) % 2) == 0;
     if (sensors_is_ready()) {
         blue = blink_on ? 255 : 0;
@@ -222,6 +239,7 @@ static void app_fill_diag(device_diag_t *diag)
     diag->mqtt_connected = mqtt_ha_is_connected();
     diag->sensors_ready = sensors_is_ready();
     diag->scd41_ready = sensors_is_scd41_ready();
+    diag->sgp41_ready = sensors_is_sgp41_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
     diag->wifi_rssi = platform_wifi_get_rssi();
     diag->uptime_sec = esp_timer_get_time() / 1000000ULL;

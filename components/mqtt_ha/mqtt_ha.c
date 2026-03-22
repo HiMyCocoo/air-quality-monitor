@@ -47,6 +47,8 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
     {"temperature", "Temperature", "temperature", "°C", "temperature", "measurement", NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
+    {"voc_index", "VOC Index", "voc_index", "index", NULL, "measurement", NULL, false},
+    {"nox_index", "NOx Index", "nox_index", "index", NULL, "measurement", NULL, false},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
@@ -448,6 +450,13 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "co2");
         cJSON_AddNullToObject(state, "temperature");
         cJSON_AddNullToObject(state, "humidity");
+    }
+    if (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) {
+        cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
+        cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
+    } else {
+        cJSON_AddNullToObject(state, "voc_index");
+        cJSON_AddNullToObject(state, "nox_index");
     }
     if (snapshot->pm_valid) {
         cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
