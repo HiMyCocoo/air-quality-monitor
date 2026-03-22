@@ -27,6 +27,8 @@ typedef struct {
     SemaphoreHandle_t lock;
     sensor_snapshot_t snapshot;
     char last_error[LAST_ERROR_LEN];
+    char scd41_error[LAST_ERROR_LEN];
+    char sps30_error[LAST_ERROR_LEN];
     device_config_t config;
     scd41_t scd41;
     sps30_t sps30;
@@ -39,17 +41,80 @@ typedef struct {
 
 static sensors_ctx_t s_ctx;
 
-static void sensors_set_error(const char *message)
+static void sensors_refresh_last_error_locked(void)
+{
+    if (s_ctx.scd41_error[0] != '\0' && s_ctx.sps30_error[0] != '\0') {
+        strlcpy(s_ctx.last_error, "SCD41: ", sizeof(s_ctx.last_error));
+        strlcat(s_ctx.last_error, s_ctx.scd41_error, sizeof(s_ctx.last_error));
+        strlcat(s_ctx.last_error, " | SPS30: ", sizeof(s_ctx.last_error));
+        strlcat(s_ctx.last_error, s_ctx.sps30_error, sizeof(s_ctx.last_error));
+    } else if (s_ctx.scd41_error[0] != '\0') {
+        strlcpy(s_ctx.last_error, "SCD41: ", sizeof(s_ctx.last_error));
+        strlcat(s_ctx.last_error, s_ctx.scd41_error, sizeof(s_ctx.last_error));
+    } else if (s_ctx.sps30_error[0] != '\0') {
+        strlcpy(s_ctx.last_error, "SPS30: ", sizeof(s_ctx.last_error));
+        strlcat(s_ctx.last_error, s_ctx.sps30_error, sizeof(s_ctx.last_error));
+    } else {
+        s_ctx.last_error[0] = '\0';
+    }
+}
+
+static void sensors_set_scd41_error(const char *message)
 {
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    strlcpy(s_ctx.last_error, message, sizeof(s_ctx.last_error));
+    strlcpy(s_ctx.scd41_error, message, sizeof(s_ctx.scd41_error));
+    sensors_refresh_last_error_locked();
     xSemaphoreGive(s_ctx.lock);
 }
 
-static void sensors_clear_error(void)
+static void sensors_clear_scd41_error(void)
 {
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    s_ctx.last_error[0] = '\0';
+    s_ctx.scd41_error[0] = '\0';
+    sensors_refresh_last_error_locked();
+    xSemaphoreGive(s_ctx.lock);
+}
+
+static void sensors_set_sps30_error(const char *message)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    strlcpy(s_ctx.sps30_error, message, sizeof(s_ctx.sps30_error));
+    sensors_refresh_last_error_locked();
+    xSemaphoreGive(s_ctx.lock);
+}
+
+static void sensors_clear_sps30_error(void)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    s_ctx.sps30_error[0] = '\0';
+    sensors_refresh_last_error_locked();
+    xSemaphoreGive(s_ctx.lock);
+}
+
+static void sensors_mark_scd41_invalid(void)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    s_ctx.snapshot.scd41_valid = false;
+    s_ctx.snapshot.co2_ppm = 0;
+    s_ctx.snapshot.temperature_c = 0.0f;
+    s_ctx.snapshot.humidity_rh = 0.0f;
+    xSemaphoreGive(s_ctx.lock);
+}
+
+static void sensors_mark_sps30_invalid(void)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    s_ctx.snapshot.pm_valid = false;
+    s_ctx.snapshot.pm1_0 = 0.0f;
+    s_ctx.snapshot.pm2_5 = 0.0f;
+    s_ctx.snapshot.pm4_0 = 0.0f;
+    s_ctx.snapshot.pm10_0 = 0.0f;
+    s_ctx.snapshot.particles_0_5um = 0.0f;
+    s_ctx.snapshot.particles_1_0um = 0.0f;
+    s_ctx.snapshot.particles_2_5um = 0.0f;
+    s_ctx.snapshot.particles_4_0um = 0.0f;
+    s_ctx.snapshot.particles_10_0um = 0.0f;
+    s_ctx.snapshot.typical_particle_size_um = 0.0f;
     xSemaphoreGive(s_ctx.lock);
 }
 
@@ -71,6 +136,7 @@ static esp_err_t sensors_init_scd41(void)
     ESP_RETURN_ON_ERROR(scd41_start_periodic_measurement(&s_ctx.scd41), TAG, "scd41 start failed");
     s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
     s_ctx.scd41_initialized = true;
+    sensors_clear_scd41_error();
     return ESP_OK;
 }
 
@@ -90,6 +156,7 @@ static esp_err_t sensors_init_sps30(void)
     s_ctx.sps30_sleeping = false;
     s_ctx.sps30_warmup_until_ms =
         (esp_timer_get_time() / 1000) + (CONFIG_AIRMON_SPS30_WARMUP_SEC * 1000LL);
+    sensors_clear_sps30_error();
     return ESP_OK;
 }
 
@@ -151,10 +218,12 @@ static void sensor_task(void *arg)
         if (!s_ctx.scd41_initialized || !s_ctx.sps30_initialized) {
             if (now_ms - last_reinit_ms > 30000) {
                 if (!s_ctx.scd41_initialized && sensors_init_scd41() != ESP_OK) {
-                    sensors_set_error("SCD41 init failed");
+                    sensors_mark_scd41_invalid();
+                    sensors_set_scd41_error("init failed");
                 }
                 if (!s_ctx.sps30_initialized && sensors_init_sps30() != ESP_OK) {
-                    sensors_set_error("SPS30 init failed");
+                    sensors_mark_sps30_invalid();
+                    sensors_set_sps30_error("init failed");
                 }
                 last_reinit_ms = now_ms;
             }
@@ -168,12 +237,14 @@ static void sensor_task(void *arg)
                 err = sps30_read_measurement(&s_ctx.sps30, &measurement);
                 if (err == ESP_OK && now_ms >= s_ctx.sps30_warmup_until_ms) {
                     sensors_apply_pm_average(&measurement);
-                    sensors_clear_error();
+                    sensors_clear_sps30_error();
                 } else if (err != ESP_OK) {
-                    sensors_set_error("SPS30 read failed");
+                    sensors_mark_sps30_invalid();
+                    sensors_set_sps30_error("read failed");
                 }
             } else if (err != ESP_OK) {
-                sensors_set_error("SPS30 ready check failed");
+                sensors_mark_sps30_invalid();
+                sensors_set_sps30_error("ready check failed");
             }
         }
 
@@ -193,12 +264,14 @@ static void sensor_task(void *arg)
                     s_ctx.snapshot.humidity_rh = humidity;
                     s_ctx.snapshot.updated_at_ms = now_ms;
                     xSemaphoreGive(s_ctx.lock);
-                    sensors_clear_error();
+                    sensors_clear_scd41_error();
                 } else {
-                    sensors_set_error("SCD41 read failed");
+                    sensors_mark_scd41_invalid();
+                    sensors_set_scd41_error("read failed");
                 }
             } else if (err != ESP_OK) {
-                sensors_set_error("SCD41 ready check failed");
+                sensors_mark_scd41_invalid();
+                sensors_set_scd41_error("ready check failed");
             }
         }
 
@@ -219,10 +292,12 @@ esp_err_t sensors_start(const device_config_t *config)
     s_ctx.running = true;
 
     if (sensors_init_scd41() != ESP_OK) {
-        sensors_set_error("SCD41 init failed");
+        sensors_mark_scd41_invalid();
+        sensors_set_scd41_error("init failed");
     }
     if (sensors_init_sps30() != ESP_OK) {
-        sensors_set_error("SPS30 init failed");
+        sensors_mark_sps30_invalid();
+        sensors_set_sps30_error("init failed");
     }
 
     BaseType_t created = xTaskCreate(sensor_task, "sensor_task", 6144, NULL, 5, &s_ctx.task_handle);
@@ -277,7 +352,17 @@ esp_err_t sensors_get_snapshot(sensor_snapshot_t *snapshot)
 
 bool sensors_is_ready(void)
 {
-    return s_ctx.scd41_initialized && s_ctx.sps30_initialized;
+    return s_ctx.scd41_initialized || s_ctx.sps30_initialized;
+}
+
+bool sensors_is_scd41_ready(void)
+{
+    return s_ctx.scd41_initialized;
+}
+
+bool sensors_is_sps30_ready(void)
+{
+    return s_ctx.sps30_initialized;
 }
 
 bool sensors_is_sps30_sleeping(void)
@@ -326,14 +411,14 @@ esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
         return ESP_ERR_INVALID_STATE;
     }
     if (reference_ppm < 400 || reference_ppm > 2000) {
-        sensors_set_error("SCD41 FRC ppm must be 400-2000");
+        sensors_set_scd41_error("FRC ppm must be 400-2000");
         return ESP_ERR_INVALID_ARG;
     }
 
     int64_t now_ms = esp_timer_get_time() / 1000;
     if (s_ctx.scd41_measurement_started_ms == 0 ||
         (now_ms - s_ctx.scd41_measurement_started_ms) < SCD41_FRC_STABILIZATION_MS) {
-        sensors_set_error("SCD41 FRC requires >=3 min in stable target CO2");
+        sensors_set_scd41_error("FRC requires >=3 min in stable target CO2");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -351,9 +436,9 @@ esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
     }
     xSemaphoreGive(s_ctx.lock);
     if (err == ESP_OK) {
-        sensors_clear_error();
+        sensors_clear_scd41_error();
     } else {
-        sensors_set_error("SCD41 FRC failed");
+        sensors_set_scd41_error("FRC failed");
     }
     return err;
 }

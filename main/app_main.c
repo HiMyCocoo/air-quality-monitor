@@ -53,6 +53,8 @@ static void app_fill_diag(device_diag_t *diag)
     diag->wifi_connected = platform_wifi_is_connected();
     diag->mqtt_connected = mqtt_ha_is_connected();
     diag->sensors_ready = sensors_is_ready();
+    diag->scd41_ready = sensors_is_scd41_ready();
+    diag->sps30_ready = sensors_is_sps30_ready();
     diag->wifi_rssi = platform_wifi_get_rssi();
     diag->uptime_sec = esp_timer_get_time() / 1000000ULL;
     diag->heap_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -143,27 +145,33 @@ static void app_request_republish(void *user_ctx)
     }
 }
 
-static void app_request_set_scd41_asc(bool enabled, void *user_ctx)
+static esp_err_t app_request_set_scd41_asc(bool enabled, void *user_ctx)
 {
     (void)user_ctx;
-    if (sensors_set_scd41_asc(enabled) == ESP_OK) {
-        xSemaphoreTake(s_app.lock, portMAX_DELAY);
-        s_app.config.scd41_asc_enabled = enabled;
-        mqtt_ha_set_control_state(enabled, s_app.frc_reference_ppm);
-        s_app.publish_now = true;
-        platform_config_save(&s_app.config);
-        xSemaphoreGive(s_app.lock);
+    esp_err_t err = sensors_set_scd41_asc(enabled);
+    if (err != ESP_OK) {
+        return err;
     }
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.config.scd41_asc_enabled = enabled;
+    mqtt_ha_set_control_state(enabled, s_app.frc_reference_ppm);
+    s_app.publish_now = true;
+    platform_config_save(&s_app.config);
+    xSemaphoreGive(s_app.lock);
+    return ESP_OK;
 }
 
-static void app_request_set_sps30_sleep(bool sleep, void *user_ctx)
+static esp_err_t app_request_set_sps30_sleep(bool sleep, void *user_ctx)
 {
     (void)user_ctx;
-    if (sensors_set_sps30_sleep(sleep) == ESP_OK) {
-        xSemaphoreTake(s_app.lock, portMAX_DELAY);
-        s_app.publish_now = true;
-        xSemaphoreGive(s_app.lock);
+    esp_err_t err = sensors_set_sps30_sleep(sleep);
+    if (err != ESP_OK) {
+        return err;
     }
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.publish_now = true;
+    xSemaphoreGive(s_app.lock);
+    return ESP_OK;
 }
 
 static esp_err_t app_request_apply_frc(uint16_t ppm, void *user_ctx)

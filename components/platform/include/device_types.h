@@ -62,6 +62,8 @@ typedef struct {
     bool wifi_connected;
     bool mqtt_connected;
     bool sensors_ready;
+    bool scd41_ready;
+    bool sps30_ready;
     int wifi_rssi;
     uint32_t uptime_sec;
     uint32_t heap_free;

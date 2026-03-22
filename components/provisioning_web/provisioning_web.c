@@ -85,16 +85,24 @@ static const char INDEX_HTML[] =
     "const configFields=['device_name','wifi_ssid','wifi_password','mqtt_host','mqtt_port','mqtt_username','mqtt_password','discovery_prefix','topic_root','publish_interval_sec','scd41_altitude_m','scd41_temp_offset_c'];"
     "let configDirty=false;"
     "for(const k of configFields){const el=document.getElementById(k);if(el){el.addEventListener('input',()=>{configDirty=true;});}}"
+    "async function getErrorMessage(r,fallback){try{const j=await r.json();return j.message||fallback;}catch(_){try{return await r.text()||fallback;}catch(__){return fallback;}}}"
+    "function wifiStatus(d){if(d.diag.provisioning_mode)return '等待 BLE 配网';if(d.diag.wifi_connected)return '已连接';return '已保存凭据，当前离线';}"
+    "function mqttStatus(d){if(!d.config.mqtt_host)return '未配置';return d.diag.mqtt_connected?'已连接':'已配置，未连接';}"
+    "function scd41Status(d){if(!d.diag.scd41_ready)return '未检测到或初始化失败';return d.snapshot.scd41_valid?'在线，正在测量':'在线，等待首包数据';}"
+    "function sps30Status(d){if(!d.diag.sps30_ready)return '未检测到或初始化失败';if(d.snapshot.sps30_sleeping)return '在线，休眠中';return d.snapshot.pm_valid?'在线，正在测量':'在线，预热中或等待数据';}"
     "async function fetchStatus(){const r=await fetch('/api/status');if(!r.ok)return;const d=await r.json();"
     "const aqiKey=d.snapshot.us_aqi_level_key||'unavailable';"
     "const aqiSummary=d.snapshot.us_aqi!=null?`US AQI ${d.snapshot.us_aqi} · ${d.snapshot.us_aqi_level}`:'US AQI unavailable';"
-    "status.innerHTML=`<div class='pill'>${d.diag.provisioning_mode?'AP mode':'Station mode'}</div>`+"
-    "`<div class='kv'><span>Device ID</span><strong>${d.diag.device_id}</strong></div>`+"
-    "`<div class='kv'><span>IP</span><strong>${d.diag.ip_addr||'n/a'}</strong></div>`+"
-    "`<div class='kv'><span>Wi-Fi RSSI</span><strong>${d.diag.wifi_rssi}</strong></div>`+"
-    "`<div class='kv'><span>MQTT</span><strong>${d.diag.mqtt_connected}</strong></div>`+"
-    "`<div class='kv'><span>Firmware</span><strong>${d.diag.firmware_version}</strong></div>`+"
-    "`<div class='kv'><span>Last Error</span><strong>${d.diag.last_error}</strong></div>`;"
+    "status.innerHTML=`<div class='pill'>${d.diag.provisioning_mode?'等待 BLE 配网':'局域网运行'}</div>`+"
+    "`<div class='kv'><span>设备 ID</span><strong>${d.diag.device_id}</strong></div>`+"
+    "`<div class='kv'><span>IP 地址</span><strong>${d.diag.ip_addr||'暂无'}</strong></div>`+"
+    "`<div class='kv'><span>Wi-Fi</span><strong>${wifiStatus(d)}</strong></div>`+"
+    "`<div class='kv'><span>信号强度</span><strong>${d.diag.wifi_connected?`${d.diag.wifi_rssi} dBm`:'暂无'}</strong></div>`+"
+    "`<div class='kv'><span>MQTT</span><strong>${mqttStatus(d)}</strong></div>`+"
+    "`<div class='kv'><span>SCD41</span><strong>${scd41Status(d)}</strong></div>`+"
+    "`<div class='kv'><span>SPS30</span><strong>${sps30Status(d)}</strong></div>`+"
+    "`<div class='kv'><span>固件版本</span><strong>${d.diag.firmware_version}</strong></div>`+"
+    "`<div class='kv'><span>最近错误</span><strong>${d.diag.last_error}</strong></div>`;"
     "telemetry.innerHTML=`<div class='pill aqi-pill aqi-${aqiKey}'>${aqiSummary}</div>`+"
     "`<div class='kv'><span>US AQI Level</span><strong>${d.snapshot.us_aqi_level ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Dominant Pollutant</span><strong>${d.snapshot.us_aqi_primary_pollutant ?? 'n/a'}</strong></div>`+"
@@ -106,7 +114,7 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>PM4.0</span><strong>${d.snapshot.pm4_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM10</span><strong>${d.snapshot.pm10_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Typical Particle Size</span><strong>${d.snapshot.typical_particle_size_um ?? 'n/a'}</strong></div>`+"
-    "`<div class='kv'><span>SPS30 Sleep</span><strong>${d.snapshot.sps30_sleeping}</strong></div>`;"
+    "`<div class='kv'><span>SPS30 状态</span><strong>${d.snapshot.sps30_sleeping?'休眠中':'运行中'}</strong></div>`;"
     "if(!configDirty){for(const k of configFields){const el=document.getElementById(k);if(el)el.value=d.config[k] ?? '';}}"
     "if(document.activeElement!==frc_reference_ppm){frc_reference_ppm.value=d.frc_reference_ppm;}}"
     "async function saveConfig(){const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({"
@@ -114,9 +122,9 @@ static const char INDEX_HTML[] =
     "mqtt_username:mqtt_username.value,mqtt_password:mqtt_password.value,discovery_prefix:discovery_prefix.value,topic_root:topic_root.value,publish_interval_sec:Number(publish_interval_sec.value),"
     "scd41_altitude_m:Number(scd41_altitude_m.value),scd41_temp_offset_c:Number(scd41_temp_offset_c.value)})});"
     "if(!r.ok){alert(await r.text()||'Config rejected');return;}configDirty=false;alert('Config saved. Device will restart.');fetchStatus();}"
-    "async function toggleAsc(enabled){await fetch('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});fetchStatus();}"
-    "async function toggleSps30(sleep){await fetch('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});fetchStatus();}"
-    "async function applyFrc(){const r=await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});if(!r.ok){const t=await r.text();alert(t||'FRC rejected');}fetchStatus();}"
+    "async function toggleAsc(enabled){const r=await fetch('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});if(!r.ok)alert(await getErrorMessage(r,'SCD41 action rejected'));fetchStatus();}"
+    "async function toggleSps30(sleep){const r=await fetch('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})});if(!r.ok)alert(await getErrorMessage(r,'SPS30 action rejected'));fetchStatus();}"
+    "async function applyFrc(){const r=await fetch('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frc_reference_ppm.value)})});if(!r.ok)alert(await getErrorMessage(r,'FRC rejected'));fetchStatus();}"
     "async function republishDiscovery(){await fetch('/api/action/republish-discovery',{method:'POST'});}"
     "async function restartDevice(){await fetch('/api/action/restart',{method:'POST'});}"
     "async function factoryReset(){if(confirm('Erase saved config and restart?')) await fetch('/api/action/factory-reset',{method:'POST'});}"
@@ -211,6 +219,9 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(diag_json, "provisioning_mode", diag.provisioning_mode);
     cJSON_AddBoolToObject(diag_json, "wifi_connected", diag.wifi_connected);
     cJSON_AddBoolToObject(diag_json, "mqtt_connected", diag.mqtt_connected);
+    cJSON_AddBoolToObject(diag_json, "sensors_ready", diag.sensors_ready);
+    cJSON_AddBoolToObject(diag_json, "scd41_ready", diag.scd41_ready);
+    cJSON_AddBoolToObject(diag_json, "sps30_ready", diag.sps30_ready);
     cJSON_AddNumberToObject(diag_json, "wifi_rssi", diag.wifi_rssi);
     cJSON_AddNumberToObject(diag_json, "uptime_sec", diag.uptime_sec);
     cJSON_AddNumberToObject(diag_json, "heap_free", diag.heap_free);
@@ -221,19 +232,40 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddStringToObject(diag_json, "last_error", diag.last_error[0] ? diag.last_error : "none");
 
     cJSON *snapshot_json = cJSON_AddObjectToObject(root, "snapshot");
-    cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
-    cJSON_AddNumberToObject(snapshot_json, "temperature_c", snapshot.temperature_c);
-    cJSON_AddNumberToObject(snapshot_json, "humidity_rh", snapshot.humidity_rh);
-    cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);
-    cJSON_AddNumberToObject(snapshot_json, "pm2_5", snapshot.pm2_5);
-    cJSON_AddNumberToObject(snapshot_json, "pm4_0", snapshot.pm4_0);
-    cJSON_AddNumberToObject(snapshot_json, "pm10_0", snapshot.pm10_0);
-    cJSON_AddNumberToObject(snapshot_json, "particles_0_5um", snapshot.particles_0_5um);
-    cJSON_AddNumberToObject(snapshot_json, "particles_1_0um", snapshot.particles_1_0um);
-    cJSON_AddNumberToObject(snapshot_json, "particles_2_5um", snapshot.particles_2_5um);
-    cJSON_AddNumberToObject(snapshot_json, "particles_4_0um", snapshot.particles_4_0um);
-    cJSON_AddNumberToObject(snapshot_json, "particles_10_0um", snapshot.particles_10_0um);
-    cJSON_AddNumberToObject(snapshot_json, "typical_particle_size_um", snapshot.typical_particle_size_um);
+    cJSON_AddBoolToObject(snapshot_json, "scd41_valid", snapshot.scd41_valid);
+    cJSON_AddBoolToObject(snapshot_json, "pm_valid", snapshot.pm_valid);
+    if (snapshot.scd41_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
+        cJSON_AddNumberToObject(snapshot_json, "temperature_c", snapshot.temperature_c);
+        cJSON_AddNumberToObject(snapshot_json, "humidity_rh", snapshot.humidity_rh);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "co2_ppm");
+        cJSON_AddNullToObject(snapshot_json, "temperature_c");
+        cJSON_AddNullToObject(snapshot_json, "humidity_rh");
+    }
+    if (snapshot.pm_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);
+        cJSON_AddNumberToObject(snapshot_json, "pm2_5", snapshot.pm2_5);
+        cJSON_AddNumberToObject(snapshot_json, "pm4_0", snapshot.pm4_0);
+        cJSON_AddNumberToObject(snapshot_json, "pm10_0", snapshot.pm10_0);
+        cJSON_AddNumberToObject(snapshot_json, "particles_0_5um", snapshot.particles_0_5um);
+        cJSON_AddNumberToObject(snapshot_json, "particles_1_0um", snapshot.particles_1_0um);
+        cJSON_AddNumberToObject(snapshot_json, "particles_2_5um", snapshot.particles_2_5um);
+        cJSON_AddNumberToObject(snapshot_json, "particles_4_0um", snapshot.particles_4_0um);
+        cJSON_AddNumberToObject(snapshot_json, "particles_10_0um", snapshot.particles_10_0um);
+        cJSON_AddNumberToObject(snapshot_json, "typical_particle_size_um", snapshot.typical_particle_size_um);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "pm1_0");
+        cJSON_AddNullToObject(snapshot_json, "pm2_5");
+        cJSON_AddNullToObject(snapshot_json, "pm4_0");
+        cJSON_AddNullToObject(snapshot_json, "pm10_0");
+        cJSON_AddNullToObject(snapshot_json, "particles_0_5um");
+        cJSON_AddNullToObject(snapshot_json, "particles_1_0um");
+        cJSON_AddNullToObject(snapshot_json, "particles_2_5um");
+        cJSON_AddNullToObject(snapshot_json, "particles_4_0um");
+        cJSON_AddNullToObject(snapshot_json, "particles_10_0um");
+        cJSON_AddNullToObject(snapshot_json, "typical_particle_size_um");
+    }
     cJSON_AddBoolToObject(snapshot_json, "sps30_sleeping", snapshot.sps30_sleeping);
     if (us_aqi.valid) {
         cJSON_AddNumberToObject(snapshot_json, "us_aqi", us_aqi.aqi);
@@ -382,7 +414,13 @@ static esp_err_t scd41_asc_handler(httpd_req_t *req)
     ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
     cJSON *enabled = cJSON_GetObjectItemCaseSensitive(json, "enabled");
     if (s_ctx.callbacks.request_set_scd41_asc != NULL && cJSON_IsBool(enabled)) {
-        s_ctx.callbacks.request_set_scd41_asc(cJSON_IsTrue(enabled), s_ctx.user_ctx);
+        esp_err_t err = s_ctx.callbacks.request_set_scd41_asc(cJSON_IsTrue(enabled), s_ctx.user_ctx);
+        cJSON_Delete(json);
+        if (err == ESP_ERR_INVALID_STATE) {
+            return send_error_json(req, "409 Conflict", "SCD41 is unavailable");
+        }
+        ESP_RETURN_ON_ERROR(err, TAG, "scd41 asc action failed");
+        return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
     }
     cJSON_Delete(json);
     return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
@@ -397,7 +435,13 @@ static esp_err_t sps30_sleep_handler(httpd_req_t *req)
     ESP_RETURN_ON_FALSE(json != NULL, ESP_FAIL, TAG, "invalid json");
     cJSON *sleep = cJSON_GetObjectItemCaseSensitive(json, "sleep");
     if (s_ctx.callbacks.request_set_sps30_sleep != NULL && cJSON_IsBool(sleep)) {
-        s_ctx.callbacks.request_set_sps30_sleep(cJSON_IsTrue(sleep), s_ctx.user_ctx);
+        esp_err_t err = s_ctx.callbacks.request_set_sps30_sleep(cJSON_IsTrue(sleep), s_ctx.user_ctx);
+        cJSON_Delete(json);
+        if (err == ESP_ERR_INVALID_STATE) {
+            return send_error_json(req, "409 Conflict", "SPS30 is unavailable");
+        }
+        ESP_RETURN_ON_ERROR(err, TAG, "sps30 sleep action failed");
+        return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
     }
     cJSON_Delete(json);
     return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
