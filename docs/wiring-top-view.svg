@@ -189,8 +189,8 @@
 
   <rect x="60" y="120" width="420" height="220" rx="20" class="sensor-a"/>
   <text x="270" y="170" text-anchor="middle" class="section">SCD41</text>
-  <text x="270" y="202" text-anchor="middle" class="small">接到左侧 3V3 / GPIO8 / GPIO9</text>
-  <text x="270" y="224" text-anchor="middle" class="small">GND 接右上角 GND</text>
+  <text x="270" y="202" text-anchor="middle" class="small">模块自上而下：SDA / SCL / VDD / GND</text>
+  <text x="270" y="224" text-anchor="middle" class="small">对应 GPIO8 / GPIO9 / 3V3 / GND</text>
   <rect x="125" y="236" width="210" height="60" rx="14" fill="#ffffff" stroke="#176087" stroke-width="2"/>
   <text x="230" y="274" text-anchor="middle" class="label">CO2 / 温湿度模块</text>
 
@@ -198,20 +198,20 @@
   <circle cx="455" cy="250" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
   <circle cx="455" cy="280" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
   <circle cx="455" cy="310" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
-  <text x="430" y="226" text-anchor="end" class="label">VCC</text>
-  <text x="430" y="256" text-anchor="end" class="label">SDA</text>
-  <text x="430" y="286" text-anchor="end" class="label">SCL</text>
+  <text x="430" y="226" text-anchor="end" class="label">SDA</text>
+  <text x="430" y="256" text-anchor="end" class="label">SCL</text>
+  <text x="430" y="286" text-anchor="end" class="label">VDD</text>
   <text x="430" y="316" text-anchor="end" class="label">GND</text>
 
-  <path d="M 463 220 C 560 220, 600 190, 682 190" class="wire" stroke="#dc2626"/>
-  <path d="M 463 250 C 560 250, 620 498, 682 498" class="wire" stroke="#eab308"/>
-  <path d="M 463 280 C 560 280, 620 582, 682 582" class="wire" stroke="#2563eb"/>
+  <path d="M 463 220 C 560 220, 620 498, 682 498" class="wire" stroke="#eab308"/>
+  <path d="M 463 250 C 560 250, 620 582, 682 582" class="wire" stroke="#2563eb"/>
+  <path d="M 463 280 C 560 280, 600 190, 682 190" class="wire" stroke="#dc2626"/>
   <path d="M 463 310 C 580 310, 860 190, 942 190" class="wire" stroke="#111827"/>
 
   <rect x="40" y="540" width="460" height="270" rx="20" class="sensor-b"/>
   <text x="270" y="590" text-anchor="middle" class="section">SPS30</text>
-  <text x="270" y="622" text-anchor="middle" class="small">接到左侧 GPIO17 / GPIO18 / 5V0</text>
-  <text x="270" y="644" text-anchor="middle" class="small">GND 和 SEL 分别接右下两个 GND</text>
+  <text x="270" y="622" text-anchor="middle" class="small">原厂 5Pin：Pin1 -&gt; Pin5 = VDD / SDA / SCL / SEL / GND</text>
+  <text x="270" y="644" text-anchor="middle" class="small">对应 5V0 / GPIO17 / GPIO18 / GND / GND</text>
   <rect x="118" y="666" width="235" height="60" rx="14" fill="#ffffff" stroke="#2d6a32" stroke-width="2"/>
   <text x="236" y="704" text-anchor="middle" class="label">颗粒物模块</text>
 
@@ -220,17 +220,17 @@
   <circle cx="470" cy="684" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
   <circle cx="470" cy="716" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
   <circle cx="470" cy="748" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <text x="445" y="626" text-anchor="end" class="label">SDA</text>
-  <text x="445" y="658" text-anchor="end" class="label">SCL</text>
-  <text x="445" y="690" text-anchor="end" class="label">VDD</text>
-  <text x="445" y="722" text-anchor="end" class="label">GND</text>
-  <text x="445" y="754" text-anchor="end" class="label">SEL</text>
+  <text x="445" y="626" text-anchor="end" class="label">VDD</text>
+  <text x="445" y="658" text-anchor="end" class="label">SDA</text>
+  <text x="445" y="690" text-anchor="end" class="label">SCL</text>
+  <text x="445" y="722" text-anchor="end" class="label">SEL</text>
+  <text x="445" y="754" text-anchor="end" class="label">GND</text>
 
-  <path d="M 478 620 C 570 620, 620 442, 682 442" class="wire" stroke="#16a34a"/>
-  <path d="M 478 652 C 570 652, 620 470, 682 470" class="wire" stroke="#94a3b8"/>
-  <path d="M 478 684 C 575 684, 615 750, 682 750" class="wire" stroke="#f97316"/>
-  <path d="M 478 716 C 615 716, 860 750, 942 750" class="wire" stroke="#111827"/>
-  <path d="M 478 748 C 615 748, 860 778, 942 778" class="wire" stroke="#6b7280"/>
+  <path d="M 478 620 C 575 620, 615 750, 682 750" class="wire" stroke="#f97316"/>
+  <path d="M 478 652 C 570 652, 620 442, 682 442" class="wire" stroke="#16a34a"/>
+  <path d="M 478 684 C 570 684, 620 470, 682 470" class="wire" stroke="#94a3b8"/>
+  <path d="M 478 716 C 615 716, 860 778, 942 778" class="wire" stroke="#6b7280"/>
+  <path d="M 478 748 C 615 748, 860 750, 942 750" class="wire" stroke="#111827"/>
 
   <rect x="1080" y="120" width="430" height="195" rx="18" class="note"/>
   <text x="1110" y="160" class="section">这张图里实际用了哪些孔位</text>
