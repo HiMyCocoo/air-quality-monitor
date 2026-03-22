@@ -195,6 +195,73 @@
 - `ESP32 GND -> SPS30 SEL`
 - `ESP32 GND -> SPS30 GND`
 
+### 5.2.1 杜邦线接线图
+
+下面这张图按“`YD-ESP32-S3 + SCD41 + SPS30`，全部使用杜邦线直连”的方式画。
+
+- 线色只是推荐，方便你实际插线时不容易插错
+- `GND` 在板内本来就是共地，所以图里用了多个 `GND` 点位来减少交叉线
+- 两条 I2C 都要保持在 `3.3V` 逻辑域，不要把 `SDA/SCL` 上拉到 `5V`
+
+```mermaid
+flowchart LR
+  classDef esp fill:#fff4d6,stroke:#8c6a00,color:#222,stroke-width:1px
+  classDef scd fill:#e6f6ff,stroke:#176087,color:#222,stroke-width:1px
+  classDef sps fill:#eef8ea,stroke:#2d6a32,color:#222,stroke-width:1px
+
+  subgraph ESP["YD-ESP32-S3 开发板"]
+    direction TB
+    ESP3V3["3V3"]
+    ESPGND1["GND"]
+    ESP8["GPIO8"]
+    ESP9["GPIO9"]
+    ESP17["GPIO17"]
+    ESP18["GPIO18"]
+    ESPGND2["GND"]
+    ESP5V["5V"]
+    ESPGND3["GND"]
+  end
+
+  subgraph SCD["SCD41"]
+    direction TB
+    SCDV["VCC"]
+    SCDG["GND"]
+    SCDSDA["SDA"]
+    SCDSCL["SCL"]
+  end
+
+  subgraph SPS["SPS30"]
+    direction TB
+    SPSV["VDD"]
+    SPSG["GND"]
+    SPSSDA["SDA"]
+    SPSSCL["SCL"]
+    SPSSEL["SEL"]
+  end
+
+  ESP3V3 -- "红色杜邦线 3.3V" --> SCDV
+  ESPGND1 -- "黑色杜邦线 GND" --> SCDG
+  ESP8 -- "黄色杜邦线 SDA" --> SCDSDA
+  ESP9 -- "蓝色杜邦线 SCL" --> SCDSCL
+
+  ESP5V -- "橙色杜邦线 5V" --> SPSV
+  ESPGND2 -- "黑色杜邦线 GND" --> SPSG
+  ESP17 -- "绿色杜邦线 SDA" --> SPSSDA
+  ESP18 -- "白色杜邦线 SCL" --> SPSSCL
+  ESPGND3 -- "灰色杜邦线 SEL 拉低" --> SPSSEL
+
+  class ESP3V3,ESPGND1,ESP8,ESP9,ESP17,ESP18,ESPGND2,ESP5V,ESPGND3 esp
+  class SCDV,SCDG,SCDSDA,SCDSCL scd
+  class SPSV,SPSG,SPSSDA,SPSSCL,SPSSEL sps
+```
+
+如果你手头杜邦线颜色不够，至少建议保持下面这套映射不变：
+
+- 电源线和数据信号线不要混色
+- `3V3` 和 `5V` 最好用两种明显不同的暖色
+- 两条 `GND` 可以都用黑色
+- `SDA` / `SCL` 在同一颗传感器上尽量固定成一组颜色
+
 ### 5.3 如果你用的是独立 5V 给 SPS30 供电
 
 如果后续你发现板载 USB 供电带 `SPS30` 风扇不够稳，可以单独给 `SPS30` 上 `5V` 电源。此时一定要保证：
