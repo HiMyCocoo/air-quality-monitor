@@ -1,4 +1,4 @@
-menu "Air Monitor"
+menu "Air Quality Monitor"
 
 config AIRMON_SCD41_I2C_PORT_NUM
     int "SCD41 I2C port"

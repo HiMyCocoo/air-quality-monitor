@@ -2,6 +2,12 @@
 
 这是一个基于 `ESP32-S3 + Sensirion SCD41 + Sensirion SPS30` 的室内空气质量监测固件工程，目标是做一台可以长期上电运行、自动接入 Home Assistant、并支持本地网页配网与 OTA 升级的空气质量节点。
 
+命名规范统一为：
+
+- 仓库目录建议使用 `air-quality-monitor`
+- CMake 工程名使用 `air_quality_monitor`
+- 面向用户的标题继续使用自然语言名称“室内空气质量监测节点”
+
 当前工程已经实现并编译通过以下功能：
 
 - `SCD41` 采集 `CO2 / 温度 / 相对湿度`
@@ -371,14 +377,14 @@
 
 默认主题根路径：
 
-- `air_monitor/<device_id>/`
+- `air_quality_monitor/<device_id>/`
 
 固定主题：
 
-- `air_monitor/<device_id>/state`
-- `air_monitor/<device_id>/diag`
-- `air_monitor/<device_id>/availability`
-- `air_monitor/<device_id>/cmd/...`
+- `air_quality_monitor/<device_id>/state`
+- `air_quality_monitor/<device_id>/diag`
+- `air_quality_monitor/<device_id>/availability`
+- `air_quality_monitor/<device_id>/cmd/...`
 
 ### 10.1 状态主题
 
@@ -518,13 +524,13 @@
 
 当前工程按 `ESP-IDF v5.5.3` 编译。
 
-### 13.2 目录名末尾空格问题
+### 13.2 推荐目录命名
 
-当前工程目录名末尾带一个空格：
+建议把仓库目录命名为：
 
-- `/Users/yifan/Documents/Vscode/particulate_matter_CO2_sensor `
+- `/path/to/air-quality-monitor`
 
-`idf.py` 对这种路径会有一致性检查问题，所以构建时推荐走一个临时软链接路径。
+避免使用空格、大小写混用，或把具体传感器型号直接堆进目录名；这样更利于构建脚本、CI 和长期维护。
 
 ### 13.3 推荐构建方式
 
@@ -533,27 +539,27 @@ export IDF_PATH=$HOME/.espressif/v5.5.3/esp-idf
 export IDF_PYTHON_ENV_PATH=$HOME/.espressif/python_env/idf5.5_py3.14_env
 . $IDF_PATH/export.sh
 
-ln -sfn '/Users/yifan/Documents/Vscode/particulate_matter_CO2_sensor ' /tmp/airmon-src
+ln -sfn '/path/to/air-quality-monitor' /tmp/air-quality-monitor-src
 
-python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build build
+python $IDF_PATH/tools/idf.py -C /tmp/air-quality-monitor-src -B /tmp/air-quality-monitor-build build
 ```
 
 如果 `idf.py` 又因为路径空格报“configured for project ... not ...”之类的错误，可以直接继续使用已生成的构建目录：
 
 ```bash
-cmake --build /tmp/airmon-build
+cmake --build /tmp/air-quality-monitor-build
 ```
 
 ### 13.4 烧录
 
 ```bash
-python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/cu.wchusbserialXXXX flash
+python $IDF_PATH/tools/idf.py -C /tmp/air-quality-monitor-src -B /tmp/air-quality-monitor-build -p /dev/cu.wchusbserialXXXX flash
 ```
 
 ### 13.5 串口监视
 
 ```bash
-python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/cu.wchusbserialXXXX monitor
+python $IDF_PATH/tools/idf.py -C /tmp/air-quality-monitor-src -B /tmp/air-quality-monitor-build -p /dev/cu.wchusbserialXXXX monitor
 ```
 
 对这块 `YD-ESP32-S3`，当前工程更推荐这样用口：
@@ -566,9 +572,9 @@ python $IDF_PATH/tools/idf.py -C /tmp/airmon-src -B /tmp/airmon-build -p /dev/cu
 
 最近一次验证构建已经成功通过：
 
-- 输出文件：`/tmp/airmon-build-check/air_monitor.bin`
-- 固件大小约：`0xdc110`
-- OTA 分区剩余空间约：`43%`
+- 输出文件：`/tmp/air-quality-monitor-build-check/air_quality_monitor.bin`
+- 固件大小约：`0xdd1b0`
+- OTA 分区剩余空间约：`42%`
 
 ---
 

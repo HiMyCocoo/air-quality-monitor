@@ -83,13 +83,13 @@ static esp_err_t app_save_config(const device_config_t *config, void *user_ctx)
     device_config_t updated = *config;
     updated.version = DEVICE_CONFIG_VERSION;
     if (updated.device_name[0] == '\0') {
-        snprintf(updated.device_name, sizeof(updated.device_name), "air-monitor-%.20s", s_app.device_id);
+        snprintf(updated.device_name, sizeof(updated.device_name), "aq-monitor-%.20s", s_app.device_id);
     }
     if (updated.discovery_prefix[0] == '\0') {
         strlcpy(updated.discovery_prefix, "homeassistant", sizeof(updated.discovery_prefix));
     }
     if (updated.topic_root[0] == '\0') {
-        snprintf(updated.topic_root, sizeof(updated.topic_root), "air_monitor/%s", s_app.device_id);
+        snprintf(updated.topic_root, sizeof(updated.topic_root), "air_quality_monitor/%s", s_app.device_id);
     }
     if (updated.publish_interval_sec < 5 || updated.publish_interval_sec > 60) {
         updated.publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;

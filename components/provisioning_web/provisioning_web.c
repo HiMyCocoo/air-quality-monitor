@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "air_quality.h"
 #include "cJSON.h"
 #include "esp_check.h"
 #include "esp_http_server.h"
@@ -47,6 +48,9 @@ static const char INDEX_HTML[] =
     "button{cursor:pointer;background:var(--accent);color:white;border:none;font-weight:600;margin-top:12px;}"
     ".ghost{background:transparent;border:1px solid var(--accent);color:var(--accent);} .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}"
     ".pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#f7dece;color:#8a4315;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}"
+    ".aqi-pill{display:block;margin-bottom:12px;text-align:center;padding:10px 14px;}"
+    ".aqi-good{background:#00e400;color:#08320d;}.aqi-moderate{background:#ffff00;color:#453b00;}.aqi-sensitive{background:#ff7e00;color:#fff7eb;}"
+    ".aqi-unhealthy{background:#ff0000;color:#fff4f4;}.aqi-very-unhealthy{background:#8f3f97;color:#fff7ff;}.aqi-hazardous{background:#7e0023;color:#fff4f8;}.aqi-unavailable{background:#ece2d6;color:#756c64;}"
     ".footer{margin-top:18px;font-size:13px;color:var(--muted);} .upload{padding:12px;border:1px dashed var(--line);border-radius:16px;}"
     "</style></head><body><div class='wrap'><h1>Air Monitor Console</h1>"
     "<p class='lede'>Config, diagnostics, MQTT control and OTA for the ESP32-S3 air-quality node.</p>"
@@ -82,6 +86,8 @@ static const char INDEX_HTML[] =
     "let configDirty=false;"
     "for(const k of configFields){const el=document.getElementById(k);if(el){el.addEventListener('input',()=>{configDirty=true;});}}"
     "async function fetchStatus(){const r=await fetch('/api/status');if(!r.ok)return;const d=await r.json();"
+    "const aqiKey=d.snapshot.us_aqi_level_key||'unavailable';"
+    "const aqiSummary=d.snapshot.us_aqi!=null?`US AQI ${d.snapshot.us_aqi} · ${d.snapshot.us_aqi_level}`:'US AQI unavailable';"
     "status.innerHTML=`<div class='pill'>${d.diag.provisioning_mode?'AP mode':'Station mode'}</div>`+"
     "`<div class='kv'><span>Device ID</span><strong>${d.diag.device_id}</strong></div>`+"
     "`<div class='kv'><span>IP</span><strong>${d.diag.ip_addr||'n/a'}</strong></div>`+"
@@ -89,7 +95,10 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>MQTT</span><strong>${d.diag.mqtt_connected}</strong></div>`+"
     "`<div class='kv'><span>Firmware</span><strong>${d.diag.firmware_version}</strong></div>`+"
     "`<div class='kv'><span>Last Error</span><strong>${d.diag.last_error}</strong></div>`;"
-    "telemetry.innerHTML=`<div class='kv'><span>CO2</span><strong>${d.snapshot.co2_ppm ?? 'n/a'}</strong></div>`+"
+    "telemetry.innerHTML=`<div class='pill aqi-pill aqi-${aqiKey}'>${aqiSummary}</div>`+"
+    "`<div class='kv'><span>US AQI Level</span><strong>${d.snapshot.us_aqi_level ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>Dominant Pollutant</span><strong>${d.snapshot.us_aqi_primary_pollutant ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>CO2</span><strong>${d.snapshot.co2_ppm ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Temperature</span><strong>${d.snapshot.temperature_c ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Humidity</span><strong>${d.snapshot.humidity_rh ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM1.0</span><strong>${d.snapshot.pm1_0 ?? 'n/a'}</strong></div>`+"
@@ -194,6 +203,8 @@ static esp_err_t status_handler(httpd_req_t *req)
     device_config_t config;
     uint16_t frc_ppm;
     fill_status(&snapshot, &diag, &config, &frc_ppm);
+    air_quality_us_aqi_t us_aqi = {0};
+    air_quality_compute_us_aqi(&snapshot, &us_aqi);
 
     cJSON *root = cJSON_CreateObject();
     cJSON *diag_json = cJSON_AddObjectToObject(root, "diag");
@@ -224,6 +235,17 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(snapshot_json, "particles_10_0um", snapshot.particles_10_0um);
     cJSON_AddNumberToObject(snapshot_json, "typical_particle_size_um", snapshot.typical_particle_size_um);
     cJSON_AddBoolToObject(snapshot_json, "sps30_sleeping", snapshot.sps30_sleeping);
+    if (us_aqi.valid) {
+        cJSON_AddNumberToObject(snapshot_json, "us_aqi", us_aqi.aqi);
+        cJSON_AddStringToObject(snapshot_json, "us_aqi_level", air_quality_category_label(us_aqi.category));
+        cJSON_AddStringToObject(snapshot_json, "us_aqi_level_key", air_quality_category_key(us_aqi.category));
+        cJSON_AddStringToObject(snapshot_json, "us_aqi_primary_pollutant", air_quality_pollutant_label(us_aqi.dominant_pollutant));
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "us_aqi");
+        cJSON_AddNullToObject(snapshot_json, "us_aqi_level");
+        cJSON_AddStringToObject(snapshot_json, "us_aqi_level_key", air_quality_category_key(AIR_QUALITY_CATEGORY_UNKNOWN));
+        cJSON_AddNullToObject(snapshot_json, "us_aqi_primary_pollutant");
+    }
 
     cJSON *config_json = cJSON_AddObjectToObject(root, "config");
     cJSON_AddStringToObject(config_json, "device_name", config.device_name);
