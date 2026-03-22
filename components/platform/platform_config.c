@@ -67,8 +67,26 @@ bool platform_config_is_complete(const device_config_t *config)
         return false;
     }
 
+    return platform_config_has_wifi(config) && platform_config_has_mqtt(config);
+}
+
+bool platform_config_has_wifi(const device_config_t *config)
+{
+    if (config == NULL) {
+        return false;
+    }
+
     return config->version == DEVICE_CONFIG_VERSION &&
-           config->wifi_ssid[0] != '\0' &&
+           config->wifi_ssid[0] != '\0';
+}
+
+bool platform_config_has_mqtt(const device_config_t *config)
+{
+    if (config == NULL) {
+        return false;
+    }
+
+    return config->version == DEVICE_CONFIG_VERSION &&
            config->mqtt_host[0] != '\0' &&
            config->topic_root[0] != '\0' &&
            config->discovery_prefix[0] != '\0' &&

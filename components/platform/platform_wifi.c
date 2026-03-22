@@ -116,6 +116,20 @@ static void destroy_netifs(void)
     }
 }
 
+esp_err_t platform_wifi_prepare_provisioning_sta(void)
+{
+    platform_wifi_stop();
+    s_sta_netif = esp_netif_create_default_wifi_sta();
+    ESP_RETURN_ON_FALSE(s_sta_netif != NULL, ESP_ERR_NO_MEM, TAG, "create sta netif failed");
+
+    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAILED_BIT);
+    s_retry_limit = 0;
+    s_retry_count = 0;
+    s_mode = PLATFORM_WIFI_MODE_STA;
+    notify_state(false);
+    return ESP_OK;
+}
+
 void platform_wifi_stop(void)
 {
     esp_wifi_stop();
