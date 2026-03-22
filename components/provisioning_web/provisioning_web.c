@@ -117,7 +117,7 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>PM2.5</span><strong>${d.snapshot.pm2_5 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM4.0</span><strong>${d.snapshot.pm4_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM10</span><strong>${d.snapshot.pm10_0 ?? 'n/a'}</strong></div>`+"
-    "`<div class='kv'><span>Typical Particle Size</span><strong>${d.snapshot.typical_particle_size_um ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>典型粒径</span><strong>${d.snapshot.typical_particle_size_um ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>SPS30 状态</span><strong>${d.snapshot.sps30_sleeping?'休眠中':'运行中'}</strong></div>`;"
     "if(!configDirty){for(const k of configFields){const el=document.getElementById(k);if(el)el.value=d.config[k] ?? '';}}"
     "if(document.activeElement!==frc_reference_ppm){frc_reference_ppm.value=d.frc_reference_ppm;}}"

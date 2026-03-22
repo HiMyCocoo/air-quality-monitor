@@ -1,260 +1,228 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
-  <title id="title">按 YD-ESP32-S3 引脚图绘制的 SCD41 与 SPS30 杜邦线接线图</title>
-  <desc id="desc">开发板按 USB 朝下的引脚图方向绘制，SCD41 接 3V3、GPIO8、GPIO9 与 GND；SPS30 接 5V0、GPIO17、GPIO18、GND 与 SEL 到 GND。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">air-quality-monitor 默认接线图</title>
+  <desc id="desc">按 YD-ESP32-S3 引脚图方向绘制。SCD41 接 GPIO8 和 GPIO9，SGP41 接 GPIO11 和 GPIO12，SPS30 走 UART 接 GPIO17 和 GPIO18，板载 RGB 使用 GPIO48。</desc>
   <style>
     text {
       font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
       fill: #1f2937;
     }
     .title { font-size: 34px; font-weight: 700; }
-    .subtitle { font-size: 19px; fill: #475569; }
+    .subtitle { font-size: 18px; fill: #475569; }
     .section { font-size: 24px; font-weight: 700; }
-    .label { font-size: 20px; font-weight: 600; }
-    .pintext { font-size: 17px; fill: #64748b; }
-    .pintext-used-gpio { font-size: 18px; font-weight: 700; fill: #15803d; }
-    .pintext-used-power { font-size: 18px; font-weight: 700; fill: #b91c1c; }
-    .pintext-used-gnd { font-size: 18px; font-weight: 700; fill: #111827; }
+    .label { font-size: 19px; font-weight: 600; }
     .small { font-size: 16px; fill: #475569; }
-    .tiny { font-size: 15px; fill: #64748b; }
-    .board { fill: #3b3b3b; stroke: #111827; stroke-width: 3; }
-    .module { fill: #c9c9c9; stroke: #666; stroke-width: 2; }
-    .sensor-a { fill: #e6f6ff; stroke: #176087; stroke-width: 3; }
-    .sensor-b { fill: #eef8ea; stroke: #2d6a32; stroke-width: 3; }
+    .tiny { font-size: 14px; fill: #64748b; }
+    .board { fill: #343434; stroke: #111827; stroke-width: 3; }
+    .module { fill: #bdbdbd; stroke: #666; stroke-width: 2; }
+    .sensor-scd { fill: #eef8ff; stroke: #176087; stroke-width: 3; }
+    .sensor-sgp { fill: #eef8ea; stroke: #2d6a32; stroke-width: 3; }
+    .sensor-sps { fill: #fff4e8; stroke: #b45309; stroke-width: 3; }
     .pin { fill: #facc15; stroke: #854d0e; stroke-width: 2; }
+    .pin-line { stroke: #9ca3af; stroke-width: 2; }
+    .pin-power { font-size: 18px; font-weight: 700; fill: #b91c1c; }
+    .pin-gpio { font-size: 18px; font-weight: 700; fill: #15803d; }
+    .pin-gnd { font-size: 18px; font-weight: 700; fill: #111827; }
     .wire { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
     .note { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 2; }
+    .ghost { fill: #cbd5e1; opacity: 0.45; }
   </style>
 
-  <rect x="0" y="0" width="1600" height="1000" fill="#fffdf8"/>
+  <rect x="0" y="0" width="1600" height="980" fill="#fffdf8"/>
 
-  <text x="800" y="54" text-anchor="middle" class="title">按 YD-ESP32-S3 引脚图位置绘制的杜邦线接线图</text>
-  <text x="800" y="84" text-anchor="middle" class="subtitle">方向按你发来的图：天线在上，USB 在下；连接仍然与当前默认 GPIO 完全一致</text>
+  <text x="800" y="56" text-anchor="middle" class="title">air-quality-monitor 默认接线图</text>
+  <text x="800" y="88" text-anchor="middle" class="subtitle">方向按你提供的 YD-ESP32-S3 引脚图绘制：天线在上，USB 在下，只高亮当前项目实际用到的孔位</text>
 
-  <rect x="690" y="110" width="260" height="720" rx="22" class="board"/>
-  <rect x="730" y="145" width="180" height="290" rx="12" class="module"/>
-  <rect x="760" y="110" width="120" height="36" rx="4" fill="#4b4b4b"/>
-  <rect x="775" y="120" width="18" height="22" fill="#3b3b3b"/>
-  <rect x="826" y="120" width="18" height="22" fill="#3b3b3b"/>
-  <rect x="877" y="120" width="18" height="22" fill="#3b3b3b"/>
-  <text x="820" y="195" text-anchor="middle" class="label" fill="#374151">ESP32-S3-WROOM</text>
-  <circle cx="820" cy="290" r="48" fill="#9a9a9a"/>
-  <path d="M 802 316 C 775 304, 780 263, 817 264 C 844 266, 851 289, 832 301 C 821 308, 805 303, 800 289" fill="none" stroke="#6b7280" stroke-width="6"/>
-  <rect x="790" y="470" width="60" height="28" rx="6" fill="#f8fafc" stroke="#9ca3af" stroke-width="2"/>
-  <text x="820" y="489" text-anchor="middle" class="small">RESET</text>
-  <rect x="790" y="555" width="60" height="28" rx="6" fill="#f8fafc" stroke="#9ca3af" stroke-width="2"/>
-  <text x="820" y="574" text-anchor="middle" class="small">BOOT</text>
-  <rect x="735" y="706" width="80" height="72" fill="#bcb7e6"/>
-  <rect x="825" y="706" width="80" height="72" fill="#bcb7e6"/>
-  <text x="775" y="690" text-anchor="middle" class="small">USB</text>
-  <text x="865" y="690" text-anchor="middle" class="small">UART</text>
-  <text x="820" y="830" text-anchor="middle" class="small">按你提供的引脚图方向绘制</text>
+  <rect x="650" y="120" width="300" height="760" rx="28" class="board"/>
+  <rect x="715" y="155" width="170" height="295" rx="14" class="module"/>
+  <rect x="745" y="118" width="110" height="34" rx="4" fill="#454545"/>
+  <rect x="762" y="126" width="18" height="20" fill="#343434"/>
+  <rect x="793" y="126" width="18" height="20" fill="#343434"/>
+  <rect x="824" y="126" width="18" height="20" fill="#343434"/>
+  <text x="800" y="196" text-anchor="middle" class="label" fill="#374151">ESP32-S3-WROOM-1</text>
+  <circle cx="800" cy="292" r="50" fill="#9f9f9f"/>
+  <path d="M 782 318 C 756 306, 760 266, 796 267 C 823 269, 832 291, 814 303 C 802 311, 786 305, 781 291" fill="none" stroke="#6b7280" stroke-width="6"/>
+  <rect x="772" y="478" width="56" height="28" rx="6" fill="#f8fafc" stroke="#9ca3af" stroke-width="2"/>
+  <text x="800" y="497" text-anchor="middle" class="small">RESET</text>
+  <rect x="772" y="560" width="56" height="28" rx="6" fill="#f8fafc" stroke="#9ca3af" stroke-width="2"/>
+  <text x="800" y="579" text-anchor="middle" class="small">BOOT</text>
+  <rect x="726" y="720" width="80" height="74" rx="8" fill="#c9c2ee"/>
+  <rect x="814" y="720" width="80" height="74" rx="8" fill="#c9c2ee"/>
+  <text x="766" y="706" text-anchor="middle" class="small">USB</text>
+  <text x="854" y="706" text-anchor="middle" class="small">UART</text>
 
-  <circle cx="690" cy="190" r="8" class="pin"/>
-  <circle cx="690" cy="218" r="8" class="pin"/>
-  <circle cx="690" cy="246" r="8" class="pin"/>
-  <circle cx="690" cy="274" r="8" class="pin"/>
-  <circle cx="690" cy="302" r="8" class="pin"/>
-  <circle cx="690" cy="330" r="8" class="pin"/>
-  <circle cx="690" cy="358" r="8" class="pin"/>
-  <circle cx="690" cy="386" r="8" class="pin"/>
-  <circle cx="690" cy="414" r="8" class="pin"/>
-  <circle cx="690" cy="442" r="8" class="pin"/>
-  <circle cx="690" cy="470" r="8" class="pin"/>
-  <circle cx="690" cy="498" r="8" class="pin"/>
-  <circle cx="690" cy="526" r="8" class="pin"/>
-  <circle cx="690" cy="554" r="8" class="pin"/>
-  <circle cx="690" cy="582" r="8" class="pin"/>
-  <circle cx="690" cy="610" r="8" class="pin"/>
-  <circle cx="690" cy="638" r="8" class="pin"/>
-  <circle cx="690" cy="666" r="8" class="pin"/>
-  <circle cx="690" cy="694" r="8" class="pin"/>
-  <circle cx="690" cy="722" r="8" class="pin"/>
-  <circle cx="690" cy="750" r="8" class="pin"/>
-  <circle cx="690" cy="778" r="8" class="pin"/>
+  <rect x="838" y="660" width="56" height="28" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="846" y="667" width="10" height="14" rx="2" fill="#ef4444"/>
+  <rect x="860" y="667" width="10" height="14" rx="2" fill="#f59e0b"/>
+  <rect x="874" y="667" width="10" height="14" rx="2" fill="#22c55e"/>
+  <text x="866" y="649" text-anchor="middle" class="small">板载 WS2812</text>
+  <text x="866" y="706" text-anchor="middle" class="tiny">GPIO48，固件已用于空气质量指示</text>
 
-  <circle cx="950" cy="190" r="8" class="pin"/>
-  <circle cx="950" cy="218" r="8" class="pin"/>
-  <circle cx="950" cy="246" r="8" class="pin"/>
-  <circle cx="950" cy="274" r="8" class="pin"/>
-  <circle cx="950" cy="302" r="8" class="pin"/>
-  <circle cx="950" cy="330" r="8" class="pin"/>
-  <circle cx="950" cy="358" r="8" class="pin"/>
-  <circle cx="950" cy="386" r="8" class="pin"/>
-  <circle cx="950" cy="414" r="8" class="pin"/>
-  <circle cx="950" cy="442" r="8" class="pin"/>
-  <circle cx="950" cy="470" r="8" class="pin"/>
-  <circle cx="950" cy="498" r="8" class="pin"/>
-  <circle cx="950" cy="526" r="8" class="pin"/>
-  <circle cx="950" cy="554" r="8" class="pin"/>
-  <circle cx="950" cy="582" r="8" class="pin"/>
-  <circle cx="950" cy="610" r="8" class="pin"/>
-  <circle cx="950" cy="638" r="8" class="pin"/>
-  <circle cx="950" cy="666" r="8" class="pin"/>
-  <circle cx="950" cy="694" r="8" class="pin"/>
-  <circle cx="950" cy="722" r="8" class="pin"/>
-  <circle cx="950" cy="750" r="8" class="pin"/>
-  <circle cx="950" cy="778" r="8" class="pin"/>
+  <circle cx="650" cy="180" r="8" class="pin"/>
+  <circle cx="650" cy="210" r="8" class="pin"/>
+  <circle cx="650" cy="430" r="8" class="pin"/>
+  <circle cx="650" cy="460" r="8" class="pin"/>
+  <circle cx="650" cy="490" r="8" class="pin"/>
+  <circle cx="650" cy="580" r="8" class="pin"/>
+  <circle cx="650" cy="640" r="8" class="pin"/>
+  <circle cx="650" cy="670" r="8" class="pin"/>
+  <circle cx="650" cy="760" r="8" class="pin"/>
+  <circle cx="650" cy="790" r="8" class="pin"/>
 
-  <line x1="682" y1="190" x2="620" y2="190" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="218" x2="620" y2="218" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="246" x2="620" y2="246" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="274" x2="620" y2="274" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="302" x2="620" y2="302" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="330" x2="620" y2="330" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="358" x2="620" y2="358" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="386" x2="620" y2="386" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="414" x2="620" y2="414" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="442" x2="620" y2="442" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="470" x2="620" y2="470" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="498" x2="620" y2="498" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="526" x2="620" y2="526" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="554" x2="620" y2="554" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="582" x2="620" y2="582" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="610" x2="620" y2="610" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="638" x2="620" y2="638" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="666" x2="620" y2="666" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="694" x2="620" y2="694" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="722" x2="620" y2="722" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="750" x2="620" y2="750" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="682" y1="778" x2="620" y2="778" stroke="#9ca3af" stroke-width="2"/>
+  <circle cx="950" cy="180" r="8" class="pin"/>
+  <circle cx="950" cy="760" r="8" class="pin"/>
+  <circle cx="950" cy="790" r="8" class="pin"/>
 
-  <line x1="958" y1="190" x2="1020" y2="190" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="218" x2="1020" y2="218" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="246" x2="1020" y2="246" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="274" x2="1020" y2="274" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="302" x2="1020" y2="302" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="330" x2="1020" y2="330" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="358" x2="1020" y2="358" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="386" x2="1020" y2="386" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="414" x2="1020" y2="414" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="442" x2="1020" y2="442" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="470" x2="1020" y2="470" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="498" x2="1020" y2="498" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="526" x2="1020" y2="526" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="554" x2="1020" y2="554" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="582" x2="1020" y2="582" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="610" x2="1020" y2="610" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="638" x2="1020" y2="638" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="666" x2="1020" y2="666" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="694" x2="1020" y2="694" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="722" x2="1020" y2="722" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="750" x2="1020" y2="750" stroke="#9ca3af" stroke-width="2"/>
-  <line x1="958" y1="778" x2="1020" y2="778" stroke="#9ca3af" stroke-width="2"/>
+  <circle cx="650" cy="250" r="6" class="ghost"/>
+  <circle cx="650" cy="280" r="6" class="ghost"/>
+  <circle cx="650" cy="310" r="6" class="ghost"/>
+  <circle cx="650" cy="340" r="6" class="ghost"/>
+  <circle cx="650" cy="370" r="6" class="ghost"/>
+  <circle cx="650" cy="520" r="6" class="ghost"/>
+  <circle cx="650" cy="550" r="6" class="ghost"/>
+  <circle cx="650" cy="610" r="6" class="ghost"/>
+  <circle cx="650" cy="700" r="6" class="ghost"/>
+  <circle cx="650" cy="730" r="6" class="ghost"/>
+  <circle cx="950" cy="210" r="6" class="ghost"/>
+  <circle cx="950" cy="240" r="6" class="ghost"/>
+  <circle cx="950" cy="270" r="6" class="ghost"/>
+  <circle cx="950" cy="300" r="6" class="ghost"/>
+  <circle cx="950" cy="330" r="6" class="ghost"/>
+  <circle cx="950" cy="360" r="6" class="ghost"/>
+  <circle cx="950" cy="390" r="6" class="ghost"/>
+  <circle cx="950" cy="420" r="6" class="ghost"/>
+  <circle cx="950" cy="450" r="6" class="ghost"/>
+  <circle cx="950" cy="480" r="6" class="ghost"/>
+  <circle cx="950" cy="510" r="6" class="ghost"/>
+  <circle cx="950" cy="540" r="6" class="ghost"/>
+  <circle cx="950" cy="570" r="6" class="ghost"/>
+  <circle cx="950" cy="600" r="6" class="ghost"/>
+  <circle cx="950" cy="630" r="6" class="ghost"/>
+  <circle cx="950" cy="660" r="6" class="ghost"/>
+  <circle cx="950" cy="690" r="6" class="ghost"/>
+  <circle cx="950" cy="720" r="6" class="ghost"/>
 
-  <text x="610" y="196" text-anchor="end" class="pintext-used-power">3V3</text>
-  <text x="610" y="224" text-anchor="end" class="pintext-used-power">3V3</text>
-  <text x="610" y="252" text-anchor="end" class="pintext">RST</text>
-  <text x="610" y="280" text-anchor="end" class="pintext">GPIO4</text>
-  <text x="610" y="308" text-anchor="end" class="pintext">GPIO5</text>
-  <text x="610" y="336" text-anchor="end" class="pintext">GPIO6</text>
-  <text x="610" y="364" text-anchor="end" class="pintext">GPIO7</text>
-  <text x="610" y="392" text-anchor="end" class="pintext">GPIO15</text>
-  <text x="610" y="420" text-anchor="end" class="pintext">GPIO16</text>
-  <text x="610" y="448" text-anchor="end" class="pintext-used-gpio">GPIO17</text>
-  <text x="610" y="476" text-anchor="end" class="pintext-used-gpio">GPIO18</text>
-  <text x="610" y="504" text-anchor="end" class="pintext-used-gpio">GPIO8</text>
-  <text x="610" y="532" text-anchor="end" class="pintext">GPIO3</text>
-  <text x="610" y="560" text-anchor="end" class="pintext">GPIO46</text>
-  <text x="610" y="588" text-anchor="end" class="pintext-used-gpio">GPIO9</text>
-  <text x="610" y="616" text-anchor="end" class="pintext">GPIO10</text>
-  <text x="610" y="644" text-anchor="end" class="pintext">GPIO11</text>
-  <text x="610" y="672" text-anchor="end" class="pintext">GPIO12</text>
-  <text x="610" y="700" text-anchor="end" class="pintext">GPIO13</text>
-  <text x="610" y="728" text-anchor="end" class="pintext">GPIO14</text>
-  <text x="610" y="756" text-anchor="end" class="pintext-used-power">5V0</text>
-  <text x="610" y="784" text-anchor="end" class="pintext-used-gnd">GND</text>
+  <line x1="642" y1="180" x2="584" y2="180" class="pin-line"/>
+  <line x1="642" y1="210" x2="584" y2="210" class="pin-line"/>
+  <line x1="642" y1="430" x2="584" y2="430" class="pin-line"/>
+  <line x1="642" y1="460" x2="584" y2="460" class="pin-line"/>
+  <line x1="642" y1="490" x2="584" y2="490" class="pin-line"/>
+  <line x1="642" y1="580" x2="584" y2="580" class="pin-line"/>
+  <line x1="642" y1="640" x2="584" y2="640" class="pin-line"/>
+  <line x1="642" y1="670" x2="584" y2="670" class="pin-line"/>
+  <line x1="642" y1="760" x2="584" y2="760" class="pin-line"/>
+  <line x1="642" y1="790" x2="584" y2="790" class="pin-line"/>
 
-  <text x="1030" y="196" class="pintext-used-gnd">GND</text>
-  <text x="1030" y="224" class="pintext">GPIO43</text>
-  <text x="1030" y="252" class="pintext">GPIO44</text>
-  <text x="1030" y="280" class="pintext">GPIO1</text>
-  <text x="1030" y="308" class="pintext">GPIO2</text>
-  <text x="1030" y="336" class="pintext">GPIO42</text>
-  <text x="1030" y="364" class="pintext">GPIO41</text>
-  <text x="1030" y="392" class="pintext">GPIO40</text>
-  <text x="1030" y="420" class="pintext">GPIO39</text>
-  <text x="1030" y="448" class="pintext">GPIO38</text>
-  <text x="1030" y="476" class="pintext">GPIO37</text>
-  <text x="1030" y="504" class="pintext">GPIO36</text>
-  <text x="1030" y="532" class="pintext">GPIO35</text>
-  <text x="1030" y="560" class="pintext">GPIO0</text>
-  <text x="1030" y="588" class="pintext">GPIO45</text>
-  <text x="1030" y="616" class="pintext">GPIO48</text>
-  <text x="1030" y="644" class="pintext">GPIO47</text>
-  <text x="1030" y="672" class="pintext">GPIO21</text>
-  <text x="1030" y="700" class="pintext">GPIO20</text>
-  <text x="1030" y="728" class="pintext">GPIO19</text>
-  <text x="1030" y="756" class="pintext-used-gnd">GND</text>
-  <text x="1030" y="784" class="pintext-used-gnd">GND</text>
+  <line x1="958" y1="180" x2="1016" y2="180" class="pin-line"/>
+  <line x1="958" y1="760" x2="1016" y2="760" class="pin-line"/>
+  <line x1="958" y1="790" x2="1016" y2="790" class="pin-line"/>
 
-  <rect x="60" y="120" width="420" height="220" rx="20" class="sensor-a"/>
-  <text x="270" y="170" text-anchor="middle" class="section">SCD41</text>
-  <text x="270" y="202" text-anchor="middle" class="small">模块自上而下：SDA / SCL / VDD / GND</text>
-  <text x="270" y="224" text-anchor="middle" class="small">对应 GPIO8 / GPIO9 / 3V3 / GND</text>
-  <rect x="125" y="236" width="210" height="60" rx="14" fill="#ffffff" stroke="#176087" stroke-width="2"/>
-  <text x="230" y="274" text-anchor="middle" class="label">CO2 / 温湿度模块</text>
+  <text x="574" y="186" text-anchor="end" class="pin-power">3V3</text>
+  <text x="574" y="216" text-anchor="end" class="pin-power">3V3</text>
+  <text x="574" y="436" text-anchor="end" class="pin-gpio">GPIO17</text>
+  <text x="574" y="466" text-anchor="end" class="pin-gpio">GPIO18</text>
+  <text x="574" y="496" text-anchor="end" class="pin-gpio">GPIO8</text>
+  <text x="574" y="586" text-anchor="end" class="pin-gpio">GPIO9</text>
+  <text x="574" y="646" text-anchor="end" class="pin-gpio">GPIO11</text>
+  <text x="574" y="676" text-anchor="end" class="pin-gpio">GPIO12</text>
+  <text x="574" y="766" text-anchor="end" class="pin-power">5V0</text>
+  <text x="574" y="796" text-anchor="end" class="pin-gnd">GND</text>
 
-  <circle cx="455" cy="220" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
-  <circle cx="455" cy="250" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
-  <circle cx="455" cy="280" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
-  <circle cx="455" cy="310" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
-  <text x="430" y="226" text-anchor="end" class="label">SDA</text>
-  <text x="430" y="256" text-anchor="end" class="label">SCL</text>
-  <text x="430" y="286" text-anchor="end" class="label">VDD</text>
-  <text x="430" y="316" text-anchor="end" class="label">GND</text>
+  <text x="1026" y="186" class="pin-gnd">GND</text>
+  <text x="1026" y="766" class="pin-gnd">GND</text>
+  <text x="1026" y="796" class="pin-gnd">GND</text>
 
-  <path d="M 463 220 C 560 220, 620 498, 682 498" class="wire" stroke="#eab308"/>
-  <path d="M 463 250 C 560 250, 620 582, 682 582" class="wire" stroke="#2563eb"/>
-  <path d="M 463 280 C 560 280, 600 190, 682 190" class="wire" stroke="#dc2626"/>
-  <path d="M 463 310 C 580 310, 860 190, 942 190" class="wire" stroke="#111827"/>
+  <rect x="70" y="140" width="420" height="200" rx="22" class="sensor-scd"/>
+  <text x="280" y="182" text-anchor="middle" class="section">SCD41</text>
+  <text x="280" y="214" text-anchor="middle" class="small">针脚自上而下：SDA / SCL / VDD / GND</text>
+  <rect x="124" y="242" width="214" height="58" rx="14" fill="#ffffff" stroke="#176087" stroke-width="2"/>
+  <text x="231" y="278" text-anchor="middle" class="label">CO2 / 温湿度</text>
+  <circle cx="458" cy="218" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
+  <circle cx="458" cy="250" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
+  <circle cx="458" cy="282" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
+  <circle cx="458" cy="314" r="8" fill="#fff" stroke="#176087" stroke-width="2"/>
+  <text x="432" y="224" text-anchor="end" class="label">SDA</text>
+  <text x="432" y="256" text-anchor="end" class="label">SCL</text>
+  <text x="432" y="288" text-anchor="end" class="label">VDD</text>
+  <text x="432" y="320" text-anchor="end" class="label">GND</text>
 
-  <rect x="40" y="540" width="460" height="270" rx="20" class="sensor-b"/>
-  <text x="270" y="590" text-anchor="middle" class="section">SPS30</text>
-  <text x="270" y="622" text-anchor="middle" class="small">原厂 5Pin：Pin1 -&gt; Pin5 = VDD / SDA / SCL / SEL / GND</text>
-  <text x="270" y="644" text-anchor="middle" class="small">对应 5V0 / GPIO17 / GPIO18 / GND / GND</text>
-  <rect x="118" y="666" width="235" height="60" rx="14" fill="#ffffff" stroke="#2d6a32" stroke-width="2"/>
-  <text x="236" y="704" text-anchor="middle" class="label">颗粒物模块</text>
+  <path d="M 466 218 C 556 218, 568 470, 642 490" class="wire" stroke="#eab308"/>
+  <path d="M 466 250 C 564 250, 576 560, 642 580" class="wire" stroke="#2563eb"/>
+  <path d="M 466 282 C 556 282, 570 198, 642 180" class="wire" stroke="#dc2626"/>
+  <path d="M 466 314 L 588 314 L 588 126 L 1010 126 L 1010 180 L 958 180" class="wire" stroke="#111827"/>
 
-  <circle cx="470" cy="620" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <circle cx="470" cy="652" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <circle cx="470" cy="684" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <circle cx="470" cy="716" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <circle cx="470" cy="748" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
-  <text x="445" y="626" text-anchor="end" class="label">VDD</text>
-  <text x="445" y="658" text-anchor="end" class="label">SDA</text>
-  <text x="445" y="690" text-anchor="end" class="label">SCL</text>
-  <text x="445" y="722" text-anchor="end" class="label">SEL</text>
-  <text x="445" y="754" text-anchor="end" class="label">GND</text>
+  <rect x="70" y="390" width="420" height="200" rx="22" class="sensor-sgp"/>
+  <text x="280" y="432" text-anchor="middle" class="section">SGP41</text>
+  <text x="280" y="464" text-anchor="middle" class="small">常用 4Pin：SDA / SCL / VDD / GND</text>
+  <rect x="124" y="492" width="214" height="58" rx="14" fill="#ffffff" stroke="#2d6a32" stroke-width="2"/>
+  <text x="231" y="528" text-anchor="middle" class="label">VOC / NOx</text>
+  <circle cx="458" cy="458" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
+  <circle cx="458" cy="490" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
+  <circle cx="458" cy="522" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
+  <circle cx="458" cy="554" r="8" fill="#fff" stroke="#2d6a32" stroke-width="2"/>
+  <text x="432" y="464" text-anchor="end" class="label">SDA</text>
+  <text x="432" y="496" text-anchor="end" class="label">SCL</text>
+  <text x="432" y="528" text-anchor="end" class="label">VDD</text>
+  <text x="432" y="560" text-anchor="end" class="label">GND</text>
 
-  <path d="M 478 620 C 575 620, 615 750, 682 750" class="wire" stroke="#f97316"/>
-  <path d="M 478 652 C 570 652, 620 442, 682 442" class="wire" stroke="#16a34a"/>
-  <path d="M 478 684 C 570 684, 620 470, 682 470" class="wire" stroke="#94a3b8"/>
-  <path d="M 478 716 C 615 716, 860 778, 942 778" class="wire" stroke="#6b7280"/>
-  <path d="M 478 748 C 615 748, 860 750, 942 750" class="wire" stroke="#111827"/>
+  <path d="M 466 458 C 556 458, 570 620, 642 640" class="wire" stroke="#eab308"/>
+  <path d="M 466 490 C 556 490, 570 650, 642 670" class="wire" stroke="#2563eb"/>
+  <path d="M 466 522 C 546 522, 568 244, 642 210" class="wire" stroke="#dc2626"/>
+  <path d="M 466 554 C 558 554, 574 770, 642 790" class="wire" stroke="#111827"/>
 
-  <rect x="1080" y="120" width="430" height="195" rx="18" class="note"/>
-  <text x="1110" y="160" class="section">这张图里实际用了哪些孔位</text>
-  <text x="1110" y="198" class="small">SCD41：左侧 `3V3`、`GPIO8`、`GPIO9`</text>
-  <text x="1110" y="224" class="small">SCD41 GND：右上 `GND`</text>
-  <text x="1110" y="250" class="small">SPS30：左侧 `GPIO17`、`GPIO18`、`5V0`</text>
-  <text x="1110" y="276" class="small">SPS30 的 `GND` 和 `SEL`：右下两个 `GND`</text>
-  <text x="1110" y="300" class="tiny">`SEL` 不是接 GPIO，而是直接拉到 `GND` 选择 I2C 模式</text>
+  <rect x="70" y="630" width="500" height="250" rx="22" class="sensor-sps"/>
+  <text x="320" y="674" text-anchor="middle" class="section">SPS30</text>
+  <text x="320" y="706" text-anchor="middle" class="small">原厂 5Pin：VDD / RX / TX / SEL / GND</text>
+  <rect x="152" y="742" width="240" height="60" rx="14" fill="#ffffff" stroke="#b45309" stroke-width="2"/>
+  <text x="272" y="780" text-anchor="middle" class="label">颗粒物模块</text>
+  <circle cx="488" cy="700" r="8" fill="#fff" stroke="#b45309" stroke-width="2"/>
+  <circle cx="488" cy="735" r="8" fill="#fff" stroke="#b45309" stroke-width="2"/>
+  <circle cx="488" cy="770" r="8" fill="#fff" stroke="#b45309" stroke-width="2"/>
+  <circle cx="488" cy="805" r="8" fill="#fff" stroke="#b45309" stroke-width="2"/>
+  <circle cx="488" cy="840" r="8" fill="#fff" stroke="#b45309" stroke-width="2"/>
+  <text x="462" y="706" text-anchor="end" class="label">VDD</text>
+  <text x="462" y="741" text-anchor="end" class="label">RX</text>
+  <text x="462" y="776" text-anchor="end" class="label">TX</text>
+  <text x="462" y="811" text-anchor="end" class="label">SEL</text>
+  <text x="462" y="846" text-anchor="end" class="label">GND</text>
 
-  <rect x="1080" y="335" width="430" height="170" rx="18" class="note"/>
-  <text x="1110" y="375" class="section">线色建议</text>
-  <text x="1110" y="411" class="small">黑 = GND，红 = 3V3，橙 = 5V0</text>
-  <text x="1110" y="437" class="small">黄 / 蓝 = SCD41 SDA / SCL</text>
-  <text x="1110" y="463" class="small">绿 / 浅灰 = SPS30 SDA / SCL，灰 = SEL→GND</text>
-  <text x="1110" y="487" class="tiny">颜色只是建议，真正关键是别把 `SDA/SCL` 上拉到 `5V`</text>
+  <path d="M 496 700 C 580 700, 592 744, 642 760" class="wire" stroke="#f97316"/>
+  <path d="M 496 735 C 576 735, 582 452, 642 430" class="wire" stroke="#16a34a"/>
+  <path d="M 496 770 C 578 770, 586 484, 642 460" class="wire" stroke="#7c3aed"/>
+  <path d="M 496 805 L 576 805" class="wire" stroke="#94a3b8" stroke-dasharray="10 10"/>
+  <text x="592" y="810" class="small">悬空，不接</text>
+  <path d="M 496 840 C 664 840, 790 818, 958 790" class="wire" stroke="#111827"/>
 
-  <rect x="1080" y="530" width="430" height="170" rx="18" class="note"/>
-  <text x="1110" y="570" class="section">为什么按这张引脚图画会更好接</text>
-  <text x="1110" y="608" class="small">1. 可以直接对着板子丝印找 `GPIO17 / GPIO18 / GPIO8 / GPIO9`</text>
-  <text x="1110" y="636" class="small">2. `5V0` 和底部 `GND` 位置也一起标出来了</text>
-  <text x="1110" y="664" class="small">3. 这张图与 README 默认配置完全一致，不需要改固件 GPIO</text>
+  <rect x="1040" y="140" width="500" height="310" rx="20" class="note"/>
+  <text x="1070" y="182" class="section">接线要点</text>
+  <text x="1070" y="220" class="small">1. SCD41 用 I2C0：GPIO8 / GPIO9</text>
+  <text x="1070" y="252" class="small">2. SGP41 用 I2C1：GPIO11 / GPIO12</text>
+  <text x="1070" y="284" class="small">3. SPS30 走 UART1：GPIO17 / GPIO18</text>
+  <text x="1070" y="316" class="small">4. GPIO17 是开发板发出，接传感器 RX</text>
+  <text x="1070" y="348" class="small">5. GPIO18 是开发板接收，接传感器 TX</text>
+  <text x="1070" y="380" class="small">6. SPS30 SEL 保持悬空，不要再拉到 GND</text>
+  <text x="1070" y="412" class="small">7. 板载 RGB 是开发板自带 WS2812(GPIO48)，不需要外接</text>
 
-  <rect x="1080" y="725" width="430" height="120" rx="18" class="note"/>
-  <text x="1110" y="765" class="section">补充</text>
-  <text x="1110" y="797" class="small">所有 `GND` 在板内互通。</text>
-  <text x="1110" y="823" class="small">如果你实际插线更顺，换另一个 `GND` 孔也可以。</text>
+  <rect x="1040" y="480" width="500" height="220" rx="20" class="note"/>
+  <text x="1070" y="522" class="section">线色建议</text>
+  <line x1="1074" y1="558" x2="1132" y2="558" class="wire" stroke="#eab308"/>
+  <text x="1150" y="564" class="small">黄色：I2C SDA</text>
+  <line x1="1074" y1="592" x2="1132" y2="592" class="wire" stroke="#2563eb"/>
+  <text x="1150" y="598" class="small">蓝色：I2C SCL</text>
+  <line x1="1074" y1="626" x2="1132" y2="626" class="wire" stroke="#dc2626"/>
+  <text x="1150" y="632" class="small">红色：3.3V</text>
+  <line x1="1074" y1="660" x2="1132" y2="660" class="wire" stroke="#f97316"/>
+  <text x="1150" y="666" class="small">橙色：5V</text>
+  <line x1="1290" y1="558" x2="1348" y2="558" class="wire" stroke="#16a34a"/>
+  <text x="1366" y="564" class="small">绿色：ESP TX -&gt; SPS30 RX</text>
+  <line x1="1290" y1="592" x2="1348" y2="592" class="wire" stroke="#7c3aed"/>
+  <text x="1366" y="598" class="small">紫色：SPS30 TX -&gt; ESP RX</text>
+  <line x1="1290" y1="626" x2="1348" y2="626" class="wire" stroke="#111827"/>
+  <text x="1366" y="632" class="small">黑色：GND</text>
+  <line x1="1290" y1="660" x2="1348" y2="660" class="wire" stroke="#94a3b8" stroke-dasharray="10 10"/>
+  <text x="1366" y="666" class="small">灰色虚线：悬空 / 不接</text>
+
+  <rect x="1040" y="730" width="500" height="130" rx="20" class="note"/>
+  <text x="1070" y="772" class="section">补充</text>
+  <text x="1070" y="806" class="small">开发板上所有 GND 在板内互通，图里只是选了更顺手的位置。</text>
+  <text x="1070" y="834" class="small">如果你改了 GPIO，请同步更新 menuconfig 和 README 里的接线说明。</text>
 </svg>
