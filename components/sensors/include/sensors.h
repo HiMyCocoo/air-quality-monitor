@@ -11,6 +11,8 @@ esp_err_t sensors_start(const device_config_t *config);
 void sensors_stop(void);
 esp_err_t sensors_get_snapshot(sensor_snapshot_t *snapshot);
 bool sensors_is_ready(void);
+bool sensors_is_scd41_ready(void);
+bool sensors_is_sps30_ready(void);
 bool sensors_is_sps30_sleeping(void);
 void sensors_get_last_error(char *buffer, size_t buffer_len);
 esp_err_t sensors_set_scd41_asc(bool enabled);
