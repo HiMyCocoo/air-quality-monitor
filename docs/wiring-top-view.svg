@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">YD-ESP32-S3 + SCD41 + SPS30 杜邦线俯视接线图</title>
+  <desc id="desc">USB 朝上，SCD41 放在开发板左上，SPS30 放在开发板左下，全部使用杜邦线连接到 YD-ESP32-S3 左侧排针。</desc>
+  <style>
+    text {
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      fill: #1f2937;
+    }
+    .title { font-size: 34px; font-weight: 700; }
+    .subtitle { font-size: 20px; fill: #475569; }
+    .section { font-size: 26px; font-weight: 700; }
+    .label { font-size: 22px; font-weight: 600; }
+    .small { font-size: 18px; fill: #475569; }
+    .tiny { font-size: 16px; fill: #64748b; }
+    .board { fill: #fff4d6; stroke: #8c6a00; stroke-width: 3; }
+    .sensor-a { fill: #e6f6ff; stroke: #176087; stroke-width: 3; }
+    .sensor-b { fill: #eef8ea; stroke: #2d6a32; stroke-width: 3; }
+    .pin { fill: #f8fafc; stroke: #334155; stroke-width: 2; }
+    .header-pin { fill: #ffffff; stroke: #334155; stroke-width: 2; }
+    .wire { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+    .note { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 2; }
+  </style>
+
+  <rect x="0" y="0" width="1400" height="900" fill="#fffdf8"/>
+
+  <text x="700" y="58" text-anchor="middle" class="title">YD-ESP32-S3 + SCD41 + SPS30 杜邦线俯视图</text>
+  <text x="700" y="92" text-anchor="middle" class="subtitle">推荐摆放：USB 朝上，传感器都放在开发板左侧，杜邦线尽量走短线</text>
+
+  <rect x="860" y="120" width="420" height="640" rx="26" class="board"/>
+  <text x="1070" y="165" text-anchor="middle" class="section">YD-ESP32-S3 开发板</text>
+  <rect x="985" y="190" width="170" height="44" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="1070" y="219" text-anchor="middle" class="label">USB &amp; OTG</text>
+  <text x="930" y="270" class="small">左侧排针</text>
+  <line x1="930" y1="295" x2="930" y2="715" stroke="#334155" stroke-width="3"/>
+
+  <circle cx="930" cy="320" r="8" class="header-pin"/>
+  <circle cx="930" cy="360" r="8" class="header-pin"/>
+  <circle cx="930" cy="410" r="8" class="header-pin"/>
+  <circle cx="930" cy="450" r="8" class="header-pin"/>
+  <circle cx="930" cy="560" r="8" class="header-pin"/>
+  <circle cx="930" cy="600" r="8" class="header-pin"/>
+  <circle cx="930" cy="660" r="8" class="header-pin"/>
+  <circle cx="930" cy="700" r="8" class="header-pin"/>
+  <circle cx="930" cy="740" r="8" class="header-pin"/>
+
+  <text x="955" y="327" class="label">3V3</text>
+  <text x="955" y="367" class="label">GND</text>
+  <text x="955" y="417" class="label">GPIO8</text>
+  <text x="955" y="457" class="label">GPIO9</text>
+  <text x="955" y="567" class="label">GPIO17</text>
+  <text x="955" y="607" class="label">GPIO18</text>
+  <text x="955" y="667" class="label">5V</text>
+  <text x="955" y="707" class="label">GND</text>
+  <text x="955" y="747" class="label">GND</text>
+  <text x="955" y="502" class="tiny">中间未使用排针已省略</text>
+
+  <rect x="90" y="130" width="520" height="220" rx="22" class="sensor-a"/>
+  <text x="350" y="180" text-anchor="middle" class="section">SCD41</text>
+  <text x="350" y="214" text-anchor="middle" class="small">建议放在开发板左上，四根线都从左侧排针上半区走</text>
+  <rect x="150" y="246" width="220" height="58" rx="14" fill="#ffffff" stroke="#176087" stroke-width="2"/>
+  <text x="260" y="282" text-anchor="middle" class="label">传感器模块</text>
+
+  <circle cx="585" cy="250" r="8" class="pin"/>
+  <circle cx="585" cy="285" r="8" class="pin"/>
+  <circle cx="585" cy="320" r="8" class="pin"/>
+  <circle cx="585" cy="355" r="8" class="pin"/>
+  <text x="510" y="257" text-anchor="end" class="label">VCC</text>
+  <text x="510" y="292" text-anchor="end" class="label">GND</text>
+  <text x="510" y="327" text-anchor="end" class="label">SDA</text>
+  <text x="510" y="362" text-anchor="end" class="label">SCL</text>
+
+  <path d="M 593 250 C 700 250, 760 320, 922 320" class="wire" stroke="#dc2626"/>
+  <path d="M 593 285 C 700 285, 760 360, 922 360" class="wire" stroke="#111827"/>
+  <path d="M 593 320 C 700 320, 760 410, 922 410" class="wire" stroke="#eab308"/>
+  <path d="M 593 355 C 700 355, 760 450, 922 450" class="wire" stroke="#2563eb"/>
+
+  <rect x="90" y="440" width="520" height="300" rx="22" class="sensor-b"/>
+  <text x="350" y="490" text-anchor="middle" class="section">SPS30</text>
+  <text x="350" y="524" text-anchor="middle" class="small">建议放在开发板左下，五根线都从左侧排针下半区走</text>
+  <rect x="150" y="560" width="220" height="58" rx="14" fill="#ffffff" stroke="#2d6a32" stroke-width="2"/>
+  <text x="260" y="596" text-anchor="middle" class="label">颗粒物模块</text>
+
+  <circle cx="585" cy="555" r="8" class="pin"/>
+  <circle cx="585" cy="595" r="8" class="pin"/>
+  <circle cx="585" cy="635" r="8" class="pin"/>
+  <circle cx="585" cy="675" r="8" class="pin"/>
+  <circle cx="585" cy="715" r="8" class="pin"/>
+  <text x="510" y="562" text-anchor="end" class="label">VDD</text>
+  <text x="510" y="602" text-anchor="end" class="label">GND</text>
+  <text x="510" y="642" text-anchor="end" class="label">SDA</text>
+  <text x="510" y="682" text-anchor="end" class="label">SCL</text>
+  <text x="510" y="722" text-anchor="end" class="label">SEL</text>
+
+  <path d="M 593 555 C 700 555, 760 660, 922 660" class="wire" stroke="#f97316"/>
+  <path d="M 593 595 C 700 595, 760 700, 922 700" class="wire" stroke="#111827"/>
+  <path d="M 593 635 C 700 635, 760 560, 922 560" class="wire" stroke="#16a34a"/>
+  <path d="M 593 675 C 700 675, 760 600, 922 600" class="wire" stroke="#94a3b8"/>
+  <path d="M 593 715 C 700 715, 760 740, 922 740" class="wire" stroke="#6b7280"/>
+
+  <rect x="830" y="785" width="470" height="86" rx="18" class="note"/>
+  <text x="855" y="820" class="small">实物摆放建议：</text>
+  <text x="855" y="848" class="tiny">1. SCD41 放左上，SPS30 放左下，避免跨板走线</text>
+  <text x="1085" y="848" class="tiny">2. 杜邦线尽量控制在 10 cm 内</text>
+
+  <rect x="70" y="785" width="700" height="86" rx="18" class="note"/>
+  <text x="95" y="820" class="small">颜色建议：</text>
+  <text x="95" y="848" class="tiny">红 = 3V3，橙 = 5V，黑 = GND，黄 = SCD41 SDA，蓝 = SCD41 SCL，绿 = SPS30 SDA，浅灰 = SPS30 SCL，灰 = SEL 拉低</text>
+</svg>
