@@ -34,18 +34,20 @@
 
 ### SCD41
 
-- `VCC -> 3V3`
-- `GND -> GND`
+- 模块针脚自上而下：`SDA / SCL / VDD / GND`
 - `SDA -> GPIO8`
 - `SCL -> GPIO9`
+- `VDD -> 3V3`
+- `GND -> GND`
 
 ### SPS30
 
+- 原厂 5Pin 接口按 `Pin1 -> Pin5`：`VDD / SDA / SCL / SEL / GND`
 - `VDD -> 5V0`
-- `GND -> GND`
-- `SEL -> GND`
 - `SDA -> GPIO17`
 - `SCL -> GPIO18`
+- `SEL -> GND`
+- `GND -> GND`
 
 接线注意：
 
