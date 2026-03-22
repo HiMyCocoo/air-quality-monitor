@@ -39,11 +39,15 @@ typedef struct {
 
 typedef struct {
     bool scd41_valid;
+    bool sgp41_valid;
+    bool sgp41_conditioning;
     bool pm_valid;
     bool sps30_sleeping;
     uint16_t co2_ppm;
     float temperature_c;
     float humidity_rh;
+    int32_t voc_index;
+    int32_t nox_index;
     float pm1_0;
     float pm2_5;
     float pm4_0;
@@ -63,6 +67,7 @@ typedef struct {
     bool mqtt_connected;
     bool sensors_ready;
     bool scd41_ready;
+    bool sgp41_ready;
     bool sps30_ready;
     int wifi_rssi;
     uint32_t uptime_sec;

@@ -89,6 +89,7 @@ static const char INDEX_HTML[] =
     "function wifiStatus(d){if(d.diag.provisioning_mode)return '等待 BLE 配网';if(d.diag.wifi_connected)return '已连接';return '已保存凭据，当前离线';}"
     "function mqttStatus(d){if(!d.config.mqtt_host)return '未配置';return d.diag.mqtt_connected?'已连接':'已配置，未连接';}"
     "function scd41Status(d){if(!d.diag.scd41_ready)return '未检测到或初始化失败';return d.snapshot.scd41_valid?'在线，正在测量':'在线，等待首包数据';}"
+    "function sgp41Status(d){if(!d.diag.sgp41_ready)return '未检测到或初始化失败';if(d.snapshot.sgp41_conditioning)return '在线，NOx 调理中';if(!d.snapshot.sgp41_valid)return '在线，等待首包数据';if((d.snapshot.voc_index??0)===0&&(d.snapshot.nox_index??0)===0)return '在线，算法学习中';return '在线，正在测量';}"
     "function sps30Status(d){if(!d.diag.sps30_ready)return '未检测到或初始化失败';if(d.snapshot.sps30_sleeping)return '在线，休眠中';return d.snapshot.pm_valid?'在线，正在测量':'在线，预热中或等待数据';}"
     "async function fetchStatus(){const r=await fetch('/api/status');if(!r.ok)return;const d=await r.json();"
     "const aqiKey=d.snapshot.us_aqi_level_key||'unavailable';"
@@ -100,6 +101,7 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>信号强度</span><strong>${d.diag.wifi_connected?`${d.diag.wifi_rssi} dBm`:'暂无'}</strong></div>`+"
     "`<div class='kv'><span>MQTT</span><strong>${mqttStatus(d)}</strong></div>`+"
     "`<div class='kv'><span>SCD41</span><strong>${scd41Status(d)}</strong></div>`+"
+    "`<div class='kv'><span>SGP41</span><strong>${sgp41Status(d)}</strong></div>`+"
     "`<div class='kv'><span>SPS30</span><strong>${sps30Status(d)}</strong></div>`+"
     "`<div class='kv'><span>固件版本</span><strong>${d.diag.firmware_version}</strong></div>`+"
     "`<div class='kv'><span>最近错误</span><strong>${d.diag.last_error}</strong></div>`;"
@@ -109,6 +111,8 @@ static const char INDEX_HTML[] =
     "`<div class='kv'><span>CO2</span><strong>${d.snapshot.co2_ppm ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Temperature</span><strong>${d.snapshot.temperature_c ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>Humidity</span><strong>${d.snapshot.humidity_rh ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>VOC Index</span><strong>${d.snapshot.voc_index ?? 'n/a'}</strong></div>`+"
+    "`<div class='kv'><span>NOx Index</span><strong>${d.snapshot.nox_index ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM1.0</span><strong>${d.snapshot.pm1_0 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM2.5</span><strong>${d.snapshot.pm2_5 ?? 'n/a'}</strong></div>`+"
     "`<div class='kv'><span>PM4.0</span><strong>${d.snapshot.pm4_0 ?? 'n/a'}</strong></div>`+"
@@ -221,6 +225,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(diag_json, "mqtt_connected", diag.mqtt_connected);
     cJSON_AddBoolToObject(diag_json, "sensors_ready", diag.sensors_ready);
     cJSON_AddBoolToObject(diag_json, "scd41_ready", diag.scd41_ready);
+    cJSON_AddBoolToObject(diag_json, "sgp41_ready", diag.sgp41_ready);
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag.sps30_ready);
     cJSON_AddNumberToObject(diag_json, "wifi_rssi", diag.wifi_rssi);
     cJSON_AddNumberToObject(diag_json, "uptime_sec", diag.uptime_sec);
@@ -233,6 +238,8 @@ static esp_err_t status_handler(httpd_req_t *req)
 
     cJSON *snapshot_json = cJSON_AddObjectToObject(root, "snapshot");
     cJSON_AddBoolToObject(snapshot_json, "scd41_valid", snapshot.scd41_valid);
+    cJSON_AddBoolToObject(snapshot_json, "sgp41_valid", snapshot.sgp41_valid);
+    cJSON_AddBoolToObject(snapshot_json, "sgp41_conditioning", snapshot.sgp41_conditioning);
     cJSON_AddBoolToObject(snapshot_json, "pm_valid", snapshot.pm_valid);
     if (snapshot.scd41_valid) {
         cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
@@ -242,6 +249,13 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNullToObject(snapshot_json, "co2_ppm");
         cJSON_AddNullToObject(snapshot_json, "temperature_c");
         cJSON_AddNullToObject(snapshot_json, "humidity_rh");
+    }
+    if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
+        cJSON_AddNumberToObject(snapshot_json, "voc_index", snapshot.voc_index);
+        cJSON_AddNumberToObject(snapshot_json, "nox_index", snapshot.nox_index);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "voc_index");
+        cJSON_AddNullToObject(snapshot_json, "nox_index");
     }
     if (snapshot.pm_valid) {
         cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);

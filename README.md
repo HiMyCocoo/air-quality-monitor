@@ -1,6 +1,6 @@
 # ESP32-S3 室内空气质量监测节点
 
-基于 `ESP32-S3 + Sensirion SCD41 + Sensirion SPS30` 的室内空气质量监测固件。
+基于 `ESP32-S3 + Sensirion SCD41 + Sensirion SGP41 + Sensirion SPS30` 的室内空气质量监测固件。
 
 当前设计：
 
@@ -12,6 +12,7 @@
 ## 当前功能
 
 - `SCD41`：`CO2 / 温度 / 相对湿度`
+- `SGP41`：`VOC Index / NOx Index`
 - `SPS30`：`PM1.0 / PM2.5 / PM4.0 / PM10.0`
 - `SPS30`：`0.5 / 1.0 / 2.5 / 4.0 / 10um` 数浓度
 - `SPS30`：`Typical Particle Size`
@@ -23,11 +24,11 @@
 
 - 主控：`YD-ESP32-S3`
 - SDK：`ESP-IDF v5.5.3`
-- 传感器：`SCD41 + SPS30`
+- 传感器：`SCD41 + SGP41 + SPS30`
 
 说明：
 
-- 板载 `WS2812 RGB LED` 使用 `GPIO47`
+- 板载 `WS2812 RGB LED` 使用 `GPIO48`
 - 当前固件会用它显示实时空气质量等级
 
 ## 默认接线
@@ -42,20 +43,26 @@
 
 ### SPS30
 
-- 原厂 5Pin 接口按 `Pin1 -> Pin5`：`VDD / SDA / SCL / SEL / GND`
+- 原厂 5Pin 接口按 `Pin1 -> Pin5`：`VDD / RX / TX / SEL / GND`
 - `VDD -> 5V0`
-- `SDA -> GPIO17`
-- `SCL -> GPIO18`
-- `SEL -> GND`
+- `RX -> GPIO17`（ESP32 `TX`）
+- `TX -> GPIO18`（ESP32 `RX`）
+- `SEL -> 悬空`
+- `GND -> GND`
+
+### SGP41
+
+- `SDA -> GPIO11`
+- `SCL -> GPIO12`
+- `VDD -> 3V3`
 - `GND -> GND`
 
 接线注意：
 
-- `SEL` 必须接 `GND`，否则 `SPS30` 不会进入 I2C 模式
-- 两条 I2C 的上拉都必须在 `3.3V` 逻辑域
+- `SPS30` 现在走 `UART`，`SEL` 不要再拉到 `GND`
+- `SGP41` 走独立 `I2C1`，不和 `SCD41` 共线
+- `SCD41` 和 `SGP41` 的 `I2C` 上拉都必须在 `3.3V` 逻辑域
 - 杜邦线尽量控制在 `10 cm` 内
-
-![杜邦线俯视接线图](docs/wiring-top-view.svg)
 
 ## 首次使用
 
@@ -113,5 +120,5 @@ BLE 配网只负责把设备接入局域网。
 
 设备主要发布：
 
-- 传感器数据：`CO2 / 温湿度 / PM / 粒子数 / Typical Particle Size`
+- 传感器数据：`CO2 / 温湿度 / VOC / NOx / PM / 粒子数 / Typical Particle Size`
 - 诊断数据：`RSSI / Uptime / Heap / Firmware / Last Error`
