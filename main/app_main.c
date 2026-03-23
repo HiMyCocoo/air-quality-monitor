@@ -51,6 +51,7 @@ typedef struct {
     bool ble_provisioning_active;
     bool mqtt_started;
     bool web_started;
+    bool status_led_enabled;
     bool publish_now;
     bool pending_restart;
     bool pending_factory_reset;
@@ -61,6 +62,17 @@ typedef struct {
 
 static app_ctx_t s_app;
 static status_led_t s_status_led;
+
+static bool app_status_led_is_enabled(void)
+{
+    bool enabled = true;
+    if (s_app.lock != NULL) {
+        xSemaphoreTake(s_app.lock, portMAX_DELAY);
+        enabled = s_app.status_led_enabled;
+        xSemaphoreGive(s_app.lock);
+    }
+    return enabled;
+}
 
 static uint8_t app_status_led_scale(uint8_t value)
 {
@@ -133,6 +145,11 @@ static esp_err_t app_status_led_init(void)
 
 static void app_status_led_update(void)
 {
+    if (!app_status_led_is_enabled()) {
+        app_status_led_set_rgb(0, 0, 0);
+        return;
+    }
+
     sensor_snapshot_t snapshot = {0};
     if (sensors_get_snapshot(&snapshot) != ESP_OK) {
         return;
@@ -142,71 +159,36 @@ static void app_status_led_update(void)
     uint8_t green = 0;
     uint8_t blue = 0;
 
-    if (snapshot.pm_valid && !snapshot.sps30_sleeping) {
-        air_quality_us_aqi_t us_aqi = {0};
-        air_quality_compute_us_aqi(&snapshot, &us_aqi);
-        if (us_aqi.valid) {
-            switch (us_aqi.category) {
-            case AIR_QUALITY_CATEGORY_GOOD:
-                green = 255;
-                break;
-            case AIR_QUALITY_CATEGORY_MODERATE:
-                red = 255;
-                green = 180;
-                break;
-            case AIR_QUALITY_CATEGORY_UNHEALTHY_SENSITIVE:
-                red = 255;
-                green = 80;
-                break;
-            case AIR_QUALITY_CATEGORY_UNHEALTHY:
-                red = 255;
-                break;
-            case AIR_QUALITY_CATEGORY_VERY_UNHEALTHY:
-                red = 160;
-                blue = 255;
-                break;
-            case AIR_QUALITY_CATEGORY_HAZARDOUS:
-                red = 255;
-                blue = 120;
-                break;
-            case AIR_QUALITY_CATEGORY_UNKNOWN:
-            default:
-                blue = 255;
-                break;
-            }
-            app_status_led_set_rgb(red, green, blue);
-            return;
-        }
-    }
-
-    if (snapshot.scd41_valid) {
-        if (snapshot.co2_ppm <= 800) {
+    air_quality_assessment_t assessment = {0};
+    air_quality_compute_overall_assessment(&snapshot, &assessment);
+    if (assessment.valid) {
+        switch (assessment.category) {
+        case AIR_QUALITY_CATEGORY_GOOD:
             green = 255;
-        } else if (snapshot.co2_ppm <= 1200) {
+            break;
+        case AIR_QUALITY_CATEGORY_MODERATE:
             red = 255;
             green = 180;
-        } else if (snapshot.co2_ppm <= 1800) {
+            break;
+        case AIR_QUALITY_CATEGORY_UNHEALTHY_SENSITIVE:
             red = 255;
             green = 80;
-        } else {
+            break;
+        case AIR_QUALITY_CATEGORY_UNHEALTHY:
             red = 255;
-        }
-        app_status_led_set_rgb(red, green, blue);
-        return;
-    }
-
-    if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
-        int32_t gas_index = snapshot.voc_index > snapshot.nox_index ? snapshot.voc_index : snapshot.nox_index;
-        if (gas_index <= 100) {
-            green = 255;
-        } else if (gas_index <= 150) {
+            break;
+        case AIR_QUALITY_CATEGORY_VERY_UNHEALTHY:
+            red = 160;
+            blue = 255;
+            break;
+        case AIR_QUALITY_CATEGORY_HAZARDOUS:
             red = 255;
-            green = 180;
-        } else if (gas_index <= 250) {
-            red = 255;
-            green = 80;
-        } else {
-            red = 255;
+            blue = 120;
+            break;
+        case AIR_QUALITY_CATEGORY_UNKNOWN:
+        default:
+            blue = 255;
+            break;
         }
         app_status_led_set_rgb(red, green, blue);
         return;
@@ -241,6 +223,8 @@ static void app_fill_diag(device_diag_t *diag)
     diag->scd41_ready = sensors_is_scd41_ready();
     diag->sgp41_ready = sensors_is_sgp41_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
+    diag->status_led_ready = s_status_led.initialized;
+    diag->status_led_enabled = s_app.status_led_enabled;
     diag->wifi_rssi = platform_wifi_get_rssi();
     diag->uptime_sec = esp_timer_get_time() / 1000000ULL;
     diag->heap_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -323,12 +307,18 @@ static void app_request_factory_reset(void *user_ctx)
     app_schedule_action(true);
 }
 
-static void app_request_republish(void *user_ctx)
+static esp_err_t app_request_republish_web(void *user_ctx)
 {
     (void)user_ctx;
-    if (mqtt_ha_is_connected()) {
-        mqtt_ha_publish_discovery();
+    if (!mqtt_ha_is_connected()) {
+        return ESP_ERR_INVALID_STATE;
     }
+    return mqtt_ha_publish_discovery();
+}
+
+static void app_request_republish(void *user_ctx)
+{
+    (void)app_request_republish_web(user_ctx);
 }
 
 static esp_err_t app_request_set_scd41_asc(bool enabled, void *user_ctx)
@@ -357,6 +347,25 @@ static esp_err_t app_request_set_sps30_sleep(bool sleep, void *user_ctx)
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     s_app.publish_now = true;
     xSemaphoreGive(s_app.lock);
+    return ESP_OK;
+}
+
+static esp_err_t app_request_set_status_led(bool enabled, void *user_ctx)
+{
+    (void)user_ctx;
+    if (!s_status_led.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.status_led_enabled = enabled;
+    s_app.publish_now = true;
+    xSemaphoreGive(s_app.lock);
+
+    if (!enabled) {
+        return app_status_led_set_rgb(0, 0, 0);
+    }
+    app_status_led_update();
     return ESP_OK;
 }
 
@@ -390,9 +399,10 @@ static esp_err_t app_start_web(void)
         .save_config = app_save_config,
         .request_restart = app_request_restart,
         .request_factory_reset = app_request_factory_reset,
-        .request_republish_discovery = app_request_republish,
+        .request_republish_discovery = app_request_republish_web,
         .request_set_scd41_asc = app_request_set_scd41_asc,
         .request_set_sps30_sleep = app_request_set_sps30_sleep,
+        .request_set_status_led = app_request_set_status_led,
         .request_apply_frc = app_request_apply_frc,
     };
 
@@ -731,6 +741,7 @@ void app_main(void)
         return;
     }
     s_app.frc_reference_ppm = 400;
+    s_app.status_led_enabled = true;
 
     app_build_device_id(s_app.device_id, sizeof(s_app.device_id));
     app_build_prov_service_name(s_app.prov_service_name, sizeof(s_app.prov_service_name));

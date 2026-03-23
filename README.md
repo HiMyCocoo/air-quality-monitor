@@ -17,6 +17,9 @@
 - `SPS30`：`PM1.0 / PM2.5 / PM4.0 / PM10.0`
 - `SPS30`：`0.5 / 1.0 / 2.5 / 4.0 / 10 μm` 粒子数浓度
 - `SPS30`：`典型粒径`
+- 总体空气质量评估：优先使用 `EPA US AQI (PM2.5 / PM10)`，并补充 `CO2 / 湿度` 室内提示
+- 直观补充评级：为 `CO2 / VOC Index / NOx Index` 生成单独等级，方便快速判断当前状态
+- 颗粒物画像：综合 `PM1.0 / PM2.5 / PM4.0 / PM10 / 粒子数 / 典型粒径` 给出粒径分布描述
 - 本地网页：状态、遥测、`Wi-Fi / MQTT` 配置、传感器控制、OTA、重启、恢复出厂
 - `Home Assistant`：自动发现传感器、按钮和控制开关
 
@@ -116,7 +119,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 网页控制台支持：
 
 - 查看设备状态、传感器在线状态、最近错误
-- 查看 `CO2 / 温湿度 / VOC / NOx / PM / 粒子数 / 典型粒径 / US AQI`
+- 查看 `Overall Air Quality / US AQI / CO2 Rating / VOC Rating / NOx Rating / Particle Profile / 温湿度 / PM / 粒子数 / 典型粒径 / 样本年龄`
 - 修改 `Wi-Fi / MQTT` 配置
 - 设置 `SCD41` 海拔补偿和温度偏移
 - 控制 `SCD41 ASC`
@@ -141,9 +144,12 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 - `CO2 / 温度 / 相对湿度`
 - `VOC Index / NOx Index`
+- `CO2 Rating / VOC Rating / NOx Rating`
+- `Particle Profile / Particle Profile Note / Sample Age`
 - `PM1.0 / PM2.5 / PM4.0 / PM10.0`
 - `粒子数浓度`
 - `典型粒径`
+- `Overall Air Quality / Basis / Driver / Note`
 - `US AQI / AQI 等级 / 主要污染物`
 - `Wi-Fi RSSI / Uptime / Heap / Firmware Version / Last Error`
 - `SCD41 ASC`
@@ -154,5 +160,9 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 - 缺少某一颗传感器时，系统仍会启动，其他在线传感器照常工作
 - `SGP41` 上电后会先经历一小段 `NOx` 调理期，随后进入算法学习阶段
-- 板载 `RGB` 的显示优先级是：`PM / US AQI`，然后 `CO2`，最后才回退到 `VOC / NOx`
+- 总体评估优先使用 `EPA AQI (PM2.5 / PM10)`，`CO2 / 湿度` 只作为美国室内指导补充提示
+- `CO2 Rating` 是通风感受分级；`VOC / NOx Rating` 基于 Sensirion 指数的相对强度，不代表绝对浓度
+- `Particle Profile` 会结合质量浓度分段、粒子数分段和典型粒径，判断当前更偏细颗粒、混合颗粒还是粗颗粒
+- `VOC / NOx Index`、`PM1.0 / PM4.0`、粒子数和典型粒径会继续上报，但不参与 `EPA AQI`
+- 板载 `RGB` 现在直接跟随统一的总体评估结果
 - 传感器都还没准备好时，板载灯会进入等待态闪烁
