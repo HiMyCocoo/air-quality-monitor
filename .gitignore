@@ -9,6 +9,7 @@ sdkconfig.old
 # Local IDE/editor files
 .vscode/
 .idea/
+.cache/
 *.swp
 *.swo
 
