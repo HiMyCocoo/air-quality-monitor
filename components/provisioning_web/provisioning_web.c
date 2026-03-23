@@ -469,12 +469,18 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddStringToObject(snapshot_json, "co2_rating",
                                 air_quality_signal_level_label(air_quality_rate_co2(snapshot.co2_ppm)));
         cJSON_AddNumberToObject(snapshot_json, "temperature_c", snapshot.temperature_c);
+        cJSON_AddStringToObject(snapshot_json, "temperature_rating",
+                                air_quality_rate_temperature_label(snapshot.temperature_c));
         cJSON_AddNumberToObject(snapshot_json, "humidity_rh", snapshot.humidity_rh);
+        cJSON_AddStringToObject(snapshot_json, "humidity_rating",
+                                air_quality_rate_humidity_label(snapshot.humidity_rh));
     } else {
         cJSON_AddNullToObject(snapshot_json, "co2_ppm");
         cJSON_AddNullToObject(snapshot_json, "co2_rating");
         cJSON_AddNullToObject(snapshot_json, "temperature_c");
+        cJSON_AddNullToObject(snapshot_json, "temperature_rating");
         cJSON_AddNullToObject(snapshot_json, "humidity_rh");
+        cJSON_AddNullToObject(snapshot_json, "humidity_rating");
     }
     if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
         cJSON_AddNumberToObject(snapshot_json, "voc_index", snapshot.voc_index);
@@ -569,6 +575,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(config_json, "publish_interval_sec", config.publish_interval_sec);
     cJSON_AddNumberToObject(config_json, "scd41_altitude_m", config.scd41_altitude_m);
     cJSON_AddNumberToObject(config_json, "scd41_temp_offset_c", config.scd41_temp_offset_c);
+    cJSON_AddBoolToObject(config_json, "scd41_asc_enabled", config.scd41_asc_enabled);
     cJSON_AddNumberToObject(root, "frc_reference_ppm", frc_ppm);
 
     esp_err_t err = send_json(req, root);
