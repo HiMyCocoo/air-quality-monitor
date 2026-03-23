@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>空气监测节点后台</title>
+  <style>
+    /* Modern Reset & Base */
+    :root {
+      --primary: #526af2;
+      --primary-hover: #4053ce;
+      --secondary: #f0f4f8;
+      --accent: #ff6b6b;
+      --accent-hover: #e55a5a;
+      --text-main: #2d3748;
+      --text-muted: #718096;
+      --bg-gradient-1: #e0c3fc;
+      --bg-gradient-2: #8ec5fc;
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+      --card-radius: 24px;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      
+      /* Status Colors */
+      --color-good: #38a169;
+      --color-moderate: #d69e2e;
+      --color-sensitive: #ed8936;
+      --color-unhealthy: #e53e3e;
+      --color-very-unhealthy: #805ad5;
+      --color-hazardous: #742a2a;
+      
+      --bg-good: #e6ffed;
+      --bg-moderate: #fffff0;
+      --bg-sensitive: #feebc8;
+      --bg-unhealthy: #fff5f5;
+      --bg-very-unhealthy: #faf5ff;
+      --bg-hazardous: #fff0f0;
+
+      --color-neutral: #4a5568;
+      --bg-neutral: #edf2f7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-main);
+      background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+      padding-bottom: 60px;
+    }
+
+    /* Ambient Background blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: -1;
+      animation: float 20s infinite ease-in-out alternate;
+    }
+    body::before {
+      top: -10%; left: -10%;
+      width: 50vw; height: 50vw;
+      background: rgba(255, 204, 229, 0.5);
+    }
+    body::after {
+      bottom: -10%; right: -10%;
+      width: 60vw; height: 60vw;
+      background: rgba(204, 255, 229, 0.4);
+      animation-delay: -10s;
+    }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(10%, 15%) scale(1.1); }
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    
+    @media (max-width: 992px) {
+      .hero { grid-template-columns: 1fr; }
+    }
+
+    /* Glass Panels */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      padding: 32px;
+      box-shadow: var(--glass-shadow);
+      transition: var(--transition);
+    }
+    .glass-panel:hover {
+      box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
+      transform: translateY(-2px);
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #2b6cb0, #805ad5);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 20px 0 12px;
+      color: var(--text-main);
+    }
+
+    p.lede {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      max-width: 800px;
+    }
+
+    .section-copy {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    /* Chips/Badges */
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    /* Semantic Chip Colors */
+    .chip-good { background: var(--bg-good); color: var(--color-good); }
+    .chip-moderate { background: var(--bg-moderate); color: var(--color-moderate); }
+    .chip-elevated { background: var(--bg-sensitive); color: var(--color-sensitive); }
+    .chip-unhealthy { background: var(--bg-unhealthy); color: var(--color-unhealthy); }
+    .chip-very-unhealthy { background: var(--bg-very-unhealthy); color: var(--color-very-unhealthy); }
+    .chip-hazardous { background: var(--bg-hazardous); color: var(--color-hazardous); }
+    .chip-neutral { background: var(--bg-neutral); color: var(--color-neutral); }
+    .chip-fine { background: #e2e8f0; color: #2b6cb0; }
+    .chip-coarse { background: #fed7d7; color: #c53030; }
+
+    /* Summary Banners */
+    .summary-banner {
+      padding: 20px 24px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255,255,255,0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .summary-banner strong {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .summary-banner span {
+      font-size: 1.05rem;
+      opacity: 0.9;
+    }
+    .summary-good { background: linear-gradient(135deg, var(--bg-good) 0%, #c6f6d5 100%); color: var(--color-good); }
+    .summary-moderate { background: linear-gradient(135deg, var(--bg-moderate) 0%, #fefcbf 100%); color: var(--color-moderate); }
+    .summary-sensitive { background: linear-gradient(135deg, var(--bg-sensitive) 0%, #fbd38d 100%); color: var(--color-sensitive); }
+    .summary-unhealthy { background: linear-gradient(135deg, var(--bg-unhealthy) 0%, #fed7d7 100%); color: var(--color-unhealthy); }
+    .summary-very-unhealthy { background: linear-gradient(135deg, var(--bg-very-unhealthy) 0%, #e9d8fd 100%); color: var(--color-very-unhealthy); }
+    .summary-hazardous { background: linear-gradient(135deg, var(--bg-hazardous) 0%, #fed7d7 100%); color: var(--color-hazardous); }
+    .summary-neutral { background: linear-gradient(135deg, var(--bg-neutral) 0%, #e2e8f0 100%); color: var(--color-neutral); }
+
+    /* Key-Value Lists */
+    .kv-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .kv {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.4);
+      border-radius: 12px;
+      transition: var(--transition);
+    }
+    .kv:hover {
+      background: rgba(255,255,255,0.7);
+    }
+    .kv span {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .kv strong {
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-align: right;
+      max-width: 65%;
+      word-break: break-word;
+    }
+
+    /* Metric Grids */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+    .metric {
+      background: rgba(255,255,255,0.5);
+      padding: 20px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+      border: 1px solid rgba(255,255,255,0.8);
+      transition: var(--transition);
+    }
+    .metric:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.8);
+      box-shadow: 0 8px 15px rgba(0,0,0,0.05);
+    }
+    .metric span {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .metric strong {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+    .metric small {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .span-2 { grid-column: span 2; }
+    
+    @media (max-width: 1024px) {
+      .main-grid { grid-template-columns: repeat(2, 1fr); }
+      .span-2 { grid-column: span 1; }
+    }
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Forms */
+    .field-grid, .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .field-span-2 {
+      grid-column: span 2;
+    }
+    @media (max-width: 640px) {
+      .field-grid, .action-grid { grid-template-columns: 1fr; }
+      .field-span-2 { grid-column: span 1; }
+    }
+    
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e0;
+      background: rgba(255,255,255,0.8);
+      color: var(--text-main);
+      font-size: 1rem;
+      transition: var(--transition);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(82, 106, 242, 0.2);
+      background: #fff;
+    }
+    .hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: -8px;
+    }
+
+    /* Buttons */
+    button {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: 0 4px 12px rgba(82, 106, 242, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    button:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(82, 106, 242, 0.4);
+    }
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(82, 106, 242, 0.3);
+    }
+    button:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+      box-shadow: none;
+      opacity: 0.7;
+    }
+    button.ghost {
+      background: rgba(255,255,255,0.6);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      box-shadow: none;
+    }
+    button.ghost:hover:not(:disabled) {
+      background: rgba(82, 106, 242, 0.1);
+    }
+    button.danger {
+      background: var(--accent);
+      box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+    }
+    button.danger:hover:not(:disabled) {
+      background: var(--accent-hover);
+      box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+    }
+    button.ghost.danger {
+      background: transparent;
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Notifications */
+    .notice {
+      padding: 16px 20px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: fadeIn 0.3s ease-out;
+      backdrop-filter: blur(10px);
+    }
+    .notice[hidden] { display: none; }
+    .notice-success { background: rgba(220,252,231,0.9); color: #166534; border: 1px solid #bbf7d0; }
+    .notice-error { background: rgba(254,226,226,0.9); color: #991b1b; border: 1px solid #fecaca; }
+    .notice-info { background: rgba(224,242,254,0.9); color: #075985; border: 1px solid #bae6fd; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* File Upload */
+    .upload-box {
+      border: 2px dashed #cbd5e0;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: var(--transition);
+      background: rgba(255,255,255,0.4);
+      margin-bottom: 16px;
+    }
+    .upload-box:hover {
+      border-color: var(--primary);
+      background: rgba(255,255,255,0.6);
+    }
+    input[type='file'] {
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    /* Subsections */
+    .subsection {
+      padding-top: 24px;
+      margin-top: 24px;
+      border-top: 1px dashed rgba(0,0,0,0.1);
+    }
+    .subsection:first-of-type {
+      padding-top: 0; margin-top: 0; border-top: none;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <section class="glass-panel">
+        <h1>设备管理后台</h1>
+        <p class="lede">ESP32-S3 室内空气监测节点。可在此统一配置网络、MQTT以及管理各传感器参数，提供现代化的交互体验。</p>
+        <div id="heroBadges" class="chip-row"></div>
+      </section>
+      <aside class="glass-panel" style="display:flex;flex-direction:column;justify-content:center;">
+        <div id="heroMeta" class="kv-list"></div>
+      </aside>
+    </header>
+
+    <div id="notice" class="notice" hidden></div>
+
+    <div class="main-grid">
+      <section class="glass-panel span-2">
+        <h2>运行概览</h2>
+        <p class="section-copy">汇总联网、采样和维护状态，便于快速确认后台主要功能是否正常。</p>
+        <div id="overview" class="kv-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;"></div>
+      </section>
+
+      <section class="glass-panel">
+        <h2>模块状态</h2>
+        <p class="section-copy">快速确认各传感器与指示灯当前状态。</p>
+        <div id="services" class="kv-list"></div>
+      </section>
+
+      <section class="glass-panel span-2">
+        <h2>空气质量总览</h2>
+        <p class="section-copy">基于 EPA AQI 标准计算出的综合指数，提供实时且可视化的评价。</p>
+        <div id="airSummary"></div>
+        <div id="airMetrics" class="metric-grid"></div>
+      </section>
+
+      <section class="glass-panel">
+        <h2>颗粒物画像</h2>
+        <p class="section-copy">结合多个粒径的粒子计数与质量浓度，分析当前环境的颗粒物主要成分。</p>
+        <div id="particleSummary"></div>
+        <div id="particleMetrics" class="kv-list"></div>
+      </section>
+
+      <section class="glass-panel span-2">
+        <h2>网络与 MQTT 配置</h2>
+        <p class="section-copy">修改配置后设备将自动重启应用新的网络设置。</p>
+        <div class="field-grid">
+          <div class="field-span-2">
+            <label>设备名称</label>
+            <input id="device_name" type="text" placeholder="设置设备在网络中的名称"/>
+          </div>
+          <div>
+            <label>Wi-Fi 名称 (SSID)</label>
+            <input id="wifi_ssid" type="text" placeholder="2.4GHz Wi-Fi"/>
+          </div>
+          <div>
+            <label>Wi-Fi 密码</label>
+            <input id="wifi_password" type="password" placeholder="留空以维持不变"/>
+          </div>
+          <div class="field-span-2">
+            <label>MQTT URL</label>
+            <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883"/>
+            <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
+          </div>
+        </div>
+        <button onclick="saveConfig()">保存网络与 MQTT 配置</button>
+      </section>
+
+      <section class="glass-panel">
+        <h2>传感器与维护</h2>
+        <p class="section-copy">对传感器的工作模式进行即时控制，以及系统固件升级。</p>
+        
+        <div class="subsection">
+          <h3>SCD41 设定</h3>
+          <div class="field-grid">
+            <div>
+              <label>海拔补偿（米）</label>
+              <input id="scd41_altitude_m" type="number" placeholder="0 - 3000"/>
+            </div>
+            <div>
+              <label>温度偏移（°C）</label>
+              <input id="scd41_temp_offset_c" type="number" step="0.1" placeholder="例如: 2.5"/>
+            </div>
+          </div>
+          <div class="action-grid">
+            <button id="asc_on_btn" onclick="toggleAsc(true)">开启 ASC 自校准</button>
+            <button id="asc_off_btn" class="ghost" onclick="toggleAsc(false)">关闭 ASC 自校准</button>
+          </div>
+          <div class="field-grid" style="margin-top:16px;">
+            <div>
+              <label>FRC 参考值 (ppm)</label>
+              <input id="frc_reference_ppm" type="number" placeholder="400"/>
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button id="frc_apply_btn" class="ghost" onclick="applyFrc()">强制校准 FRC</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>模块控制</h3>
+          <div class="action-grid">
+            <button id="sps30_wake_btn" onclick="toggleSps30(false)">唤醒 SPS30</button>
+            <button id="sps30_sleep_btn" class="ghost" onclick="toggleSps30(true)">休眠 SPS30</button>
+            <button id="status_led_on_btn" onclick="toggleStatusLed(true)">打开 RGB 灯</button>
+            <button id="status_led_off_btn" class="ghost" onclick="toggleStatusLed(false)">关闭 RGB 灯</button>
+            <button id="republish_btn" class="ghost action-span" onclick="republishDiscovery()">重发 Discovery</button>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>系统操作</h3>
+          <div class="upload-box">
+            <input id="firmware" type="file" accept=".bin"/>
+          </div>
+          <button onclick="uploadFirmware()" style="margin-bottom:16px;">上传并安装固件</button>
+          <div class="action-grid">
+            <button onclick="restartDevice()" class="ghost">重启设备</button>
+            <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="footer-note">当前管理页面面向受信任的局域网环境，默认无需鉴权。</div>
+  </div>
+
+  <script>
+    const configFields=['device_name','wifi_ssid','wifi_password','mqtt_url','scd41_altitude_m','scd41_temp_offset_c'];
+    const configInputs=Object.fromEntries(configFields.map((id)=>[id,document.getElementById(id)]));
+    const noticeEl=document.getElementById('notice');
+    const heroBadgesEl=document.getElementById('heroBadges');
+    const heroMetaEl=document.getElementById('heroMeta');
+    const overviewEl=document.getElementById('overview');
+    const servicesEl=document.getElementById('services');
+    const airSummaryEl=document.getElementById('airSummary');
+    const airMetricsEl=document.getElementById('airMetrics');
+    const particleSummaryEl=document.getElementById('particleSummary');
+    const particleMetricsEl=document.getElementById('particleMetrics');
+    const frcInput=document.getElementById('frc_reference_ppm');
+    const firmwareInput=document.getElementById('firmware');
+    const ascOnBtn=document.getElementById('asc_on_btn');
+    const ascOffBtn=document.getElementById('asc_off_btn');
+    const sps30WakeBtn=document.getElementById('sps30_wake_btn');
+    const sps30SleepBtn=document.getElementById('sps30_sleep_btn');
+    const statusLedOnBtn=document.getElementById('status_led_on_btn');
+    const statusLedOffBtn=document.getElementById('status_led_off_btn');
+    const frcApplyBtn=document.getElementById('frc_apply_btn');
+    const republishBtn=document.getElementById('republish_btn');
+    
+    let configDirty=false;
+    let noticeTimer=0;
+    
+    const categoryLabels={'Good':'良好','Moderate':'一般','Unhealthy for Sensitive Groups':'敏感人群不健康','Unhealthy':'不健康','Very Unhealthy':'非常不健康','Hazardous':'危险','Unavailable':'暂不可用'};
+    const signalLabels={'Good':'良好','Acceptable':'可接受','Elevated':'偏高','High':'高','Very High':'很高','Unavailable':'暂不可用'};
+    const factorLabels={'PM2.5':'PM2.5','PM10':'PM10','CO2':'二氧化碳','Humidity':'湿度','Unavailable':'未提供'};
+    const profileLabels={'Fine-Dominant':'细颗粒主导','Mixed':'混合','Coarse-Dominant':'粗颗粒主导','Unavailable':'暂不可用'};
+    const basisLabels={
+      'EPA AQI (PM2.5 / PM10)':'EPA AQI（PM2.5 / PM10）',
+      'EPA AQI unavailable':'EPA AQI 暂不可用',
+      'U.S. indoor humidity guidance':'美国室内湿度参考',
+      'U.S. indoor ventilation proxy':'美国室内通风参考',
+      'U.S. indoor ventilation/humidity guidance':'美国室内通风/湿度参考',
+      'EPA AQI with U.S. indoor guidance':'EPA AQI + 室内参考',
+      'No sensor data':'暂无传感器数据',
+      'Unavailable':'未提供'
+    };
+
+    function translate(map,value,fallback='未提供'){return map[value]||value||fallback;}
+    function num(value,digits=0,unit=''){
+      if(value==null||value==='')return '--';
+      const n=Number(value);
+      if(Number.isNaN(n))return '--';
+      return `${digits===null?n:n.toFixed(digits)}${unit}`;
+    }
+    function fmtAge(seconds){
+      if(seconds==null||seconds==='')return '--';
+      const sec=Number(seconds);
+      if(Number.isNaN(sec))return '--';
+      if(sec<60)return `${sec} 秒`;
+      const min=Math.floor(sec/60);
+      const rem=sec%60;
+      if(min<60)return rem?`${min} 分 ${rem} 秒`:`${min} 分`;
+      const hr=Math.floor(min/60);
+      const m=min%60;
+      return m?`${hr} 小时 ${m} 分`:`${hr} 小时`;
+    }
+
+    // Components
+    function kv(label,value){return `<div class='kv'><span>${label}</span><strong>${value||'--'}</strong></div>`;}
+    function metric(label,value,meta=''){return `<div class='metric'><span>${label}</span><strong>${value||'--'}</strong>${meta?`<small>${meta}</small>`:''}</div>`;}
+    function chip(label,tone='neutral'){return `<span class='chip chip-${tone||'neutral'}'>${label}</span>`;}
+    function summaryBanner(value,detail,tone='neutral'){return `<div class='summary-banner summary-${tone||'neutral'}'><strong>${value}</strong><span>${detail}</span></div>`;}
+    
+    function localizedOverall(value){return translate(categoryLabels,value,'评估不可用');}
+    
+    function wifiStatus(d){
+      if(d.diag.provisioning_mode) return '等待配网';
+      if(d.diag.wifi_connected) return `已连接 (${d.diag.wifi_rssi} dBm)`;
+      return '离线';
+    }
+    function mqttStatus(d){
+      if(!d.config.mqtt_url) return '未配置';
+      return d.diag.mqtt_connected ? '已连接' : '未连接';
+    }
+
+    function syncActionAvailability(d){
+      const scd41Ready=!!d.diag.scd41_ready;
+      const sps30Ready=!!d.diag.sps30_ready;
+      const ledReady=!!d.diag.status_led_ready;
+      ascOnBtn.disabled=!scd41Ready; ascOffBtn.disabled=!scd41Ready; frcApplyBtn.disabled=!scd41Ready;
+      sps30WakeBtn.disabled=!sps30Ready; sps30SleepBtn.disabled=!sps30Ready;
+      statusLedOnBtn.disabled=!ledReady; statusLedOffBtn.disabled=!ledReady;
+      republishBtn.disabled=!d.diag.mqtt_connected;
+    }
+
+    async function getErrorMessage(r,fallback){
+      try{const j=await r.json();return j.message||fallback;}
+      catch(_){try{return await r.text()||fallback;}catch(__){return fallback;}}
+    }
+    function showNotice(type,message){
+      clearTimeout(noticeTimer);
+      noticeEl.hidden=false;
+      noticeEl.className=`notice notice-${type}`;
+      noticeEl.textContent=message;
+      noticeTimer=setTimeout(()=>{noticeEl.hidden=true;}, 5000);
+      // scroll to top to see notice
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    async function apiRequest(url,options,fallback,successMessage){
+      try {
+        const r=await fetch(url,options);
+        if(!r.ok){showNotice('error',await getErrorMessage(r,fallback));return false;}
+        if(successMessage) showNotice('success',successMessage);
+        return true;
+      } catch(e) {
+        showNotice('error', fallback + ': ' + e.message);
+        return false;
+      }
+    }
+
+    function setConfigValues(d){
+      if(!configDirty){
+        for(const k of configFields){
+          const el=configInputs[k];
+          if(el) el.value=d.config[k]==null?'':d.config[k];
+        }
+      }
+      if(document.activeElement!==frcInput){
+        frcInput.value=d.frc_reference_ppm;
+      }
+    }
+
+    function renderView(d) {
+      const overallKey = d.snapshot.overall_air_quality_key||'neutral';
+      
+      heroBadgesEl.innerHTML=[
+        chip(d.diag.provisioning_mode?'等待配网':'局域网内运行', d.diag.provisioning_mode?'elevated':'good'),
+        chip(`环境：${localizedOverall(d.snapshot.overall_air_quality)}`, overallKey),
+        chip(`MQTT：${mqttStatus(d)}`, d.diag.mqtt_connected?'good':'neutral')
+      ].join('');
+      
+      heroMetaEl.innerHTML=[
+        kv('设备标识', d.diag.device_id),
+        kv('内网 IP', d.diag.ip_addr||'--'),
+        kv('固件版本', d.diag.firmware_version)
+      ].join('');
+
+      overviewEl.innerHTML=[
+        kv('运行模式', d.diag.provisioning_mode?'BLE 配网':'局域网运行'),
+        kv('Wi-Fi 强度', `${d.diag.wifi_rssi} dBm`),
+        kv('系统内存', `${(d.diag.heap_free/1024).toFixed(1)} KB 空闲`),
+        kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec))
+      ].join('');
+
+      servicesEl.innerHTML=[
+        kv('Wi-Fi', wifiStatus(d)),
+        kv('MQTT', mqttStatus(d)),
+        kv('SCD41 状态', d.diag.scd41_ready ? '在线' : '离线'),
+        kv('SGP41 状态', d.diag.sgp41_ready ? '在线' : '离线'),
+        kv('SPS30 状态', d.diag.sps30_ready ? '在线' : '离线'),
+        kv('RGB 灯状态', d.diag.status_led_ready ? (d.diag.status_led_enabled?'开启':'关闭') : '不可用')
+      ].join('');
+
+      airSummaryEl.innerHTML=summaryBanner(
+        `综合环境：${localizedOverall(d.snapshot.overall_air_quality)}`,
+        `${translate(basisLabels, d.snapshot.overall_air_quality_basis)}`,
+        overallKey
+      );
+
+      airMetricsEl.innerHTML=[
+        metric('US AQI', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level)),
+        metric('首要关注', translate(factorLabels, d.snapshot.overall_air_quality_driver, '--'), '影响空气质量主因'),
+        metric('CO2 浓度', num(d.snapshot.co2_ppm, 0, ' ppm'), translate(signalLabels, d.snapshot.co2_rating)),
+        metric('室内温度', num(d.snapshot.temperature_c, 1, ' °C'), 'SCD41 校准前数据'),
+        metric('相对湿度', num(d.snapshot.humidity_rh, 1, ' %'), '建议区间30~60%'),
+        metric('VOC 指数', num(d.snapshot.voc_index), translate(signalLabels, d.snapshot.voc_rating)),
+        metric('NOx 指数', num(d.snapshot.nox_index), translate(signalLabels, d.snapshot.nox_rating))
+      ].join('');
+
+      particleSummaryEl.innerHTML=summaryBanner(
+        `环境诊断：${translate(profileLabels, d.snapshot.particle_profile)}`,
+        d.snapshot.particle_profile_note ? `分析结论：${d.snapshot.particle_profile_note}` : '',
+        d.snapshot.particle_profile_key||'neutral'
+      );
+
+      particleMetricsEl.innerHTML=[
+        kv('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³')),
+        kv('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³')),
+        kv('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³')),
+        kv('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³')),
+        kv('大粒径(>4.0µm)', num(d.snapshot.particles_4_0um, 1, ' #/cm³')),
+        kv('中值粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'))
+      ].join('');
+    }
+
+    async function fetchStatus(){
+      try {
+        const r=await fetch('/api/status');
+        if(!r.ok) return;
+        const d=await r.json();
+        renderView(d);
+        syncActionAvailability(d);
+        setConfigValues(d);
+      } catch(e) { }
+    }
+
+    async function saveConfig(){
+      const payload={
+        device_name: configInputs.device_name.value,
+        wifi_ssid: configInputs.wifi_ssid.value,
+        wifi_password: configInputs.wifi_password.value,
+        mqtt_url: configInputs.mqtt_url.value,
+        scd41_altitude_m: Number(configInputs.scd41_altitude_m.value),
+        scd41_temp_offset_c: Number(configInputs.scd41_temp_offset_c.value)
+      };
+      if(await apiRequest('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},'配置保存失败','配置已保存，系统将重启应用网络重连。')){
+        configDirty=false;
+        setTimeout(fetchStatus, 1500);
+      }
+    }
+    
+    // Actions
+    async function toggleAsc(enabled){ await apiRequest('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'ASC 已开启':'ASC 已关闭'); fetchStatus(); }
+    async function toggleSps30(sleep){ await apiRequest('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})},'操作失败',sleep?'SPS30 休眠中':'SPS30 唤醒中'); fetchStatus(); }
+    async function toggleStatusLed(enabled){ await apiRequest('/api/action/status-led',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'指示灯开启':'指示灯关闭'); fetchStatus(); }
+    async function applyFrc(){ await apiRequest('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frcInput.value)})},'FRC校准失败','已强制校准'); fetchStatus(); }
+    async function republishDiscovery(){ await apiRequest('/api/action/republish-discovery',{method:'POST'},'请求失败','已重新发送 Discovery 报文'); }
+    async function restartDevice(){ await apiRequest('/api/action/restart',{method:'POST'},'请求失败','已请求重启'); }
+    async function factoryReset(){ if(confirm('⚠️ 此操作将清除所有 Wi-Fi 和 MQTT 配置，是否继续？')){ await apiRequest('/api/action/factory-reset',{method:'POST'},'失败','设备即将初始化完毕'); } }
+    async function uploadFirmware(){
+      const file=firmwareInput.files[0];
+      if(!file){ showNotice('info','请选择固件'); return; }
+      if(await apiRequest('/api/ota',{method:'POST',body:file},'OTA 升级失败')){ showNotice('success','固件上传及校验成功，即将重启！'); }
+    }
+
+    for(const key of configFields){ const el=document.getElementById(key); if(el) el.addEventListener('input',()=>configDirty=true); }
+    fetchStatus();
+    setInterval(fetchStatus, 5000);
+  </script>
+</body>
+</html>
