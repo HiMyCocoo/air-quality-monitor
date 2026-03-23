@@ -597,6 +597,51 @@ esp_err_t sensors_set_scd41_asc(bool enabled)
     return err;
 }
 
+esp_err_t sensors_set_scd41_compensation(uint16_t altitude_m, float temp_offset_c)
+{
+    if (!s_ctx.scd41_initialized || s_ctx.lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (altitude_m > 3000 || temp_offset_c < 0.0f || temp_offset_c > 20.0f) {
+        sensors_set_scd41_error("Compensation values out of range");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    esp_err_t err = scd41_stop_periodic_measurement(&s_ctx.scd41);
+    if (err == ESP_OK) {
+        esp_err_t temp_err = scd41_set_temperature_offset(&s_ctx.scd41, temp_offset_c);
+        esp_err_t alt_err = temp_err == ESP_OK ? scd41_set_sensor_altitude(&s_ctx.scd41, altitude_m) : ESP_OK;
+        esp_err_t resume_err = scd41_start_periodic_measurement(&s_ctx.scd41);
+        if (temp_err != ESP_OK) {
+            err = temp_err;
+            if (resume_err != ESP_OK) {
+                ESP_LOGW(TAG, "failed to resume SCD41 periodic measurement after temp offset error: %d", resume_err);
+            }
+        } else if (alt_err != ESP_OK) {
+            err = alt_err;
+            if (resume_err != ESP_OK) {
+                ESP_LOGW(TAG, "failed to resume SCD41 periodic measurement after altitude error: %d", resume_err);
+            }
+        } else {
+            err = resume_err;
+        }
+    }
+    if (err == ESP_OK) {
+        s_ctx.config.scd41_altitude_m = altitude_m;
+        s_ctx.config.scd41_temp_offset_c = temp_offset_c;
+        s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
+    }
+    xSemaphoreGive(s_ctx.lock);
+
+    if (err == ESP_OK) {
+        sensors_clear_scd41_error();
+    } else {
+        sensors_set_scd41_error("Compensation update failed");
+    }
+    return err;
+}
+
 esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm)
 {
     if (!s_ctx.scd41_initialized || s_ctx.lock == NULL) {

@@ -457,6 +457,14 @@ void mqtt_ha_set_control_state(bool scd41_asc_enabled, uint16_t frc_reference_pp
     s_ctx.frc_reference_ppm = frc_reference_ppm;
 }
 
+void mqtt_ha_set_device_name(const char *device_name)
+{
+    if (device_name == NULL) {
+        return;
+    }
+    strlcpy(s_ctx.config.device_name, device_name, sizeof(s_ctx.config.device_name));
+}
+
 uint16_t mqtt_ha_get_frc_reference_ppm(void)
 {
     return s_ctx.frc_reference_ppm;

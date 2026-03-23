@@ -899,6 +899,73 @@
       font-size: 0.9rem;
       margin-bottom: 16px;
     }
+    .maintenance-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .maintenance-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+    .maintenance-column .glass-panel {
+      padding: 24px;
+    }
+    .maintenance-panel h2 {
+      margin-bottom: 16px;
+    }
+    .maintenance-toggle-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .maintenance-toggle-stack .toggle-row {
+      min-height: 88px;
+    }
+    .maintenance-panel .inner-card {
+      padding: 16px;
+    }
+    .maintenance-panel .inner-card h3 {
+      margin-bottom: 12px;
+    }
+    .maintenance-section-title {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      color: var(--text-main);
+    }
+    .maintenance-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .maintenance-tool-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .maintenance-tool-block {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.48);
+      border: 1px solid rgba(255,255,255,0.78);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .maintenance-tool-block h3 {
+      margin: 0 0 10px;
+      font-size: 0.96rem;
+    }
+    .maintenance-system-card {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .maintenance-subsection {
+      padding-top: 16px;
+      border-top: 1px dashed rgba(0,0,0,0.1);
+    }
 
     @media (max-width: 768px) {
       .tabs {
@@ -934,6 +1001,9 @@
         grid-template-columns: 1fr;
       }
       .operation-grid {
+        grid-template-columns: 1fr;
+      }
+      .maintenance-layout {
         grid-template-columns: 1fr;
       }
     }
@@ -1070,15 +1140,14 @@
     </section>
 
     <section id="tab-maintenance" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-maintenance" data-tab="maintenance" hidden>
-      <div class="main-grid">
-        <section class="glass-panel span-2 panel-primary">
-          <h2>设备控制</h2>
-          <div class="control-grid">
-            <div class="control-card">
-              <h3>SPS30 工作状态</h3>
+      <div class="maintenance-layout">
+        <div class="maintenance-column">
+          <section class="glass-panel panel-secondary maintenance-panel">
+            <h2>设备开关</h2>
+            <div class="maintenance-toggle-stack">
               <div class="toggle-row">
                 <div class="toggle-copy">
-                  <span class="toggle-title">连续采样</span>
+                  <span class="toggle-title">SPS30 连续采样</span>
                   <span id="sps30_status_text" class="toggle-status">当前：--</span>
                 </div>
                 <label class="switch" for="sps30_toggle">
@@ -1086,13 +1155,10 @@
                   <span class="switch-slider" aria-hidden="true"></span>
                 </label>
               </div>
-            </div>
 
-            <div class="control-card">
-              <h3>RGB 状态灯</h3>
               <div class="toggle-row">
                 <div class="toggle-copy">
-                  <span class="toggle-title">状态灯</span>
+                  <span class="toggle-title">RGB 状态灯</span>
                   <span id="status_led_text" class="toggle-status">当前：--</span>
                 </div>
                 <label class="switch" for="status_led_toggle">
@@ -1101,37 +1167,36 @@
                 </label>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="glass-panel panel-secondary">
-          <h2>MQTT 工具与校准</h2>
-          <div class="inner-stack">
-            <div class="inner-card">
-              <h3>重发 Discovery</h3>
-              <button id="republish_btn" class="ghost" onclick="republishDiscovery()">重发 Discovery</button>
-            </div>
+          <section class="glass-panel panel-secondary maintenance-panel">
+            <h2>MQTT 工具与校准</h2>
+            <div class="maintenance-tool-list">
+              <div class="maintenance-tool-block">
+                <h3>重发 Discovery</h3>
+                <button id="republish_btn" class="ghost" onclick="republishDiscovery()">重发 Discovery</button>
+              </div>
 
-            <div class="inner-card">
-              <h3>FRC 强制校准</h3>
-              <div class="field-grid button-stack-narrow">
-                <div>
-                  <label>FRC 参考值 (ppm)</label>
-                  <input id="frc_reference_ppm" type="number" placeholder="400"/>
-                </div>
-                <div style="display:flex; align-items:flex-end;">
-                  <button id="frc_apply_btn" class="ghost no-wrap" onclick="applyFrc()">应用 FRC 校准</button>
+              <div class="maintenance-tool-block">
+                <h3>FRC 强制校准</h3>
+                <div class="field-grid button-stack-narrow">
+                  <div>
+                    <label>FRC 参考值 (ppm)</label>
+                    <input id="frc_reference_ppm" type="number" placeholder="400"/>
+                  </div>
+                  <div style="display:flex; align-items:flex-end;">
+                    <button id="frc_apply_btn" class="ghost no-wrap" onclick="applyFrc()">应用 FRC 校准</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <section class="glass-panel span-3 panel-primary">
-          <h2>固件升级与系统操作</h2>
-          <div class="operation-grid">
-            <div class="inner-card">
-              <h3>固件升级</h3>
+        <div class="maintenance-column">
+          <section class="glass-panel panel-primary maintenance-panel">
+            <h2>固件升级与系统操作</h2>
+            <div class="maintenance-system-card">
               <div class="mini-kv">
                 <span>当前固件版本</span>
                 <strong id="firmware_version_text">--</strong>
@@ -1146,22 +1211,24 @@
                   </span>
                 </label>
               </div>
-              <button class="card-footer" onclick="uploadFirmware()">上传并安装固件</button>
-            </div>
+              <button onclick="uploadFirmware()">上传并安装固件</button>
 
-            <div class="inner-card">
-              <h3>设备管理</h3>
-              <div class="mini-kv">
-                <span>设备标识</span>
-                <strong id="device_id_text">--</strong>
-              </div>
-              <div class="action-grid card-footer" style="margin-bottom:0;">
-                <button onclick="restartDevice()" class="ghost">重启设备</button>
-                <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
+              <div class="maintenance-subsection">
+                <h3 class="maintenance-section-title">设备管理</h3>
+                <div class="maintenance-actions">
+                  <div class="mini-kv">
+                    <span>设备标识</span>
+                    <strong id="device_id_text">--</strong>
+                  </div>
+                  <div class="action-grid" style="margin-bottom:0;">
+                    <button onclick="restartDevice()" class="ghost">重启设备</button>
+                    <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </section>
   </div>
@@ -1384,6 +1451,29 @@
       }
     }
 
+    async function apiRequestJson(url,options,fallback){
+      if(mockMode){
+        const result=handleMockRequest(url,options);
+        if(!result.ok){
+          showNotice('error',result.message||fallback);
+          return null;
+        }
+        return result;
+      }
+      try {
+        const r=await fetch(url,options);
+        if(!r.ok){
+          showNotice('error',await getErrorMessage(r,fallback));
+          return null;
+        }
+        try{return await r.json();}
+        catch(_){return {status:'ok'};}
+      } catch(e) {
+        showNotice('error', fallback + ': ' + e.message);
+        return null;
+      }
+    }
+
     function parseMockJsonBody(options){
       if(!options||typeof options.body!=='string') return {};
       try{return JSON.parse(options.body);}
@@ -1393,6 +1483,7 @@
     function handleMockRequest(url,options){
       const body=parseMockJsonBody(options);
       if(url==='/api/config'){
+        const previous=clone(mockStatus.config);
         mockStatus.config.device_name=body.device_name||'';
         mockStatus.config.wifi_ssid=body.wifi_ssid||'';
         if(body.wifi_password) mockStatus.config.wifi_password=body.wifi_password;
@@ -1402,7 +1493,14 @@
         mockStatus.diag.provisioning_mode=!mockStatus.config.wifi_ssid;
         mockStatus.diag.wifi_connected=!!mockStatus.config.wifi_ssid;
         mockStatus.diag.mqtt_connected=!!mockStatus.config.mqtt_url;
-        return {ok:true};
+        const restart=
+          previous.wifi_ssid!==mockStatus.config.wifi_ssid ||
+          previous.wifi_password!==mockStatus.config.wifi_password ||
+          previous.mqtt_url!==mockStatus.config.mqtt_url;
+        const runtime_applied=
+          previous.scd41_altitude_m!==mockStatus.config.scd41_altitude_m ||
+          previous.scd41_temp_offset_c!==mockStatus.config.scd41_temp_offset_c;
+        return {ok:true,status:'ok',restart,runtime_applied};
       }
       if(url==='/api/action/scd41-asc'){
         mockStatus.config.scd41_asc_enabled=!!body.enabled;
@@ -1612,10 +1710,26 @@
         scd41_altitude_m: Number(configInputs.scd41_altitude_m.value),
         scd41_temp_offset_c: Number(configInputs.scd41_temp_offset_c.value)
       };
-      if(await apiRequest('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},'配置保存失败','配置已保存，系统将重启应用网络重连。')){
-        configDirty=false;
+      const result=await apiRequestJson('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},'配置保存失败');
+      if(!result) return;
+      configDirty=false;
+      if(result.restart && result.runtime_applied){
+        showNotice('success','配置已保存，系统将重启应用网络重连。SCD41 补偿参数已即时下发。');
         setTimeout(fetchStatus, 1500);
+        return;
       }
+      if(result.restart){
+        showNotice('success','网络 / MQTT 配置已保存，系统将重启应用网络重连。');
+        setTimeout(fetchStatus, 1500);
+        return;
+      }
+      if(result.runtime_applied){
+        showNotice('success','SCD41 补偿参数已即时生效。');
+        fetchStatus();
+        return;
+      }
+      showNotice('success','配置已保存。');
+      fetchStatus();
     }
     
     // Actions

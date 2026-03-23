@@ -94,6 +94,18 @@ static esp_err_t send_ok_restart_json(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"status\":\"ok\",\"restart\":true}");
 }
 
+static esp_err_t send_ok_config_json(httpd_req_t *req, bool restart, bool runtime_applied)
+{
+    cJSON *root = cJSON_CreateObject();
+    ESP_RETURN_ON_FALSE(root != NULL, ESP_ERR_NO_MEM, TAG, "json alloc failed");
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddBoolToObject(root, "restart", restart);
+    cJSON_AddBoolToObject(root, "runtime_applied", runtime_applied);
+    esp_err_t err = send_json(req, root);
+    cJSON_Delete(root);
+    return err;
+}
+
 static esp_err_t parse_json_request(httpd_req_t *req, cJSON **json_out)
 {
     char *body = read_body(req);
@@ -647,11 +659,20 @@ static esp_err_t config_handler(httpd_req_t *req)
     }
     cJSON_Delete(json);
 
+    bool restart_required = false;
+    bool runtime_applied = false;
     if (s_ctx.callbacks.save_config != NULL) {
-        ESP_RETURN_ON_ERROR(s_ctx.callbacks.save_config(&config, s_ctx.user_ctx), TAG, "save config failed");
+        esp_err_t err = s_ctx.callbacks.save_config(&config, &restart_required, &runtime_applied, s_ctx.user_ctx);
+        if (err == ESP_ERR_INVALID_STATE) {
+            return send_error_json(req, "409 Conflict", "SCD41 当前不可用，无法即时应用补偿参数");
+        }
+        if (err == ESP_ERR_INVALID_ARG) {
+            return send_error_json(req, "400 Bad Request", "SCD41 补偿参数无效");
+        }
+        ESP_RETURN_ON_ERROR(err, TAG, "save config failed");
     }
 
-    return send_ok_restart_json(req);
+    return send_ok_config_json(req, restart_required, runtime_applied);
 }
 
 static esp_err_t simple_action_handler(httpd_req_t *req, void (*action)(void *))
