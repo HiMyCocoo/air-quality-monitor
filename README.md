@@ -4,7 +4,8 @@
 
 当前固件设计很明确：
 
-- 首次配网走 `ESP BLE Prov`
+- 启动时优先尝试已保存的 `Wi-Fi`；没有已保存配置时，当前默认构建还会先尝试编译进固件的默认 `Wi-Fi`
+- 没有可用网络或联网失败超时后，自动回退到 `ESP BLE Prov`
 - 设备连上局域网后提供本地网页控制台
 - 配好 `MQTT` 后通过 `MQTT Discovery` 自动接入 `Home Assistant`
 - 允许缺少部分传感器继续运行，缺失项在网页和 MQTT 中显示为不可用
@@ -20,7 +21,7 @@
 - 总体空气质量评估：优先使用 `EPA US AQI (PM2.5 / PM10)`，并补充 `CO2 / 湿度` 室内提示
 - 直观补充评级：为 `CO2 / VOC Index / NOx Index` 生成单独等级，方便快速判断当前状态
 - 颗粒物画像：综合 `PM1.0 / PM2.5 / PM4.0 / PM10 / 粒子数 / 典型粒径` 给出粒径分布描述
-- 本地网页：状态、遥测、`Wi-Fi / MQTT` 配置、传感器控制、OTA、重启、恢复出厂
+- 本地网页：状态、遥测、`Wi-Fi / MQTT URL` 配置、传感器控制、`RGB` 灯控制、Discovery 重发、OTA、重启、恢复出厂
 - `Home Assistant`：自动发现传感器、按钮和控制开关
 
 ## 硬件与默认 GPIO
@@ -84,35 +85,44 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 ## 首次上电与配网
 
-### 1. BLE 配网
+### 1. 默认联网尝试
 
-没有保存过 `Wi-Fi` 凭据时，设备会进入 `ESP BLE Prov`。
+如果设备里还没有已保存的配置，当前仓库默认构建出来的固件会先尝试连接一组编译时默认 `Wi-Fi`：
+
+- `SSID: ong`
+- `Password: jiajia990820`
+
+这组默认值主要用于开发和联调。如果你不希望带着这组凭据发布固件，应在构建前改掉它。
+
+### 2. BLE 配网回退
+
+没有可用 `Wi-Fi`、默认 `Wi-Fi` 连接失败、或离线超时后，设备会进入 `ESP BLE Prov`。
 
 - BLE Service Name：`airmon-<device_id>`
 - PoP：`<device_id>`
 
 这里的 `device_id` 是设备 `MAC` 后 3 字节的小写十六进制字符串，例如 `a1b2c3`。
 
-### 2. 接入局域网
+### 3. 接入局域网
 
 用 Espressif 官方 `ESP BLE Prov` App 或兼容客户端下发 `Wi-Fi` 后，设备会自动连入局域网。
 
-### 3. 打开本地网页补 MQTT
+### 4. 打开本地网页补 MQTT
 
-设备拿到 IP 后，用浏览器访问设备 IP，在网页里填写：
+设备拿到 IP 后，用浏览器访问设备 IP，在网页里填写一行 `MQTT URL`：
 
-- `MQTT Host`
-- `MQTT Port`
-- `MQTT Username / Password`（如果有）
-- `Discovery Prefix`
-- `Topic Root`
+- 例如：`mqtt://user:password@192.168.1.20:1883`
 
 保存后设备会自动重启。
 
 说明：
 
 - 只配 `Wi-Fi` 也能进入局域网
-- 只有 `MQTT Host` 配好后，设备才会启动 MQTT 并发布 Discovery
+- 只有 `MQTT URL` 配好后，设备才会启动 MQTT 并发布 Discovery
+- `MQTT URL` 格式为 `mqtt://[user:password@]host[:port]`
+- 用户名或密码里如果有 `@ / :` 等保留字符，需要做 `URL 编码`
+- `Discovery Prefix / Topic Root / Publish Interval` 不再由网页输入，而是固定使用固件默认值
+- 恢复出厂后如果现场默认 `Wi-Fi` 仍然可连，设备会直接回到该网络，不一定停留在 `BLE` 配网页面
 
 ## 本地网页控制台
 
@@ -125,10 +135,20 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - 控制 `SCD41 ASC`
 - 应用 `SCD41 FRC`
 - 控制 `SPS30` 休眠 / 唤醒
+- 控制板载 `RGB` 状态灯开关
+- 重新发布 `Home Assistant Discovery`
 - OTA 升级
-- 重启设备、恢复出厂、重新发布 Discovery
+- 重启设备、恢复出厂
 
 当前网页管理端口不带登录认证，只适合你信任的局域网。
+
+网页前端文件当前在 `components/provisioning_web/index.html`，构建时会作为嵌入资源打进固件，而不是独立存储在文件系统里。
+
+### OTA 说明
+
+- OTA 升级的是整包应用镜像，不只是后端逻辑
+- 因为管理后台前端已经嵌入固件，所以 OTA 会连前端页面一起升级
+- 如果 OTA 后浏览器里样式还是旧的，通常是缓存问题，强制刷新一次即可
 
 ## MQTT / Home Assistant
 
