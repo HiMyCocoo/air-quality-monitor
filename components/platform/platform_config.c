@@ -15,23 +15,22 @@
 
 static const char *TAG = "platform_config";
 
-static void platform_config_sanitize(device_config_t *config, const char *device_id)
+void platform_config_sanitize(device_config_t *config, const char *device_id)
 {
+    if (config == NULL) {
+        return;
+    }
     if (config->device_name[0] == '\0' && device_id != NULL) {
         snprintf(config->device_name, sizeof(config->device_name), "aq-monitor-%.20s", device_id);
     }
-    if (config->discovery_prefix[0] == '\0') {
-        snprintf(config->discovery_prefix, sizeof(config->discovery_prefix), "homeassistant");
-    }
-    if (config->topic_root[0] == '\0' && device_id != NULL) {
+    snprintf(config->discovery_prefix, sizeof(config->discovery_prefix), "homeassistant");
+    if (device_id != NULL) {
         snprintf(config->topic_root, sizeof(config->topic_root), "air_quality_monitor/%s", device_id);
     }
     if (config->mqtt_port == 0) {
         config->mqtt_port = 1883;
     }
-    if (config->publish_interval_sec < 5 || config->publish_interval_sec > 60) {
-        config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
-    }
+    config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     if (config->scd41_temp_offset_c < 0.0f || config->scd41_temp_offset_c > 20.0f) {
         config->scd41_temp_offset_c = 4.0f;
     }

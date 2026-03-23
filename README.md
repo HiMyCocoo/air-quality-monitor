@@ -120,7 +120,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 - 查看设备状态、传感器在线状态、最近错误
 - 查看 `Overall Air Quality / US AQI / CO2 Rating / VOC Rating / NOx Rating / Particle Profile / 温湿度 / PM / 粒子数 / 典型粒径 / 样本年龄`
-- 修改 `Wi-Fi / MQTT` 配置
+- 修改 `Wi-Fi / MQTT URL` 配置
 - 设置 `SCD41` 海拔补偿和温度偏移
 - 控制 `SCD41 ASC`
 - 应用 `SCD41 FRC`
@@ -139,6 +139,12 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - `topic_root = air_quality_monitor/<device_id>`
 - `mqtt_port = 1883`
 - `publish_interval_sec = 10`
+
+网页后台里，`MQTT` 现在只需要填写一行 `MQTT URL`，例如：
+
+- `mqtt://user:password@192.168.1.20:1883`
+
+`Discovery 前缀 / 主题根路径 / 发布间隔` 不再由用户输入，而是固定使用上面的代码默认值。
 
 自动发布的主要实体：
 
