@@ -44,15 +44,55 @@ typedef struct {
 
 static mqtt_ctx_t s_ctx;
 
+static const char *voc_rating_label_for_ha(air_quality_signal_level_t level)
+{
+    switch (level) {
+    case AIR_QUALITY_SIGNAL_GOOD:
+        return "Fresh Air";
+    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
+        return "Normal";
+    case AIR_QUALITY_SIGNAL_ELEVATED:
+        return "Light Pollution";
+    case AIR_QUALITY_SIGNAL_HIGH:
+        return "Moderate Pollution";
+    case AIR_QUALITY_SIGNAL_VERY_HIGH:
+        return "Heavy Pollution";
+    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
+    default:
+        return "Unavailable";
+    }
+}
+
+static const char *nox_rating_label_for_ha(air_quality_signal_level_t level)
+{
+    switch (level) {
+    case AIR_QUALITY_SIGNAL_GOOD:
+        return "Normal";
+    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
+        return "Slightly Elevated";
+    case AIR_QUALITY_SIGNAL_ELEVATED:
+        return "Light Pollution";
+    case AIR_QUALITY_SIGNAL_HIGH:
+        return "Moderate Pollution";
+    case AIR_QUALITY_SIGNAL_VERY_HIGH:
+        return "Heavy Pollution";
+    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
+    default:
+        return "Unavailable";
+    }
+}
+
 static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
     {"co2_rating", "CO2 Rating", "co2_rating", NULL, NULL, NULL, NULL, false},
     {"temperature", "Temperature", "temperature", "°C", "temperature", "measurement", NULL, false},
+    {"temperature_rating", "Temperature Rating", "temperature_rating", NULL, NULL, NULL, NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
-    {"voc_index", "VOC Index", "voc_index", "index", NULL, "measurement", NULL, false},
-    {"voc_rating", "VOC Rating", "voc_rating", NULL, NULL, NULL, NULL, false},
-    {"nox_index", "NOx Index", "nox_index", "index", NULL, "measurement", NULL, false},
-    {"nox_rating", "NOx Rating", "nox_rating", NULL, NULL, NULL, NULL, false},
+    {"humidity_rating", "Humidity Rating", "humidity_rating", NULL, NULL, NULL, NULL, false},
+    {"voc_index", "VOC Index", "voc_index", "points", NULL, "measurement", NULL, false},
+    {"voc_rating", "VOC Classification", "voc_rating", NULL, NULL, NULL, NULL, false},
+    {"nox_index", "NOx Index", "nox_index", "points", NULL, "measurement", NULL, false},
+    {"nox_rating", "NOx Classification", "nox_rating", NULL, NULL, NULL, NULL, false},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
@@ -463,27 +503,35 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     air_quality_signal_level_t co2_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
     air_quality_signal_level_t voc_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
     air_quality_signal_level_t nox_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
+    const char *temperature_rating = "Unavailable";
+    const char *humidity_rating = "Unavailable";
 
     cJSON *state = cJSON_CreateObject();
     if (snapshot->scd41_valid) {
         co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
+        temperature_rating = air_quality_rate_temperature_label(snapshot->temperature_c);
+        humidity_rating = air_quality_rate_humidity_label(snapshot->humidity_rh);
         cJSON_AddNumberToObject(state, "co2", snapshot->co2_ppm);
         cJSON_AddStringToObject(state, "co2_rating", air_quality_signal_level_label(co2_rating));
         cJSON_AddNumberToObject(state, "temperature", snapshot->temperature_c);
+        cJSON_AddStringToObject(state, "temperature_rating", temperature_rating);
         cJSON_AddNumberToObject(state, "humidity", snapshot->humidity_rh);
+        cJSON_AddStringToObject(state, "humidity_rating", humidity_rating);
     } else {
         cJSON_AddNullToObject(state, "co2");
         cJSON_AddNullToObject(state, "co2_rating");
         cJSON_AddNullToObject(state, "temperature");
+        cJSON_AddNullToObject(state, "temperature_rating");
         cJSON_AddNullToObject(state, "humidity");
+        cJSON_AddNullToObject(state, "humidity_rating");
     }
     if (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) {
         voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
         nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
         cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
-        cJSON_AddStringToObject(state, "voc_rating", air_quality_signal_level_label(voc_rating));
+        cJSON_AddStringToObject(state, "voc_rating", voc_rating_label_for_ha(voc_rating));
         cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
-        cJSON_AddStringToObject(state, "nox_rating", air_quality_signal_level_label(nox_rating));
+        cJSON_AddStringToObject(state, "nox_rating", nox_rating_label_for_ha(nox_rating));
     } else {
         cJSON_AddNullToObject(state, "voc_index");
         cJSON_AddNullToObject(state, "voc_rating");

@@ -87,17 +87,6 @@
       padding: 40px 24px;
     }
 
-    .hero {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 24px;
-      margin-bottom: 32px;
-    }
-    
-    @media (max-width: 992px) {
-      .hero { grid-template-columns: 1fr; }
-    }
-
     /* Glass Panels */
     .glass-panel {
       background: var(--glass-bg);
@@ -115,17 +104,6 @@
     }
 
     /* Typography */
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
-      background: linear-gradient(90deg, #2b6cb0, #805ad5);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
     h2 {
       font-size: 1.25rem;
       font-weight: 700;
@@ -142,46 +120,6 @@
       margin: 20px 0 12px;
       color: var(--text-main);
     }
-
-    p.lede {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-      max-width: 800px;
-    }
-
-    .section-copy {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin-bottom: 24px;
-    }
-
-    /* Chips/Badges */
-    .chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .chip {
-      padding: 6px 14px;
-      border-radius: 99px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    /* Semantic Chip Colors */
-    .chip-good { background: var(--bg-good); color: var(--color-good); }
-    .chip-moderate { background: var(--bg-moderate); color: var(--color-moderate); }
-    .chip-elevated { background: var(--bg-sensitive); color: var(--color-sensitive); }
-    .chip-unhealthy { background: var(--bg-unhealthy); color: var(--color-unhealthy); }
-    .chip-very-unhealthy { background: var(--bg-very-unhealthy); color: var(--color-very-unhealthy); }
-    .chip-hazardous { background: var(--bg-hazardous); color: var(--color-hazardous); }
-    .chip-neutral { background: var(--bg-neutral); color: var(--color-neutral); }
-    .chip-fine { background: #e2e8f0; color: #2b6cb0; }
-    .chip-coarse { background: #fed7d7; color: #c53030; }
 
     /* Summary Banners */
     .summary-banner {
@@ -200,6 +138,25 @@
     .summary-banner span {
       font-size: 1.05rem;
       opacity: 0.9;
+    }
+    .summary-banner-compact {
+      padding: 14px 18px;
+      margin-bottom: 0;
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .summary-banner-compact strong {
+      display: inline;
+      font-size: 1.02rem;
+      margin-bottom: 0;
+      white-space: nowrap;
+    }
+    .summary-banner-compact span {
+      font-size: 0.92rem;
+      line-height: 1.45;
     }
     .summary-good { background: linear-gradient(135deg, var(--bg-good) 0%, #c6f6d5 100%); color: var(--color-good); }
     .summary-moderate { background: linear-gradient(135deg, var(--bg-moderate) 0%, #fefcbf 100%); color: var(--color-moderate); }
@@ -246,6 +203,40 @@
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 16px;
     }
+    .air-metrics-primary {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .air-metrics-secondary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .particle-overview {
+      padding: 20px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.52);
+      border: 1px solid rgba(255,255,255,0.8);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .particle-overview h3 {
+      margin: 0 0 16px;
+      font-size: 1.02rem;
+      color: var(--text-main);
+    }
+    .particle-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .particle-grid .kv {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(255,255,255,0.78);
+      border-radius: 14px;
+    }
     .metric {
       background: rgba(255,255,255,0.5);
       padding: 20px;
@@ -274,12 +265,155 @@
       font-weight: 700;
       color: var(--text-main);
       line-height: 1.1;
-      margin-bottom: 8px;
+      margin-bottom: 0;
     }
     .metric small {
       font-size: 0.8rem;
       color: var(--text-muted);
       line-height: 1.3;
+    }
+    .metric-value {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      width: 100%;
+    }
+    .metric-unit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--primary);
+      background: rgba(82, 106, 242, 0.1);
+      border: 1px solid rgba(82, 106, 242, 0.18);
+      margin-top: 6px;
+      margin-left: 12px;
+      font-style: normal;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .metric-primary {
+      min-height: 190px;
+      padding: 28px 24px;
+      background: rgba(255,255,255,0.78);
+      box-shadow: 0 12px 28px rgba(31, 38, 135, 0.08);
+    }
+    .metric-primary strong {
+      font-size: 3rem;
+      letter-spacing: -0.04em;
+    }
+    .metric-primary .metric-unit {
+      margin-top: 8px;
+    }
+    .metric-primary small {
+      font-size: 1rem;
+    }
+    .metric-featured {
+      min-height: 218px;
+      padding: 32px 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.82) 100%);
+      box-shadow: 0 18px 34px rgba(31, 38, 135, 0.1);
+    }
+    .metric-featured strong {
+      font-size: 4.2rem;
+      letter-spacing: -0.05em;
+    }
+    .metric-featured small {
+      font-size: 1.08rem;
+    }
+    .metric-featured .metric-unit {
+      margin-top: 10px;
+    }
+    .metric-featured.metric-tone-good {
+      background: linear-gradient(180deg, rgba(230, 255, 237, 0.98) 0%, rgba(198, 246, 213, 0.88) 100%);
+      border-color: rgba(56, 161, 105, 0.22);
+      box-shadow: 0 18px 34px rgba(56, 161, 105, 0.16);
+    }
+    .metric-featured.metric-tone-moderate {
+      background: linear-gradient(180deg, rgba(255, 255, 240, 0.98) 0%, rgba(254, 252, 191, 0.9) 100%);
+      border-color: rgba(214, 158, 46, 0.22);
+      box-shadow: 0 18px 34px rgba(214, 158, 46, 0.16);
+    }
+    .metric-featured.metric-tone-sensitive {
+      background: linear-gradient(180deg, rgba(254, 235, 200, 0.98) 0%, rgba(251, 211, 141, 0.9) 100%);
+      border-color: rgba(237, 137, 54, 0.24);
+      box-shadow: 0 18px 34px rgba(237, 137, 54, 0.18);
+    }
+    .metric-featured.metric-tone-unhealthy {
+      background: linear-gradient(180deg, rgba(255, 245, 245, 0.98) 0%, rgba(254, 215, 215, 0.92) 100%);
+      border-color: rgba(229, 62, 62, 0.24);
+      box-shadow: 0 18px 34px rgba(229, 62, 62, 0.18);
+    }
+    .metric-featured.metric-tone-very-unhealthy {
+      background: linear-gradient(180deg, rgba(250, 245, 255, 0.98) 0%, rgba(233, 216, 253, 0.92) 100%);
+      border-color: rgba(128, 90, 213, 0.24);
+      box-shadow: 0 18px 34px rgba(128, 90, 213, 0.18);
+    }
+    .metric-featured.metric-tone-hazardous {
+      background: linear-gradient(180deg, rgba(255, 240, 240, 0.98) 0%, rgba(254, 215, 215, 0.94) 100%);
+      border-color: rgba(116, 42, 42, 0.28);
+      box-shadow: 0 18px 34px rgba(116, 42, 42, 0.18);
+    }
+    .metric-featured.metric-tone-unavailable,
+    .metric-featured.metric-tone-neutral {
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(237, 242, 247, 0.86) 100%);
+    }
+    .metric-featured.metric-tone-good span,
+    .metric-featured.metric-tone-good small,
+    .metric-featured.metric-tone-good .metric-unit,
+    .metric-featured.metric-tone-good strong {
+      color: var(--color-good);
+    }
+    .metric-featured.metric-tone-moderate span,
+    .metric-featured.metric-tone-moderate small,
+    .metric-featured.metric-tone-moderate .metric-unit,
+    .metric-featured.metric-tone-moderate strong {
+      color: var(--color-moderate);
+    }
+    .metric-featured.metric-tone-sensitive span,
+    .metric-featured.metric-tone-sensitive small,
+    .metric-featured.metric-tone-sensitive .metric-unit,
+    .metric-featured.metric-tone-sensitive strong {
+      color: var(--color-sensitive);
+    }
+    .metric-featured.metric-tone-unhealthy span,
+    .metric-featured.metric-tone-unhealthy small,
+    .metric-featured.metric-tone-unhealthy .metric-unit,
+    .metric-featured.metric-tone-unhealthy strong {
+      color: var(--color-unhealthy);
+    }
+    .metric-featured.metric-tone-very-unhealthy span,
+    .metric-featured.metric-tone-very-unhealthy small,
+    .metric-featured.metric-tone-very-unhealthy .metric-unit,
+    .metric-featured.metric-tone-very-unhealthy strong {
+      color: var(--color-very-unhealthy);
+    }
+    .metric-featured.metric-tone-hazardous span,
+    .metric-featured.metric-tone-hazardous small,
+    .metric-featured.metric-tone-hazardous .metric-unit,
+    .metric-featured.metric-tone-hazardous strong {
+      color: var(--color-hazardous);
+    }
+    .metric-featured[class*='metric-tone-'] .metric-unit {
+      background: rgba(255,255,255,0.42);
+      border-color: rgba(255,255,255,0.45);
+    }
+    .metric-secondary {
+      min-height: 148px;
+      background: rgba(255,255,255,0.48);
+    }
+    .metric-secondary strong {
+      font-size: 2.2rem;
+      letter-spacing: -0.03em;
+    }
+    .metric-secondary small {
+      font-size: 0.95rem;
     }
 
     /* Main Grid */
@@ -305,11 +439,110 @@
       gap: 16px;
       margin-bottom: 24px;
     }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .overview-clusters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .overview-group {
+      padding: 22px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.34);
+      border: 1px solid rgba(255,255,255,0.72);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .overview-group h3 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      color: var(--text-main);
+    }
+    .overview-group .kv {
+      background: rgba(255,255,255,0.55);
+    }
+    .panel-primary {
+      background: linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.76) 100%);
+      border-color: rgba(255,255,255,0.88);
+      box-shadow: 0 18px 36px rgba(31, 38, 135, 0.08);
+    }
+    .panel-secondary {
+      background: rgba(255,255,255,0.58);
+      border-color: rgba(255,255,255,0.82);
+      box-shadow: 0 10px 24px rgba(31, 38, 135, 0.05);
+    }
+    .inner-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .inner-card {
+      padding: 20px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.44);
+      border: 1px solid rgba(255,255,255,0.78);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .inner-card h3 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      color: var(--text-main);
+    }
+    .inner-card p {
+      margin: 0 0 16px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .inner-card .field-grid:last-child,
+    .inner-card .action-grid:last-child {
+      margin-bottom: 0;
+    }
+    .operation-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 1fr);
+      gap: 18px;
+    }
+    .operation-grid > .inner-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .card-footer {
+      margin-top: auto;
+    }
+    .mini-kv {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.72);
+      margin-bottom: 16px;
+    }
+    .mini-kv span {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    .mini-kv strong {
+      color: var(--text-main);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
     .field-span-2 {
       grid-column: span 2;
     }
     @media (max-width: 640px) {
       .field-grid, .action-grid { grid-template-columns: 1fr; }
+      .overview-grid { grid-template-columns: 1fr; }
+      .overview-clusters { grid-template-columns: 1fr; }
+      .air-metrics-primary, .air-metrics-secondary, .particle-grid { grid-template-columns: 1fr; }
+      .operation-grid { grid-template-columns: 1fr; }
       .field-span-2 { grid-column: span 1; }
     }
     
@@ -426,8 +659,7 @@
     .upload-box {
       border: 2px dashed #cbd5e0;
       border-radius: 16px;
-      padding: 20px;
-      text-align: center;
+      padding: 18px 20px;
       transition: var(--transition);
       background: rgba(255,255,255,0.4);
       margin-bottom: 16px;
@@ -436,13 +668,56 @@
       border-color: var(--primary);
       background: rgba(255,255,255,0.6);
     }
-    input[type='file'] {
+    .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
       padding: 0;
-      border: none;
-      background: transparent;
-      box-shadow: none;
-      color: var(--text-main);
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .file-picker {
+      display: flex;
+      align-items: center;
+      gap: 16px;
       cursor: pointer;
+      min-height: 72px;
+    }
+    .file-picker-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: rgba(82, 106, 242, 0.12);
+      color: var(--primary);
+      border: 1px solid rgba(82, 106, 242, 0.22);
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: var(--transition);
+    }
+    .upload-box:hover .file-picker-btn {
+      background: rgba(82, 106, 242, 0.18);
+      border-color: rgba(82, 106, 242, 0.28);
+    }
+    .file-picker-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .file-picker-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      word-break: break-word;
+    }
+    .file-picker-hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
 
     /* Subsections */
@@ -461,162 +736,477 @@
       color: var(--text-muted);
       font-size: 0.9rem;
     }
+
+    .tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 10px;
+      background: rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.45);
+      border-radius: 22px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .tab-btn {
+      width: auto;
+      min-width: 148px;
+      padding: 12px 18px;
+      border-radius: 16px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      box-shadow: none;
+      flex: 1 1 0;
+      white-space: nowrap;
+    }
+    .tab-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.55);
+      color: var(--text-main);
+      box-shadow: none;
+      transform: none;
+    }
+    .tab-btn[aria-selected='true'] {
+      background: rgba(255,255,255,0.92);
+      color: var(--primary);
+      border-color: rgba(82, 106, 242, 0.18);
+      box-shadow: 0 10px 24px rgba(82, 106, 242, 0.16);
+    }
+    .tab-panel[hidden] {
+      display: none;
+    }
+    .span-3 {
+      grid-column: 1 / -1;
+    }
+    .no-wrap {
+      white-space: nowrap;
+    }
+    .button-stack {
+      margin-bottom: 0;
+    }
+    .section-save {
+      margin-top: 16px;
+    }
+    .tab-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+    .tab-actions button {
+      width: 100%;
+      max-width: 360px;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(255,255,255,0.7);
+    }
+    .toggle-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .toggle-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .toggle-status {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .switch {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      padding: 0;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+    }
+    .switch-slider {
+      position: relative;
+      display: block;
+      width: 64px;
+      height: 36px;
+      border-radius: 999px;
+      background: #d7deea;
+      border: 1px solid rgba(45, 55, 72, 0.12);
+      transition: var(--transition);
+    }
+    .switch-slider::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(45, 55, 72, 0.18);
+      transition: var(--transition);
+    }
+    .switch input:checked + .switch-slider {
+      background: linear-gradient(135deg, #526af2 0%, #6f83ff 100%);
+      border-color: rgba(82, 106, 242, 0.45);
+    }
+    .switch input:checked + .switch-slider::after {
+      transform: translateX(28px);
+    }
+    .switch input:focus-visible + .switch-slider {
+      box-shadow: 0 0 0 3px rgba(82, 106, 242, 0.22);
+    }
+    .switch input:disabled + .switch-slider {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .control-card {
+      padding: 20px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.48);
+      border: 1px solid rgba(255,255,255,0.78);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .control-card h3 {
+      margin: 0 0 8px;
+    }
+    .control-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .tabs {
+        padding: 8px;
+        gap: 8px;
+      }
+      .tab-btn {
+        min-width: 132px;
+        flex: 0 0 auto;
+      }
+      .overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .overview-clusters {
+        grid-template-columns: 1fr;
+      }
+      .air-metrics-primary {
+        grid-template-columns: 1fr;
+      }
+      .air-metrics-secondary,
+      .particle-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .file-picker {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .toggle-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+      .operation-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .button-stack-narrow {
+        grid-template-columns: 1fr;
+      }
+      .air-metrics-primary {
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
+      }
+      .air-metrics-secondary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <header class="hero">
-      <section class="glass-panel">
-        <h1>设备管理后台</h1>
-        <p class="lede">ESP32-S3 室内空气监测节点。可在此统一配置网络、MQTT以及管理各传感器参数，提供现代化的交互体验。</p>
-        <div id="heroBadges" class="chip-row"></div>
-      </section>
-      <aside class="glass-panel" style="display:flex;flex-direction:column;justify-content:center;">
-        <div id="heroMeta" class="kv-list"></div>
-      </aside>
-    </header>
-
     <div id="notice" class="notice" hidden></div>
 
-    <div class="main-grid">
-      <section class="glass-panel span-2">
-        <h2>运行概览</h2>
-        <p class="section-copy">汇总联网、采样和维护状态，便于快速确认后台主要功能是否正常。</p>
-        <div id="overview" class="kv-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;"></div>
-      </section>
-
-      <section class="glass-panel">
-        <h2>模块状态</h2>
-        <p class="section-copy">快速确认各传感器与指示灯当前状态。</p>
-        <div id="services" class="kv-list"></div>
-      </section>
-
-      <section class="glass-panel span-2">
-        <h2>空气质量总览</h2>
-        <p class="section-copy">基于 EPA AQI 标准计算出的综合指数，提供实时且可视化的评价。</p>
-        <div id="airSummary"></div>
-        <div id="airMetrics" class="metric-grid"></div>
-      </section>
-
-      <section class="glass-panel">
-        <h2>颗粒物画像</h2>
-        <p class="section-copy">结合多个粒径的粒子计数与质量浓度，分析当前环境的颗粒物主要成分。</p>
-        <div id="particleSummary"></div>
-        <div id="particleMetrics" class="kv-list"></div>
-      </section>
-
-      <section class="glass-panel span-2">
-        <h2>网络与 MQTT 配置</h2>
-        <p class="section-copy">修改配置后设备将自动重启应用新的网络设置。</p>
-        <div class="field-grid">
-          <div class="field-span-2">
-            <label>设备名称</label>
-            <input id="device_name" type="text" placeholder="设置设备在网络中的名称"/>
-          </div>
-          <div>
-            <label>Wi-Fi 名称 (SSID)</label>
-            <input id="wifi_ssid" type="text" placeholder="2.4GHz Wi-Fi"/>
-          </div>
-          <div>
-            <label>Wi-Fi 密码</label>
-            <input id="wifi_password" type="password" placeholder="留空以维持不变"/>
-          </div>
-          <div class="field-span-2">
-            <label>MQTT URL</label>
-            <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883"/>
-            <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
-          </div>
-        </div>
-        <button onclick="saveConfig()">保存网络与 MQTT 配置</button>
-      </section>
-
-      <section class="glass-panel">
-        <h2>传感器与维护</h2>
-        <p class="section-copy">对传感器的工作模式进行即时控制，以及系统固件升级。</p>
-        
-        <div class="subsection">
-          <h3>SCD41 设定</h3>
-          <div class="field-grid">
-            <div>
-              <label>海拔补偿（米）</label>
-              <input id="scd41_altitude_m" type="number" placeholder="0 - 3000"/>
-            </div>
-            <div>
-              <label>温度偏移（°C）</label>
-              <input id="scd41_temp_offset_c" type="number" step="0.1" placeholder="例如: 2.5"/>
-            </div>
-          </div>
-          <div class="action-grid">
-            <button id="asc_on_btn" onclick="toggleAsc(true)">开启 ASC 自校准</button>
-            <button id="asc_off_btn" class="ghost" onclick="toggleAsc(false)">关闭 ASC 自校准</button>
-          </div>
-          <div class="field-grid" style="margin-top:16px;">
-            <div>
-              <label>FRC 参考值 (ppm)</label>
-              <input id="frc_reference_ppm" type="number" placeholder="400"/>
-            </div>
-            <div style="display:flex; align-items:flex-end;">
-              <button id="frc_apply_btn" class="ghost" onclick="applyFrc()">强制校准 FRC</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="subsection">
-          <h3>模块控制</h3>
-          <div class="action-grid">
-            <button id="sps30_wake_btn" onclick="toggleSps30(false)">唤醒 SPS30</button>
-            <button id="sps30_sleep_btn" class="ghost" onclick="toggleSps30(true)">休眠 SPS30</button>
-            <button id="status_led_on_btn" onclick="toggleStatusLed(true)">打开 RGB 灯</button>
-            <button id="status_led_off_btn" class="ghost" onclick="toggleStatusLed(false)">关闭 RGB 灯</button>
-            <button id="republish_btn" class="ghost action-span" onclick="republishDiscovery()">重发 Discovery</button>
-          </div>
-        </div>
-
-        <div class="subsection">
-          <h3>系统操作</h3>
-          <div class="upload-box">
-            <input id="firmware" type="file" accept=".bin"/>
-          </div>
-          <button onclick="uploadFirmware()" style="margin-bottom:16px;">上传并安装固件</button>
-          <div class="action-grid">
-            <button onclick="restartDevice()" class="ghost">重启设备</button>
-            <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
-          </div>
-        </div>
-      </section>
+    <div class="tabs" role="tablist" aria-label="设备后台功能分区">
+      <button id="tab-btn-realtime" class="tab-btn" type="button" role="tab" aria-selected="true" aria-controls="tab-realtime" data-tab="realtime">实时监测</button>
+      <button id="tab-btn-config" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-config" data-tab="config" tabindex="-1">项目配置</button>
+      <button id="tab-btn-maintenance" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-maintenance" data-tab="maintenance" tabindex="-1">维护操作</button>
     </div>
-    <div class="footer-note">当前管理页面面向受信任的局域网环境，默认无需鉴权。</div>
+
+    <section id="tab-realtime" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-realtime" data-tab="realtime">
+      <div class="main-grid">
+        <section class="glass-panel span-3">
+          <h2>空气质量总览</h2>
+          <div id="airSummary"></div>
+          <div id="airMetricsPrimary" class="air-metrics-primary"></div>
+          <div id="airMetricsSecondary" class="air-metrics-secondary"></div>
+          <section class="particle-overview">
+            <h3>颗粒物画像</h3>
+            <div id="particleMetrics" class="particle-grid"></div>
+            <div id="particleSummary"></div>
+          </section>
+        </section>
+
+        <section class="glass-panel span-3">
+          <h2>运行概览</h2>
+          <div class="overview-clusters">
+            <div class="overview-group">
+              <h3>联网状态</h3>
+              <div id="overviewNetwork" class="kv-list"></div>
+            </div>
+            <div class="overview-group">
+              <h3>模块状态</h3>
+              <div id="overviewModules" class="kv-list"></div>
+            </div>
+            <div class="overview-group">
+              <h3>系统与采样</h3>
+              <div id="overviewSystem" class="kv-list"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-config" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" data-tab="config" hidden>
+      <div class="main-grid">
+        <section class="glass-panel span-2 panel-primary">
+          <h2>网络与 MQTT 配置</h2>
+          <div class="inner-stack">
+            <div class="inner-card">
+              <h3>设备与网络</h3>
+              <div class="field-grid">
+                <div class="field-span-2">
+                  <label>设备名称</label>
+                  <input id="device_name" type="text" placeholder="设置设备在网络中的名称"/>
+                </div>
+                <div>
+                  <label>Wi-Fi 名称 (SSID)</label>
+                  <input id="wifi_ssid" type="text" placeholder="2.4GHz Wi-Fi"/>
+                </div>
+                <div>
+                  <label>Wi-Fi 密码</label>
+                  <input id="wifi_password" type="password" placeholder="留空以维持不变"/>
+                </div>
+              </div>
+            </div>
+
+            <div class="inner-card">
+              <h3>MQTT 接入</h3>
+              <div class="field-grid">
+                <div class="field-span-2">
+                  <label>MQTT URL</label>
+                  <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883"/>
+                  <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel panel-secondary">
+          <h2>传感器策略</h2>
+          <div class="inner-stack">
+            <div class="inner-card">
+              <h3>SCD41 补偿参数</h3>
+              <div class="field-grid">
+                <div>
+                  <label>海拔补偿（米）</label>
+                  <input id="scd41_altitude_m" type="number" placeholder="0 - 3000"/>
+                </div>
+                <div>
+                  <label>温度偏移（°C）</label>
+                  <input id="scd41_temp_offset_c" type="number" step="0.1" placeholder="例如: 2.5"/>
+                </div>
+              </div>
+            </div>
+
+            <div class="inner-card">
+              <h3>ASC 自校准</h3>
+              <div class="toggle-row">
+                <div class="toggle-copy">
+                  <span class="toggle-title">自动自校准</span>
+                  <span id="asc_status_text" class="toggle-status">当前：--</span>
+                </div>
+                <label class="switch" for="asc_toggle">
+                  <input id="asc_toggle" type="checkbox" role="switch" aria-label="SCD41 ASC 自校准开关"/>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="tab-actions">
+        <button onclick="saveConfig()">保存全部项目配置</button>
+      </div>
+    </section>
+
+    <section id="tab-maintenance" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-maintenance" data-tab="maintenance" hidden>
+      <div class="main-grid">
+        <section class="glass-panel span-2 panel-primary">
+          <h2>设备控制</h2>
+          <div class="control-grid">
+            <div class="control-card">
+              <h3>SPS30 工作状态</h3>
+              <div class="toggle-row">
+                <div class="toggle-copy">
+                  <span class="toggle-title">连续采样</span>
+                  <span id="sps30_status_text" class="toggle-status">当前：--</span>
+                </div>
+                <label class="switch" for="sps30_toggle">
+                  <input id="sps30_toggle" type="checkbox" role="switch" aria-label="SPS30 工作状态开关"/>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-card">
+              <h3>RGB 状态灯</h3>
+              <div class="toggle-row">
+                <div class="toggle-copy">
+                  <span class="toggle-title">状态灯</span>
+                  <span id="status_led_text" class="toggle-status">当前：--</span>
+                </div>
+                <label class="switch" for="status_led_toggle">
+                  <input id="status_led_toggle" type="checkbox" role="switch" aria-label="RGB 状态灯开关"/>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel panel-secondary">
+          <h2>MQTT 工具与校准</h2>
+          <div class="inner-stack">
+            <div class="inner-card">
+              <h3>重发 Discovery</h3>
+              <button id="republish_btn" class="ghost" onclick="republishDiscovery()">重发 Discovery</button>
+            </div>
+
+            <div class="inner-card">
+              <h3>FRC 强制校准</h3>
+              <div class="field-grid button-stack-narrow">
+                <div>
+                  <label>FRC 参考值 (ppm)</label>
+                  <input id="frc_reference_ppm" type="number" placeholder="400"/>
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                  <button id="frc_apply_btn" class="ghost no-wrap" onclick="applyFrc()">应用 FRC 校准</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="glass-panel span-3 panel-primary">
+          <h2>固件升级与系统操作</h2>
+          <div class="operation-grid">
+            <div class="inner-card">
+              <h3>固件升级</h3>
+              <div class="mini-kv">
+                <span>当前固件版本</span>
+                <strong id="firmware_version_text">--</strong>
+              </div>
+              <div class="upload-box">
+                <input id="firmware" class="file-input" type="file" accept=".bin"/>
+                <label for="firmware" class="file-picker">
+                  <span class="file-picker-btn">选择固件文件</span>
+                  <span class="file-picker-copy">
+                    <span id="firmware_name" class="file-picker-name">尚未选择任何文件</span>
+                    <span class="file-picker-hint">支持 .bin 固件包，上传后会自动校验并重启。</span>
+                  </span>
+                </label>
+              </div>
+              <button class="card-footer" onclick="uploadFirmware()">上传并安装固件</button>
+            </div>
+
+            <div class="inner-card">
+              <h3>设备管理</h3>
+              <div class="mini-kv">
+                <span>设备标识</span>
+                <strong id="device_id_text">--</strong>
+              </div>
+              <div class="action-grid card-footer" style="margin-bottom:0;">
+                <button onclick="restartDevice()" class="ghost">重启设备</button>
+                <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   </div>
 
   <script>
     const configFields=['device_name','wifi_ssid','wifi_password','mqtt_url','scd41_altitude_m','scd41_temp_offset_c'];
     const configInputs=Object.fromEntries(configFields.map((id)=>[id,document.getElementById(id)]));
     const noticeEl=document.getElementById('notice');
-    const heroBadgesEl=document.getElementById('heroBadges');
-    const heroMetaEl=document.getElementById('heroMeta');
-    const overviewEl=document.getElementById('overview');
-    const servicesEl=document.getElementById('services');
+    const overviewNetworkEl=document.getElementById('overviewNetwork');
+    const overviewModulesEl=document.getElementById('overviewModules');
+    const overviewSystemEl=document.getElementById('overviewSystem');
     const airSummaryEl=document.getElementById('airSummary');
-    const airMetricsEl=document.getElementById('airMetrics');
+    const airMetricsPrimaryEl=document.getElementById('airMetricsPrimary');
+    const airMetricsSecondaryEl=document.getElementById('airMetricsSecondary');
     const particleSummaryEl=document.getElementById('particleSummary');
     const particleMetricsEl=document.getElementById('particleMetrics');
     const frcInput=document.getElementById('frc_reference_ppm');
     const firmwareInput=document.getElementById('firmware');
-    const ascOnBtn=document.getElementById('asc_on_btn');
-    const ascOffBtn=document.getElementById('asc_off_btn');
-    const sps30WakeBtn=document.getElementById('sps30_wake_btn');
-    const sps30SleepBtn=document.getElementById('sps30_sleep_btn');
-    const statusLedOnBtn=document.getElementById('status_led_on_btn');
-    const statusLedOffBtn=document.getElementById('status_led_off_btn');
+    const firmwareNameEl=document.getElementById('firmware_name');
+    const firmwareVersionTextEl=document.getElementById('firmware_version_text');
+    const deviceIdTextEl=document.getElementById('device_id_text');
+    const ascToggle=document.getElementById('asc_toggle');
+    const ascStatusText=document.getElementById('asc_status_text');
+    const sps30Toggle=document.getElementById('sps30_toggle');
+    const sps30StatusText=document.getElementById('sps30_status_text');
+    const statusLedToggle=document.getElementById('status_led_toggle');
+    const statusLedText=document.getElementById('status_led_text');
     const frcApplyBtn=document.getElementById('frc_apply_btn');
     const republishBtn=document.getElementById('republish_btn');
+    const tabButtons=[...document.querySelectorAll('.tab-btn')];
+    const tabPanels=[...document.querySelectorAll('.tab-panel')];
+    const urlParams=new URLSearchParams(window.location.search);
+    const mockMode=urlParams.get('mock')==='1'||urlParams.get('demo')==='1';
     
     let configDirty=false;
     let noticeTimer=0;
+    const activeTabStorageKey='airmon-active-tab';
+    const mockSampleTimestamp=Date.now()-18000;
+    let mockStatus=createMockStatus();
     
     const categoryLabels={'Good':'良好','Moderate':'一般','Unhealthy for Sensitive Groups':'敏感人群不健康','Unhealthy':'不健康','Very Unhealthy':'非常不健康','Hazardous':'危险','Unavailable':'暂不可用'};
     const signalLabels={'Good':'良好','Acceptable':'可接受','Elevated':'偏高','High':'高','Very High':'很高','Unavailable':'暂不可用'};
-    const factorLabels={'PM2.5':'PM2.5','PM10':'PM10','CO2':'二氧化碳','Humidity':'湿度','Unavailable':'未提供'};
+    const vocSignalLabels={'Good':'优 / 新鲜空气','Acceptable':'正常','Elevated':'轻度污染','High':'中度污染','Very High':'重度污染','Unavailable':'暂不可用'};
+    const noxSignalLabels={'Good':'正常','Acceptable':'轻微升高','Elevated':'轻度污染','High':'中度污染','Very High':'重度污染','Unavailable':'暂不可用'};
+    const comfortLabels={'Low':'偏低','Acceptable':'可接受','High':'偏高','Unavailable':'暂不可用'};
     const profileLabels={'Fine-Dominant':'细颗粒主导','Mixed':'混合','Coarse-Dominant':'粗颗粒主导','Unavailable':'暂不可用'};
     const basisLabels={
       'EPA AQI (PM2.5 / PM10)':'EPA AQI（PM2.5 / PM10）',
@@ -630,6 +1220,7 @@
     };
 
     function translate(map,value,fallback='未提供'){return map[value]||value||fallback;}
+    function clone(data){return JSON.parse(JSON.stringify(data));}
     function num(value,digits=0,unit=''){
       if(value==null||value==='')return '--';
       const n=Number(value);
@@ -651,12 +1242,97 @@
 
     // Components
     function kv(label,value){return `<div class='kv'><span>${label}</span><strong>${value||'--'}</strong></div>`;}
-    function metric(label,value,meta=''){return `<div class='metric'><span>${label}</span><strong>${value||'--'}</strong>${meta?`<small>${meta}</small>`:''}</div>`;}
-    function chip(label,tone='neutral'){return `<span class='chip chip-${tone||'neutral'}'>${label}</span>`;}
+    function metric(label,value,meta='',variant='secondary',unitBadge='',tone=''){return `<div class='metric metric-${variant}${tone?` metric-tone-${tone}`:''}'><span>${label}</span><div class='metric-value'><strong>${value||'--'}</strong>${unitBadge?`<em class='metric-unit'>${unitBadge}</em>`:''}</div>${meta?`<small>${meta}</small>`:''}</div>`;}
     function summaryBanner(value,detail,tone='neutral'){return `<div class='summary-banner summary-${tone||'neutral'}'><strong>${value}</strong><span>${detail}</span></div>`;}
+    function compactSummaryBanner(value,detail,tone='neutral'){return `<div class='summary-banner summary-banner-compact summary-${tone||'neutral'}'><strong>${value}</strong>${detail?`<span>${detail}</span>`:''}</div>`;}
     
     function localizedOverall(value){return translate(categoryLabels,value,'评估不可用');}
-    
+    function compactParticleNote(note){
+      if(!note) return '';
+      return String(note)
+        .replace(/。$/,'')
+        .replace(/^以/,'')
+        .replace(/为主，常见于/,'，常见于');
+    }
+    function createMockStatus(){
+      return {
+        diag: {
+          provisioning_mode: false,
+          wifi_connected: true,
+          wifi_rssi: -48,
+          mqtt_connected: true,
+          scd41_ready: true,
+          sgp41_ready: true,
+          sps30_ready: true,
+          status_led_ready: true,
+          status_led_enabled: true,
+          device_id: 'AQM-S3-DEMO-01',
+          ip_addr: '192.168.31.88',
+          firmware_version: 'v0.9.4-mock',
+          heap_free: 241664
+        },
+        config: {
+          device_name: '客厅空气监测节点',
+          wifi_ssid: 'AirLab-2.4G',
+          wifi_password: '********',
+          mqtt_url: 'mqtt://demo:demo123@192.168.31.20:1883',
+          mqtt_host: '192.168.31.20',
+          mqtt_port: 1883,
+          mqtt_username: 'demo',
+          mqtt_password: 'demo123',
+          discovery_prefix: 'homeassistant',
+          topic_root: 'airmon/living-room',
+          publish_interval_sec: 15,
+          scd41_altitude_m: 36,
+          scd41_temp_offset_c: 1.6,
+          scd41_asc_enabled: true
+        },
+        snapshot: {
+          sample_age_sec: 18,
+          sps30_sleeping: false,
+          us_aqi: 74,
+          us_aqi_level: 'Moderate',
+          us_aqi_level_key: 'moderate',
+          us_aqi_primary_pollutant: 'PM2.5',
+          overall_air_quality: 'Moderate',
+          overall_air_quality_key: 'moderate',
+          overall_air_quality_driver: 'PM2.5',
+          overall_air_quality_basis: 'EPA AQI with U.S. indoor guidance',
+          overall_air_quality_note: 'PM2.5 偏高，建议开启新风或短时通风。',
+          co2_ppm: 862,
+          co2_rating: 'Acceptable',
+          temperature_c: 25.8,
+          temperature_rating: 'Acceptable',
+          humidity_rh: 57.4,
+          humidity_rating: 'Acceptable',
+          voc_index: 123,
+          voc_rating: 'Acceptable',
+          nox_index: 8,
+          nox_rating: 'Acceptable',
+          pm1_0: 18.4,
+          pm2_5: 28.6,
+          pm4_0: 34.8,
+          pm10_0: 41.2,
+          particle_profile: 'Fine-Dominant',
+          particle_profile_key: 'fine',
+          particle_profile_note: '以细颗粒物为主，常见于烹饪、室内扬尘或室外渗透。',
+          particles_0_5um: 162.3,
+          particles_1_0um: 81.4,
+          particles_2_5um: 26.8,
+          particles_4_0um: 7.9,
+          particles_10_0um: 1.6,
+          typical_particle_size_um: 0.78
+        },
+        frc_reference_ppm: 420
+      };
+    }
+
+    function getMockStatus(){
+      const next=clone(mockStatus);
+      next.snapshot.sample_age_sec=Math.max(1, Math.round((Date.now()-mockSampleTimestamp)/1000));
+      return next;
+    }
+
     function wifiStatus(d){
       if(d.diag.provisioning_mode) return '等待配网';
       if(d.diag.wifi_connected) return `已连接 (${d.diag.wifi_rssi} dBm)`;
@@ -671,9 +1347,9 @@
       const scd41Ready=!!d.diag.scd41_ready;
       const sps30Ready=!!d.diag.sps30_ready;
       const ledReady=!!d.diag.status_led_ready;
-      ascOnBtn.disabled=!scd41Ready; ascOffBtn.disabled=!scd41Ready; frcApplyBtn.disabled=!scd41Ready;
-      sps30WakeBtn.disabled=!sps30Ready; sps30SleepBtn.disabled=!sps30Ready;
-      statusLedOnBtn.disabled=!ledReady; statusLedOffBtn.disabled=!ledReady;
+      ascToggle.disabled=!scd41Ready; frcApplyBtn.disabled=!scd41Ready;
+      sps30Toggle.disabled=!sps30Ready;
+      statusLedToggle.disabled=!ledReady;
       republishBtn.disabled=!d.diag.mqtt_connected;
     }
 
@@ -691,6 +1367,12 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     async function apiRequest(url,options,fallback,successMessage){
+      if(mockMode){
+        const result=handleMockRequest(url,options);
+        if(!result.ok){showNotice('error',result.message||fallback);return false;}
+        if(successMessage) showNotice('success',successMessage);
+        return true;
+      }
       try {
         const r=await fetch(url,options);
         if(!r.ok){showNotice('error',await getErrorMessage(r,fallback));return false;}
@@ -700,6 +1382,66 @@
         showNotice('error', fallback + ': ' + e.message);
         return false;
       }
+    }
+
+    function parseMockJsonBody(options){
+      if(!options||typeof options.body!=='string') return {};
+      try{return JSON.parse(options.body);}
+      catch(_){return {};}
+    }
+
+    function handleMockRequest(url,options){
+      const body=parseMockJsonBody(options);
+      if(url==='/api/config'){
+        mockStatus.config.device_name=body.device_name||'';
+        mockStatus.config.wifi_ssid=body.wifi_ssid||'';
+        if(body.wifi_password) mockStatus.config.wifi_password=body.wifi_password;
+        mockStatus.config.mqtt_url=body.mqtt_url||'';
+        mockStatus.config.scd41_altitude_m=Number.isFinite(body.scd41_altitude_m)?body.scd41_altitude_m:mockStatus.config.scd41_altitude_m;
+        mockStatus.config.scd41_temp_offset_c=Number.isFinite(body.scd41_temp_offset_c)?body.scd41_temp_offset_c:mockStatus.config.scd41_temp_offset_c;
+        mockStatus.diag.provisioning_mode=!mockStatus.config.wifi_ssid;
+        mockStatus.diag.wifi_connected=!!mockStatus.config.wifi_ssid;
+        mockStatus.diag.mqtt_connected=!!mockStatus.config.mqtt_url;
+        return {ok:true};
+      }
+      if(url==='/api/action/scd41-asc'){
+        mockStatus.config.scd41_asc_enabled=!!body.enabled;
+        return {ok:true};
+      }
+      if(url==='/api/action/sps30-sleep'){
+        mockStatus.snapshot.sps30_sleeping=!!body.sleep;
+        return {ok:true};
+      }
+      if(url==='/api/action/status-led'){
+        mockStatus.diag.status_led_enabled=!!body.enabled;
+        return {ok:true};
+      }
+      if(url==='/api/action/apply-frc'){
+        mockStatus.frc_reference_ppm=Number.isFinite(body.ppm)?body.ppm:mockStatus.frc_reference_ppm;
+        return {ok:true};
+      }
+      if(url==='/api/action/republish-discovery'){
+        return mockStatus.diag.mqtt_connected ? {ok:true} : {ok:false,message:'MQTT 未连接，无法重新发布 Discovery'};
+      }
+      if(url==='/api/action/restart'){
+        return {ok:true};
+      }
+      if(url==='/api/action/factory-reset'){
+        mockStatus=createMockStatus();
+        mockStatus.config.wifi_ssid='';
+        mockStatus.config.wifi_password='';
+        mockStatus.config.mqtt_url='';
+        mockStatus.diag.provisioning_mode=true;
+        mockStatus.diag.wifi_connected=false;
+        mockStatus.diag.mqtt_connected=false;
+        mockStatus.diag.ip_addr='192.168.4.1';
+        return {ok:true};
+      }
+      if(url==='/api/ota'){
+        mockStatus.diag.firmware_version='v0.9.5-mock';
+        return {ok:true};
+      }
+      return {ok:true};
     }
 
     function setConfigValues(d){
@@ -714,70 +1456,143 @@
       }
     }
 
+    function syncFirmwareLabel(){
+      const file=firmwareInput.files && firmwareInput.files[0];
+      firmwareNameEl.textContent=file ? file.name : '尚未选择任何文件';
+    }
+
+    function syncAscState(enabled,ready){
+      const active=!!enabled;
+      ascToggle.checked=active;
+      ascToggle.disabled=!ready;
+      ascStatusText.textContent=!ready ? '当前：SCD41 不可用' : active ? '当前：已开启' : '当前：已关闭';
+    }
+
+    function syncSps30State(sleeping,ready){
+      const active=!sleeping;
+      sps30Toggle.checked=active;
+      sps30Toggle.disabled=!ready;
+      sps30StatusText.textContent=!ready ? '当前：SPS30 不可用' : active ? '当前：运行中' : '当前：休眠中';
+    }
+
+    function syncStatusLedState(enabled,ready){
+      const active=!!enabled;
+      statusLedToggle.checked=active;
+      statusLedToggle.disabled=!ready;
+      statusLedText.textContent=!ready ? '当前：RGB 灯不可用' : active ? '当前：已开启' : '当前：已关闭';
+    }
+
+    function shouldShowOverallSummary(d){
+      const overall=d.snapshot.overall_air_quality;
+      if(!overall) return false;
+      if(d.snapshot.us_aqi==null || !d.snapshot.us_aqi_level) return true;
+
+      const sameCategory=overall===d.snapshot.us_aqi_level;
+      const indoorOverride=d.snapshot.overall_air_quality_driver==='CO2' || d.snapshot.overall_air_quality_driver==='Humidity';
+      return !sameCategory || indoorOverride;
+    }
+
+    function setActiveTab(tabName,{persist=true,updateHash=true}={}){
+      const hasTab=tabButtons.some((btn)=>btn.dataset.tab===tabName);
+      const nextTab=hasTab?tabName:'realtime';
+      tabButtons.forEach((btn)=>{
+        const active=btn.dataset.tab===nextTab;
+        btn.setAttribute('aria-selected', String(active));
+        btn.tabIndex=active?0:-1;
+      });
+      tabPanels.forEach((panel)=>{
+        panel.hidden=panel.dataset.tab!==nextTab;
+      });
+      if(persist){
+        try{localStorage.setItem(activeTabStorageKey,nextTab);}catch(_){}
+      }
+      if(updateHash&&window.location.hash!==`#${nextTab}`){
+        history.replaceState(null,'',`#${nextTab}`);
+      }
+    }
+
+    function moveTabFocus(currentIndex,offset){
+      const nextIndex=(currentIndex+offset+tabButtons.length)%tabButtons.length;
+      tabButtons[nextIndex].focus();
+      setActiveTab(tabButtons[nextIndex].dataset.tab);
+    }
+
     function renderView(d) {
       const overallKey = d.snapshot.overall_air_quality_key||'neutral';
-      
-      heroBadgesEl.innerHTML=[
-        chip(d.diag.provisioning_mode?'等待配网':'局域网内运行', d.diag.provisioning_mode?'elevated':'good'),
-        chip(`环境：${localizedOverall(d.snapshot.overall_air_quality)}`, overallKey),
-        chip(`MQTT：${mqttStatus(d)}`, d.diag.mqtt_connected?'good':'neutral')
-      ].join('');
-      
-      heroMetaEl.innerHTML=[
-        kv('设备标识', d.diag.device_id),
-        kv('内网 IP', d.diag.ip_addr||'--'),
-        kv('固件版本', d.diag.firmware_version)
-      ].join('');
 
-      overviewEl.innerHTML=[
+      overviewNetworkEl.innerHTML=[
         kv('运行模式', d.diag.provisioning_mode?'BLE 配网':'局域网运行'),
-        kv('Wi-Fi 强度', `${d.diag.wifi_rssi} dBm`),
-        kv('系统内存', `${(d.diag.heap_free/1024).toFixed(1)} KB 空闲`),
-        kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec))
-      ].join('');
-
-      servicesEl.innerHTML=[
         kv('Wi-Fi', wifiStatus(d)),
         kv('MQTT', mqttStatus(d)),
-        kv('SCD41 状态', d.diag.scd41_ready ? '在线' : '离线'),
-        kv('SGP41 状态', d.diag.sgp41_ready ? '在线' : '离线'),
-        kv('SPS30 状态', d.diag.sps30_ready ? '在线' : '离线'),
-        kv('RGB 灯状态', d.diag.status_led_ready ? (d.diag.status_led_enabled?'开启':'关闭') : '不可用')
+        kv('内网 IP', d.diag.ip_addr||'--')
       ].join('');
 
-      airSummaryEl.innerHTML=summaryBanner(
-        `综合环境：${localizedOverall(d.snapshot.overall_air_quality)}`,
-        `${translate(basisLabels, d.snapshot.overall_air_quality_basis)}`,
-        overallKey
-      );
-
-      airMetricsEl.innerHTML=[
-        metric('US AQI', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level)),
-        metric('首要关注', translate(factorLabels, d.snapshot.overall_air_quality_driver, '--'), '影响空气质量主因'),
-        metric('CO2 浓度', num(d.snapshot.co2_ppm, 0, ' ppm'), translate(signalLabels, d.snapshot.co2_rating)),
-        metric('室内温度', num(d.snapshot.temperature_c, 1, ' °C'), 'SCD41 校准前数据'),
-        metric('相对湿度', num(d.snapshot.humidity_rh, 1, ' %'), '建议区间30~60%'),
-        metric('VOC 指数', num(d.snapshot.voc_index), translate(signalLabels, d.snapshot.voc_rating)),
-        metric('NOx 指数', num(d.snapshot.nox_index), translate(signalLabels, d.snapshot.nox_rating))
+      overviewModulesEl.innerHTML=[
+        kv('SCD41', d.diag.scd41_ready ? '在线' : '离线'),
+        kv('SGP41', d.diag.sgp41_ready ? '在线' : '离线'),
+        kv('SPS30', d.diag.sps30_ready ? (d.snapshot.sps30_sleeping ? '休眠中' : '在线') : '离线'),
+        kv('RGB 灯', d.diag.status_led_ready ? (d.diag.status_led_enabled?'开启':'关闭') : '不可用')
       ].join('');
 
-      particleSummaryEl.innerHTML=summaryBanner(
-        `环境诊断：${translate(profileLabels, d.snapshot.particle_profile)}`,
-        d.snapshot.particle_profile_note ? `分析结论：${d.snapshot.particle_profile_note}` : '',
-        d.snapshot.particle_profile_key||'neutral'
-      );
+      overviewSystemEl.innerHTML=[
+        kv('设备标识', d.diag.device_id),
+        kv('固件版本', d.diag.firmware_version),
+        kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec)),
+        kv('系统内存', `${(d.diag.heap_free/1024).toFixed(1)} KB 空闲`)
+      ].join('');
+
+      firmwareVersionTextEl.textContent=d.diag.firmware_version||'--';
+      deviceIdTextEl.textContent=d.diag.device_id||'--';
+
+      airSummaryEl.innerHTML=shouldShowOverallSummary(d)
+        ? summaryBanner(
+            `综合环境：${localizedOverall(d.snapshot.overall_air_quality)}`,
+            `${translate(basisLabels, d.snapshot.overall_air_quality_basis)}`,
+            overallKey
+          )
+        : '';
+
+      airMetricsPrimaryEl.innerHTML=[
+        metric('US AQI', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level), 'featured', 'AQI', d.snapshot.us_aqi_level_key||'unavailable'),
+        metric('CO2 浓度', num(d.snapshot.co2_ppm), translate(signalLabels, d.snapshot.co2_rating), 'primary', 'ppm')
+      ].join('');
+
+      airMetricsSecondaryEl.innerHTML=[
+        metric('室内温度', num(d.snapshot.temperature_c, 1), translate(comfortLabels, d.snapshot.temperature_rating, '--'), 'secondary', '°C'),
+        metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
+        metric('VOC 指数', num(d.snapshot.voc_index), translate(vocSignalLabels, d.snapshot.voc_rating), 'secondary', 'points'),
+        metric('NOx 指数', num(d.snapshot.nox_index), translate(noxSignalLabels, d.snapshot.nox_rating), 'secondary', 'points')
+      ].join('');
+
+      syncAscState(d.config.scd41_asc_enabled, d.diag.scd41_ready);
+      syncSps30State(d.snapshot.sps30_sleeping, d.diag.sps30_ready);
+      syncStatusLedState(d.diag.status_led_enabled, d.diag.status_led_ready);
 
       particleMetricsEl.innerHTML=[
         kv('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³')),
         kv('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³')),
         kv('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³')),
         kv('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³')),
-        kv('大粒径(>4.0µm)', num(d.snapshot.particles_4_0um, 1, ' #/cm³')),
-        kv('中值粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'))
+        kv('颗粒数 PM0.5', num(d.snapshot.particles_0_5um, 1, ' #/cm³')),
+        kv('颗粒数 PM10', num(d.snapshot.particles_10_0um, 1, ' #/cm³')),
+        kv('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'))
       ].join('');
+
+      particleSummaryEl.innerHTML=compactSummaryBanner(
+        translate(profileLabels, d.snapshot.particle_profile),
+        compactParticleNote(d.snapshot.particle_profile_note),
+        d.snapshot.particle_profile_key||'neutral'
+      );
     }
 
     async function fetchStatus(){
+      if(mockMode){
+        const d=getMockStatus();
+        renderView(d);
+        syncActionAvailability(d);
+        setConfigValues(d);
+        return;
+      }
       try {
         const r=await fetch('/api/status');
         if(!r.ok) return;
@@ -804,9 +1619,21 @@
     }
     
     // Actions
-    async function toggleAsc(enabled){ await apiRequest('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'ASC 已开启':'ASC 已关闭'); fetchStatus(); }
-    async function toggleSps30(sleep){ await apiRequest('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})},'操作失败',sleep?'SPS30 休眠中':'SPS30 唤醒中'); fetchStatus(); }
-    async function toggleStatusLed(enabled){ await apiRequest('/api/action/status-led',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'指示灯开启':'指示灯关闭'); fetchStatus(); }
+    async function toggleAsc(enabled){
+      const ok=await apiRequest('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'ASC 已开启':'ASC 已关闭');
+      await fetchStatus();
+      return ok;
+    }
+    async function toggleSps30(sleep){
+      const ok=await apiRequest('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})},'操作失败',sleep?'SPS30 休眠中':'SPS30 唤醒中');
+      await fetchStatus();
+      return ok;
+    }
+    async function toggleStatusLed(enabled){
+      const ok=await apiRequest('/api/action/status-led',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'操作失败',enabled?'指示灯开启':'指示灯关闭');
+      await fetchStatus();
+      return ok;
+    }
     async function applyFrc(){ await apiRequest('/api/action/apply-frc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ppm:Number(frcInput.value)})},'FRC校准失败','已强制校准'); fetchStatus(); }
     async function republishDiscovery(){ await apiRequest('/api/action/republish-discovery',{method:'POST'},'请求失败','已重新发送 Discovery 报文'); }
     async function restartDevice(){ await apiRequest('/api/action/restart',{method:'POST'},'请求失败','已请求重启'); }
@@ -818,6 +1645,51 @@
     }
 
     for(const key of configFields){ const el=document.getElementById(key); if(el) el.addEventListener('input',()=>configDirty=true); }
+    firmwareInput.addEventListener('change', syncFirmwareLabel);
+    ascToggle.addEventListener('change', async ()=>{
+      const nextValue=ascToggle.checked;
+      const previousValue=!nextValue;
+      ascToggle.disabled=true;
+      const ok=await toggleAsc(nextValue);
+      if(!ok){
+        syncAscState(previousValue, true);
+      }
+    });
+    sps30Toggle.addEventListener('change', async ()=>{
+      const nextValue=sps30Toggle.checked;
+      const previousValue=!nextValue;
+      sps30Toggle.disabled=true;
+      const ok=await toggleSps30(!nextValue);
+      if(!ok){
+        syncSps30State(!previousValue, true);
+      }
+    });
+    statusLedToggle.addEventListener('change', async ()=>{
+      const nextValue=statusLedToggle.checked;
+      const previousValue=!nextValue;
+      statusLedToggle.disabled=true;
+      const ok=await toggleStatusLed(nextValue);
+      if(!ok){
+        syncStatusLedState(previousValue, true);
+      }
+    });
+    tabButtons.forEach((btn,index)=>{
+      btn.addEventListener('click',()=>setActiveTab(btn.dataset.tab));
+      btn.addEventListener('keydown',(event)=>{
+        if(event.key==='ArrowRight'){ event.preventDefault(); moveTabFocus(index,1); }
+        if(event.key==='ArrowLeft'){ event.preventDefault(); moveTabFocus(index,-1); }
+        if(event.key==='Home'){ event.preventDefault(); tabButtons[0].focus(); setActiveTab(tabButtons[0].dataset.tab); }
+        if(event.key==='End'){ event.preventDefault(); tabButtons[tabButtons.length-1].focus(); setActiveTab(tabButtons[tabButtons.length-1].dataset.tab); }
+      });
+    });
+    const initialTab=(()=>{
+      const hashTab=window.location.hash.replace('#','');
+      if(hashTab) return hashTab;
+      try{return localStorage.getItem(activeTabStorageKey)||'realtime';}
+      catch(_){return 'realtime';}
+    })();
+    syncFirmwareLabel();
+    setActiveTab(initialTab,{persist:false,updateHash:!!window.location.hash});
     fetchStatus();
     setInterval(fetchStatus, 5000);
   </script>

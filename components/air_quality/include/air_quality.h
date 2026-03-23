@@ -84,6 +84,8 @@ void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air
 air_quality_signal_level_t air_quality_rate_co2(uint16_t co2_ppm);
 air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index);
 air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index);
+const char *air_quality_rate_temperature_label(float temperature_c);
+const char *air_quality_rate_humidity_label(float humidity_rh);
 const char *air_quality_category_label(air_quality_category_t category);
 const char *air_quality_category_key(air_quality_category_t category);
 const char *air_quality_pollutant_label(air_quality_pollutant_t pollutant);

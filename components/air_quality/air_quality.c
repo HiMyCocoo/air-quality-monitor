@@ -19,14 +19,16 @@ typedef struct {
 #define CO2_VENTILATION_PROXY_ALERT_PPM CO2_ACCEPTABLE_MAX_PPM
 #define HUMIDITY_RECOMMENDED_MIN_RH 30.0
 #define HUMIDITY_RECOMMENDED_MAX_RH 60.0
+#define TEMPERATURE_RECOMMENDED_MIN_C 20.0
+#define TEMPERATURE_RECOMMENDED_MAX_C 26.0
 #define VOC_GOOD_MAX_INDEX 100
 #define VOC_ACCEPTABLE_MAX_INDEX 150
-#define VOC_ELEVATED_MAX_INDEX 250
-#define VOC_HIGH_MAX_INDEX 400
-#define NOX_GOOD_MAX_INDEX 1
+#define VOC_ELEVATED_MAX_INDEX 200
+#define VOC_HIGH_MAX_INDEX 300
+#define NOX_GOOD_MAX_INDEX 2
 #define NOX_ACCEPTABLE_MAX_INDEX 10
 #define NOX_ELEVATED_MAX_INDEX 20
-#define NOX_HIGH_MAX_INDEX 100
+#define NOX_HIGH_MAX_INDEX 50
 
 static const aqi_breakpoint_t PM2_5_BREAKPOINTS[] = {
     {0.0, 9.0, 0, 50},
@@ -288,7 +290,11 @@ air_quality_signal_level_t air_quality_rate_co2(uint16_t co2_ppm)
 
 air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index)
 {
-    /* Sensirion maps typical VOC conditions to 100 and uses >150 as a clear event. */
+    /*
+     * Sensirion maps the recent average VOC condition to 100 and commonly uses
+     * >150 as an example action threshold. The finer 5-band split below is a
+     * UI heuristic for this project, not an official Sensirion health standard.
+     */
     if (voc_index <= 0) {
         return AIR_QUALITY_SIGNAL_UNAVAILABLE;
     }
@@ -309,7 +315,11 @@ air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index)
 
 air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index)
 {
-    /* Sensirion maps typical NOx conditions to 1 and uses >20 as a clear event. */
+    /*
+     * Sensirion maps the recent average NOx condition to 1 and commonly uses
+     * >20 as an example action threshold. The finer 5-band split below is a
+     * UI heuristic for this project, not an official Sensirion health standard.
+     */
     if (nox_index <= 0) {
         return AIR_QUALITY_SIGNAL_UNAVAILABLE;
     }
@@ -326,6 +336,35 @@ air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index)
         return AIR_QUALITY_SIGNAL_HIGH;
     }
     return AIR_QUALITY_SIGNAL_VERY_HIGH;
+}
+
+const char *air_quality_rate_temperature_label(float temperature_c)
+{
+    /* Use a broad U.S. indoor comfort band equivalent to roughly 68-79 F. */
+    if (!isfinite(temperature_c)) {
+        return "Unavailable";
+    }
+    if (temperature_c < TEMPERATURE_RECOMMENDED_MIN_C) {
+        return "Low";
+    }
+    if (temperature_c <= TEMPERATURE_RECOMMENDED_MAX_C) {
+        return "Acceptable";
+    }
+    return "High";
+}
+
+const char *air_quality_rate_humidity_label(float humidity_rh)
+{
+    if (!isfinite(humidity_rh)) {
+        return "Unavailable";
+    }
+    if (humidity_rh < HUMIDITY_RECOMMENDED_MIN_RH) {
+        return "Low";
+    }
+    if (humidity_rh <= HUMIDITY_RECOMMENDED_MAX_RH) {
+        return "Acceptable";
+    }
+    return "High";
 }
 
 void air_quality_compute_overall_assessment(const sensor_snapshot_t *snapshot, air_quality_assessment_t *result)
