@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -257,23 +258,90 @@ static void app_schedule_action(bool factory_reset)
     xSemaphoreGive(s_app.lock);
 }
 
-static esp_err_t app_save_config(const device_config_t *config, void *user_ctx)
+static bool app_config_needs_restart(const device_config_t *previous, const device_config_t *updated)
+{
+    return strcmp(previous->wifi_ssid, updated->wifi_ssid) != 0 ||
+           strcmp(previous->wifi_password, updated->wifi_password) != 0 ||
+           strcmp(previous->mqtt_host, updated->mqtt_host) != 0 ||
+           previous->mqtt_port != updated->mqtt_port ||
+           strcmp(previous->mqtt_username, updated->mqtt_username) != 0 ||
+           strcmp(previous->mqtt_password, updated->mqtt_password) != 0;
+}
+
+static bool app_config_changed_device_metadata(const device_config_t *previous, const device_config_t *updated)
+{
+    return strcmp(previous->device_name, updated->device_name) != 0;
+}
+
+static esp_err_t app_save_config(const device_config_t *config, bool *restart_required, bool *runtime_applied, void *user_ctx)
 {
     (void)user_ctx;
+    if (restart_required != NULL) {
+        *restart_required = false;
+    }
+    if (runtime_applied != NULL) {
+        *runtime_applied = false;
+    }
+
+    device_config_t previous = {0};
     device_config_t updated = *config;
     updated.version = DEVICE_CONFIG_VERSION;
 
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    previous = s_app.config;
     updated.scd41_asc_enabled = s_app.config.scd41_asc_enabled;
     updated.pms_control_pins_enabled = s_app.config.pms_control_pins_enabled;
     xSemaphoreGive(s_app.lock);
     platform_config_sanitize(&updated, s_app.device_id);
 
-    ESP_RETURN_ON_ERROR(platform_config_save(&updated), TAG, "config save failed");
+    bool compensation_changed =
+        previous.scd41_altitude_m != updated.scd41_altitude_m ||
+        fabsf(previous.scd41_temp_offset_c - updated.scd41_temp_offset_c) > 0.0001f;
+    bool restart = app_config_needs_restart(&previous, &updated);
+    bool metadata_changed = app_config_changed_device_metadata(&previous, &updated);
+
+    if (compensation_changed) {
+        ESP_RETURN_ON_ERROR(sensors_set_scd41_compensation(updated.scd41_altitude_m, updated.scd41_temp_offset_c),
+                            TAG,
+                            "scd41 compensation apply failed");
+        if (runtime_applied != NULL) {
+            *runtime_applied = true;
+        }
+    }
+
+    esp_err_t save_err = platform_config_save(&updated);
+    if (save_err != ESP_OK) {
+        if (compensation_changed) {
+            esp_err_t rollback_err =
+                sensors_set_scd41_compensation(previous.scd41_altitude_m, previous.scd41_temp_offset_c);
+            if (rollback_err != ESP_OK) {
+                ESP_LOGW(TAG, "failed to roll back SCD41 compensation after config save failure: %d", rollback_err);
+            }
+        }
+        return save_err;
+    }
+
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     s_app.config = updated;
+    if (!restart && (compensation_changed || metadata_changed)) {
+        s_app.publish_now = true;
+    }
     xSemaphoreGive(s_app.lock);
-    app_schedule_action(false);
+
+    if (!restart && metadata_changed && mqtt_ha_is_connected()) {
+        mqtt_ha_set_device_name(updated.device_name);
+        esp_err_t republish_err = mqtt_ha_publish_discovery();
+        if (republish_err != ESP_OK) {
+            ESP_LOGW(TAG, "failed to republish discovery after device name update: %d", republish_err);
+        }
+    }
+
+    if (restart) {
+        app_schedule_action(false);
+    }
+    if (restart_required != NULL) {
+        *restart_required = restart;
+    }
     return ESP_OK;
 }
 

@@ -8,7 +8,7 @@
 
 typedef struct {
     void (*get_status)(sensor_snapshot_t *snapshot, device_diag_t *diag, device_config_t *config, uint16_t *frc_ppm, void *user_ctx);
-    esp_err_t (*save_config)(const device_config_t *config, void *user_ctx);
+    esp_err_t (*save_config)(const device_config_t *config, bool *restart_required, bool *runtime_applied, void *user_ctx);
     void (*request_restart)(void *user_ctx);
     void (*request_factory_reset)(void *user_ctx);
     esp_err_t (*request_republish_discovery)(void *user_ctx);

@@ -16,6 +16,7 @@ bool sensors_is_sgp41_ready(void);
 bool sensors_is_sps30_ready(void);
 bool sensors_is_sps30_sleeping(void);
 void sensors_get_last_error(char *buffer, size_t buffer_len);
+esp_err_t sensors_set_scd41_compensation(uint16_t altitude_m, float temp_offset_c);
 esp_err_t sensors_set_scd41_asc(bool enabled);
 esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm);
 esp_err_t sensors_set_sps30_sleep(bool sleep);

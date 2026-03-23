@@ -24,6 +24,7 @@ esp_err_t mqtt_ha_start(const device_config_t *config,
 void mqtt_ha_stop(void);
 bool mqtt_ha_is_connected(void);
 void mqtt_ha_set_control_state(bool scd41_asc_enabled, uint16_t frc_reference_ppm);
+void mqtt_ha_set_device_name(const char *device_name);
 uint16_t mqtt_ha_get_frc_reference_ppm(void);
 esp_err_t mqtt_ha_publish_discovery(void);
 esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_diag_t *diag);
