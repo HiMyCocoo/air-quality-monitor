@@ -1,5 +1,6 @@
 #include "provisioning_web.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,9 @@ static const char *TAG = "provisioning_web";
 
 #define MQTT_PORT_MIN 1
 #define MQTT_PORT_MAX 65535
-#define PUBLISH_INTERVAL_MIN 5
-#define PUBLISH_INTERVAL_MAX 60
+#define MQTT_DEFAULT_PORT 1883
+#define MQTT_URL_BUFFER_LEN 512
+#define MQTT_SCHEME "mqtt://"
 #define SCD41_ALTITUDE_MIN 0
 #define SCD41_ALTITUDE_MAX 3000
 #define SCD41_TEMP_OFFSET_MIN 0.0
@@ -106,18 +108,13 @@ static const char INDEX_HTML[] =
     "<section class='card'><h2>连接与模块</h2><p class='section-copy'>快速确认 Wi-Fi、MQTT、各传感器与指示灯的当前状态。</p><div id='services' class='kv-list'></div></section>"
     "<section class='card span-2'><h2>空气质量总览</h2><p class='section-copy'>统一展示总体评估、美国 AQI 和气体相关补充指标，避免结论分散。</p><div id='airSummary'></div><div id='airMetrics' class='metric-grid'></div></section>"
     "<section class='card'><h2>颗粒物画像</h2><p class='section-copy'>结合 PM 分段、粒子计数与典型粒径，帮助判断颗粒物更偏细颗粒、混合颗粒还是粗颗粒。</p><div id='particleSummary'></div><div id='particleMetrics' class='kv-list'></div></section>"
-    "<section class='card'><h2>网络与 MQTT 配置</h2><p class='section-copy'>保存后设备会自动重启并重新应用网络相关配置。</p>"
+    "<section class='card'><h2>网络与 MQTT 配置</h2><p class='section-copy'>保存后设备会自动重启并重新应用网络相关配置。MQTT 只需填写一行 URL，发布间隔、Discovery 前缀和主题路径由固件默认。</p>"
     "<div class='field-grid'>"
     "<div class='field-span-2'><label>设备名称</label><input id='device_name'/></div>"
     "<div><label>Wi-Fi 名称</label><input id='wifi_ssid'/></div>"
     "<div><label>Wi-Fi 密码</label><input id='wifi_password' type='password'/></div>"
-    "<div class='field-span-2'><label>MQTT 主机</label><input id='mqtt_host'/></div>"
-    "<div><label>MQTT 端口</label><input id='mqtt_port' type='number'/></div>"
-    "<div><label>发布间隔（秒）</label><input id='publish_interval_sec' type='number'/></div>"
-    "<div><label>MQTT 用户名</label><input id='mqtt_username'/></div>"
-    "<div><label>MQTT 密码</label><input id='mqtt_password' type='password'/></div>"
-    "<div><label>Discovery 前缀</label><input id='discovery_prefix'/></div>"
-    "<div><label>主题根路径</label><input id='topic_root'/></div>"
+    "<div class='field-span-2'><label>MQTT URL</label><input id='mqtt_url' placeholder='mqtt://user:password@192.168.1.20:1883'/></div>"
+    "<div class='field-span-2 hint'>格式示例：mqtt://user:password@192.168.1.20:1883。若用户名或密码包含 @、:、/ 等特殊字符，请使用 URL 编码。</div>"
     "</div><button onclick='saveConfig()'>保存网络与 MQTT 配置</button></section>"
     "<section class='card'><h2>传感器与指示灯</h2><p class='section-copy'>所有即时控制集中在这里，避免配置项和运行时动作混在一起。</p>"
     "<div class='subsection'><h3>SCD41 校准</h3><p>调整海拔补偿、温度偏移以及自动自校准。</p>"
@@ -136,7 +133,7 @@ static const char INDEX_HTML[] =
     "<div class='footer-note'>当前管理页面默认面向受信任的局域网环境，不带登录鉴权。</div>"
     "</section>"
     "</div></div><script>"
-    "const configFields=['device_name','wifi_ssid','wifi_password','mqtt_host','mqtt_port','mqtt_username','mqtt_password','discovery_prefix','topic_root','publish_interval_sec','scd41_altitude_m','scd41_temp_offset_c'];"
+    "const configFields=['device_name','wifi_ssid','wifi_password','mqtt_url','scd41_altitude_m','scd41_temp_offset_c'];"
     "const configInputs=Object.fromEntries(configFields.map((id)=>[id,document.getElementById(id)]));"
     "const noticeEl=document.getElementById('notice');"
     "const heroBadgesEl=document.getElementById('heroBadges');"
@@ -201,7 +198,7 @@ static const char INDEX_HTML[] =
     ".replaceAll('Not enough AQI-supported measurements are available yet.','当前仍缺少足够的 AQI 支持数据。');}"
     "function localizedParticleNote(value){if(value==null||value==='')return '未提供';const m=/Mass is led by (.*), counts are led by (.*), typical size ([0-9.]+) um\\./.exec(value);if(m){return `质量主导区间：${m[1]}；计数主导区间：${m[2]}；典型粒径：${m[3]} μm。`;}return value;}"
     "function wifiStatus(d){if(d.diag.provisioning_mode)return '等待 BLE 配网';if(d.diag.wifi_connected)return '已连接';return '已保存凭据，当前离线';}"
-    "function mqttStatus(d){if(!d.config.mqtt_host)return '未配置';return d.diag.mqtt_connected?'已连接':'已配置，未连接';}"
+    "function mqttStatus(d){if(!d.config.mqtt_url)return '未配置';return d.diag.mqtt_connected?'已连接':'已配置，未连接';}"
     "function scd41Status(d){if(!d.diag.scd41_ready)return '未检测到或初始化失败';return d.snapshot.scd41_valid?'在线，正在测量':'在线，等待首包数据';}"
     "function sgp41Status(d){if(!d.diag.sgp41_ready)return '未检测到或初始化失败';if(d.snapshot.sgp41_conditioning)return '在线，NOx 调理中';if(!d.snapshot.sgp41_valid)return '在线，等待首包数据';if(valueOr(d.snapshot.voc_index,0)===0&&valueOr(d.snapshot.nox_index,0)===0)return '在线，算法学习中';return '在线，正在测量';}"
     "function sps30Status(d){if(!d.diag.sps30_ready)return '未检测到或初始化失败';if(d.snapshot.sps30_sleeping)return '在线，休眠中';return d.snapshot.pm_valid?'在线，正在测量':'在线，预热中或等待数据';}"
@@ -218,7 +215,7 @@ static const char INDEX_HTML[] =
     "function renderAir(d,overallKey){const overall=localizedOverall(d.snapshot.overall_air_quality);const basis=localizedBasis(d.snapshot.overall_air_quality_basis);const note=localizedNote(d.snapshot.overall_air_quality_note);const usAqi=d.snapshot.us_aqi!=null?`${d.snapshot.us_aqi} · ${translate(categoryLabels,d.snapshot.us_aqi_level)}`:'暂不可用';airSummaryEl.innerHTML=summaryBanner(`总体评估：${overall}`,`${basis}。${note}`,overallKey);airMetricsEl.innerHTML=[metric('US AQI',usAqi,text(translate(categoryLabels,d.snapshot.us_aqi_level),'暂无等级')),metric('主要污染物',translate(factorLabels,d.snapshot.us_aqi_primary_pollutant),text(localizedFactor(d.snapshot.overall_air_quality_driver),'未提供')),metric('CO2',num(d.snapshot.co2_ppm,0,' ppm'),localizedSignal(d.snapshot.co2_rating)),metric('温度',num(d.snapshot.temperature_c,1,' °C'),'SCD41 实时测量'),metric('湿度',num(d.snapshot.humidity_rh,1,' %'),'建议区间 30% 到 60%'),metric('VOC 指数',num(d.snapshot.voc_index,0,''),localizedSignal(d.snapshot.voc_rating)),metric('NOx 指数',num(d.snapshot.nox_index,0,''),localizedSignal(d.snapshot.nox_rating)),metric('样本年龄',fmtAge(d.snapshot.sample_age_sec),'最新一次有效采样到现在')].join('');}"
     "function renderParticles(d){const keyMap={fine:'fine',mixed:'mixed',coarse:'coarse',unavailable:'neutral'};const profileKey=keyMap[d.snapshot.particle_profile_key]||'neutral';particleSummaryEl.innerHTML=summaryBanner(`颗粒物画像：${localizedProfile(d.snapshot.particle_profile)}`,localizedParticleNote(d.snapshot.particle_profile_note),profileKey);particleMetricsEl.innerHTML=[kv('PM1.0',num(d.snapshot.pm1_0,1,' µg/m³')),kv('PM2.5',num(d.snapshot.pm2_5,1,' µg/m³')),kv('PM4.0',num(d.snapshot.pm4_0,1,' µg/m³')),kv('PM10',num(d.snapshot.pm10_0,1,' µg/m³')),kv('>0.5 µm 粒子数',num(d.snapshot.particles_0_5um,1,' #/cm³')),kv('>1.0 µm 粒子数',num(d.snapshot.particles_1_0um,1,' #/cm³')),kv('>2.5 µm 粒子数',num(d.snapshot.particles_2_5um,1,' #/cm³')),kv('>4.0 µm 粒子数',num(d.snapshot.particles_4_0um,1,' #/cm³')),kv('>10 µm 粒子数',num(d.snapshot.particles_10_0um,1,' #/cm³')),kv('典型粒径',num(d.snapshot.typical_particle_size_um,2,' µm'))].join('');}"
     "async function fetchStatus(){const r=await fetch('/api/status');if(!r.ok)return;const d=await r.json();const overallKey=d.snapshot.overall_air_quality_key||'neutral';renderHero(d,overallKey);renderOverview(d);renderServices(d);renderAir(d,overallKey);renderParticles(d);syncActionAvailability(d);setConfigValues(d);}"
-    "async function saveConfig(){const payload={device_name:configInputs.device_name.value,wifi_ssid:configInputs.wifi_ssid.value,wifi_password:configInputs.wifi_password.value,mqtt_host:configInputs.mqtt_host.value,mqtt_port:Number(configInputs.mqtt_port.value),mqtt_username:configInputs.mqtt_username.value,mqtt_password:configInputs.mqtt_password.value,discovery_prefix:configInputs.discovery_prefix.value,topic_root:configInputs.topic_root.value,publish_interval_sec:Number(configInputs.publish_interval_sec.value),scd41_altitude_m:Number(configInputs.scd41_altitude_m.value),scd41_temp_offset_c:Number(configInputs.scd41_temp_offset_c.value)};const ok=await apiRequest('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},'配置保存失败','配置已保存，设备将自动重启。');if(ok){configDirty=false;setTimeout(fetchStatus,800);}}"
+    "async function saveConfig(){const payload={device_name:configInputs.device_name.value,wifi_ssid:configInputs.wifi_ssid.value,wifi_password:configInputs.wifi_password.value,mqtt_url:configInputs.mqtt_url.value,scd41_altitude_m:Number(configInputs.scd41_altitude_m.value),scd41_temp_offset_c:Number(configInputs.scd41_temp_offset_c.value)};const ok=await apiRequest('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},'配置保存失败','配置已保存，设备将自动重启。');if(ok){configDirty=false;setTimeout(fetchStatus,800);}}"
     "async function toggleAsc(enabled){if(await apiRequest('/api/action/scd41-asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'SCD41 ASC 操作失败',enabled?'已开启 ASC。':'已关闭 ASC。')){fetchStatus();}}"
     "async function toggleSps30(sleep){if(await apiRequest('/api/action/sps30-sleep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sleep})},'SPS30 操作失败',sleep?'已让 SPS30 进入休眠。':'已唤醒 SPS30。')){fetchStatus();}}"
     "async function toggleStatusLed(enabled){if(await apiRequest('/api/action/status-led',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})},'RGB 状态灯操作失败',enabled?'已打开 RGB 状态灯。':'已关闭 RGB 状态灯。')){fetchStatus();}}"
@@ -315,6 +312,289 @@ static bool whole_number_in_range(cJSON *item, long min, long max)
            floor(item->valuedouble) == item->valuedouble;
 }
 
+static void trim_ascii_whitespace(char *text)
+{
+    if (text == NULL) {
+        return;
+    }
+
+    char *start = text;
+    while (*start != '\0' && isspace((unsigned char)*start)) {
+        start++;
+    }
+
+    if (start != text) {
+        memmove(text, start, strlen(start) + 1);
+    }
+
+    size_t len = strlen(text);
+    while (len > 0 && isspace((unsigned char)text[len - 1])) {
+        text[--len] = '\0';
+    }
+}
+
+static bool mqtt_url_is_unreserved(char ch)
+{
+    return isalnum((unsigned char)ch) || ch == '-' || ch == '.' || ch == '_' || ch == '~';
+}
+
+static bool mqtt_url_encode_component(const char *src, char *dst, size_t dst_len)
+{
+    size_t used = 0;
+    for (const unsigned char *cursor = (const unsigned char *)src; cursor != NULL && *cursor != '\0'; cursor++) {
+        if (mqtt_url_is_unreserved((char)*cursor)) {
+            if (used + 1 >= dst_len) {
+                return false;
+            }
+            dst[used++] = (char)*cursor;
+            continue;
+        }
+
+        if (used + 3 >= dst_len) {
+            return false;
+        }
+        snprintf(dst + used, dst_len - used, "%%%02X", *cursor);
+        used += 3;
+    }
+
+    if (dst_len == 0) {
+        return false;
+    }
+    dst[used] = '\0';
+    return true;
+}
+
+static int mqtt_url_hex_value(char ch)
+{
+    if (ch >= '0' && ch <= '9') {
+        return ch - '0';
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return ch - 'A' + 10;
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return ch - 'a' + 10;
+    }
+    return -1;
+}
+
+static bool mqtt_url_decode_component(const char *src, char *dst, size_t dst_len)
+{
+    size_t used = 0;
+    for (size_t i = 0; src != NULL && src[i] != '\0'; i++) {
+        unsigned char value = (unsigned char)src[i];
+        if (value == '%') {
+            if (src[i + 1] == '\0' || src[i + 2] == '\0') {
+                return false;
+            }
+            int hi = mqtt_url_hex_value(src[i + 1]);
+            int lo = mqtt_url_hex_value(src[i + 2]);
+            if (hi < 0 || lo < 0) {
+                return false;
+            }
+            value = (unsigned char)((hi << 4) | lo);
+            i += 2;
+        }
+
+        if (used + 1 >= dst_len) {
+            return false;
+        }
+        dst[used++] = (char)value;
+    }
+
+    if (dst_len == 0) {
+        return false;
+    }
+    dst[used] = '\0';
+    return true;
+}
+
+static bool parse_mqtt_port_text(const char *text, uint16_t *port_out)
+{
+    if (text == NULL || *text == '\0' || port_out == NULL) {
+        return false;
+    }
+
+    char *end = NULL;
+    long port = strtol(text, &end, 10);
+    if (end == NULL || *end != '\0' || port < MQTT_PORT_MIN || port > MQTT_PORT_MAX) {
+        return false;
+    }
+
+    *port_out = (uint16_t)port;
+    return true;
+}
+
+static void clear_mqtt_url_config(device_config_t *config)
+{
+    config->mqtt_host[0] = '\0';
+    config->mqtt_username[0] = '\0';
+    config->mqtt_password[0] = '\0';
+    config->mqtt_port = MQTT_DEFAULT_PORT;
+}
+
+static bool parse_mqtt_url_string(const char *input, device_config_t *config, char *error, size_t error_len)
+{
+    char url[MQTT_URL_BUFFER_LEN];
+    if (input == NULL) {
+        clear_mqtt_url_config(config);
+        return true;
+    }
+
+    size_t length = strlen(input);
+    if (length >= sizeof(url)) {
+        snprintf(error, error_len, "MQTT URL 过长");
+        return false;
+    }
+
+    memcpy(url, input, length + 1);
+    trim_ascii_whitespace(url);
+    if (url[0] == '\0') {
+        clear_mqtt_url_config(config);
+        return true;
+    }
+
+    const size_t scheme_len = strlen(MQTT_SCHEME);
+    if (strncmp(url, MQTT_SCHEME, scheme_len) != 0) {
+        snprintf(error, error_len, "MQTT URL 必须以 mqtt:// 开头");
+        return false;
+    }
+
+    char *authority = url + scheme_len;
+    char *tail = strpbrk(authority, "/?#");
+    if (tail != NULL) {
+        if (*tail == '/' && tail[1] == '\0') {
+            *tail = '\0';
+        } else {
+            snprintf(error, error_len, "MQTT URL 只支持地址、端口、用户名和密码");
+            return false;
+        }
+    }
+    if (authority[0] == '\0') {
+        snprintf(error, error_len, "MQTT URL 缺少主机地址");
+        return false;
+    }
+
+    char username[MQTT_USER_LEN + 1] = {0};
+    char password[MQTT_PASSWORD_LEN + 1] = {0};
+    char host[MQTT_HOST_LEN + 1] = {0};
+    uint16_t port = MQTT_DEFAULT_PORT;
+
+    char *host_part = authority;
+    char *userinfo = strrchr(authority, '@');
+    if (userinfo != NULL) {
+        *userinfo = '\0';
+        host_part = userinfo + 1;
+
+        char *password_sep = strchr(authority, ':');
+        if (password_sep != NULL) {
+            *password_sep = '\0';
+            if (!mqtt_url_decode_component(authority, username, sizeof(username)) ||
+                !mqtt_url_decode_component(password_sep + 1, password, sizeof(password))) {
+                snprintf(error, error_len, "MQTT 用户名或密码包含无效的 URL 编码");
+                return false;
+            }
+        } else if (!mqtt_url_decode_component(authority, username, sizeof(username))) {
+            snprintf(error, error_len, "MQTT 用户名包含无效的 URL 编码");
+            return false;
+        }
+    }
+
+    if (host_part[0] == '[') {
+        char *host_end = strchr(host_part, ']');
+        if (host_end == NULL) {
+            snprintf(error, error_len, "MQTT 主机地址格式无效");
+            return false;
+        }
+
+        size_t host_len = (size_t)(host_end - host_part + 1);
+        if (host_len == 0 || host_len > MQTT_HOST_LEN) {
+            snprintf(error, error_len, "MQTT 主机地址过长");
+            return false;
+        }
+        memcpy(host, host_part, host_len);
+        host[host_len] = '\0';
+
+        if (host_end[1] == '\0') {
+            port = MQTT_DEFAULT_PORT;
+        } else if (host_end[1] == ':') {
+            if (!parse_mqtt_port_text(host_end + 2, &port)) {
+                snprintf(error, error_len, "MQTT 端口必须在 1 到 65535 之间");
+                return false;
+            }
+        } else {
+            snprintf(error, error_len, "MQTT 主机地址格式无效");
+            return false;
+        }
+    } else {
+        char *port_sep = strrchr(host_part, ':');
+        if (port_sep != NULL) {
+            if (strchr(host_part, ':') != port_sep) {
+                snprintf(error, error_len, "IPv6 地址请使用 [addr]:port 格式");
+                return false;
+            }
+            *port_sep = '\0';
+            if (!parse_mqtt_port_text(port_sep + 1, &port)) {
+                snprintf(error, error_len, "MQTT 端口必须在 1 到 65535 之间");
+                return false;
+            }
+        }
+
+        if (host_part[0] == '\0') {
+            snprintf(error, error_len, "MQTT URL 缺少主机地址");
+            return false;
+        }
+        if (strlen(host_part) > MQTT_HOST_LEN) {
+            snprintf(error, error_len, "MQTT 主机地址过长");
+            return false;
+        }
+        strlcpy(host, host_part, sizeof(host));
+    }
+
+    strlcpy(config->mqtt_host, host, sizeof(config->mqtt_host));
+    strlcpy(config->mqtt_username, username, sizeof(config->mqtt_username));
+    strlcpy(config->mqtt_password, password, sizeof(config->mqtt_password));
+    config->mqtt_port = port;
+    return true;
+}
+
+static void build_mqtt_url_string(const device_config_t *config, char *buffer, size_t buffer_len)
+{
+    if (buffer_len == 0) {
+        return;
+    }
+
+    buffer[0] = '\0';
+    if (config == NULL || config->mqtt_host[0] == '\0') {
+        return;
+    }
+
+    char username[MQTT_USER_LEN * 3 + 1] = {0};
+    char password[MQTT_PASSWORD_LEN * 3 + 1] = {0};
+    uint16_t port = config->mqtt_port ? config->mqtt_port : MQTT_DEFAULT_PORT;
+    if (!mqtt_url_encode_component(config->mqtt_username, username, sizeof(username)) ||
+        !mqtt_url_encode_component(config->mqtt_password, password, sizeof(password))) {
+        return;
+    }
+
+    int written = 0;
+    if (config->mqtt_username[0] != '\0' || config->mqtt_password[0] != '\0') {
+        if (config->mqtt_password[0] != '\0') {
+            written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s:%s@%s:%u",
+                               username, password, config->mqtt_host, port);
+        } else {
+            written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s@%s:%u",
+                               username, config->mqtt_host, port);
+        }
+    } else {
+        written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s:%u", config->mqtt_host, port);
+    }
+
+    if (written < 0 || (size_t)written >= buffer_len) {
+        buffer[0] = '\0';
+    }
+}
+
 static void fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, device_config_t *config, uint16_t *frc_ppm)
 {
     memset(snapshot, 0, sizeof(*snapshot));
@@ -338,12 +618,14 @@ static esp_err_t status_handler(httpd_req_t *req)
     device_diag_t diag;
     device_config_t config;
     uint16_t frc_ppm;
+    char mqtt_url[MQTT_URL_BUFFER_LEN];
     fill_status(&snapshot, &diag, &config, &frc_ppm);
     air_quality_assessment_t assessment = {0};
     air_quality_compute_overall_assessment(&snapshot, &assessment);
     air_quality_particle_insight_t particle = {0};
     air_quality_compute_particle_insight(&snapshot, &particle);
     int64_t now_ms = esp_timer_get_time() / 1000;
+    build_mqtt_url_string(&config, mqtt_url, sizeof(mqtt_url));
 
     cJSON *root = cJSON_CreateObject();
     cJSON *diag_json = cJSON_AddObjectToObject(root, "diag");
@@ -465,6 +747,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddStringToObject(config_json, "device_name", config.device_name);
     cJSON_AddStringToObject(config_json, "wifi_ssid", config.wifi_ssid);
     cJSON_AddStringToObject(config_json, "wifi_password", config.wifi_password);
+    cJSON_AddStringToObject(config_json, "mqtt_url", mqtt_url);
     cJSON_AddStringToObject(config_json, "mqtt_host", config.mqtt_host);
     cJSON_AddNumberToObject(config_json, "mqtt_port", config.mqtt_port);
     cJSON_AddStringToObject(config_json, "mqtt_username", config.mqtt_username);
@@ -505,34 +788,29 @@ static esp_err_t config_handler(httpd_req_t *req)
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "wifi_password")) && cJSON_IsString(item)) {
         strlcpy(config.wifi_password, item->valuestring, sizeof(config.wifi_password));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_host")) && cJSON_IsString(item)) {
-        strlcpy(config.mqtt_host, item->valuestring, sizeof(config.mqtt_host));
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port")) != NULL) {
-        if (!whole_number_in_range(item, MQTT_PORT_MIN, MQTT_PORT_MAX)) {
+    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_url")) && cJSON_IsString(item)) {
+        char error[96];
+        if (!parse_mqtt_url_string(item->valuestring, &config, error, sizeof(error))) {
             cJSON_Delete(json);
-            return send_error_json(req, "400 Bad Request", "MQTT 端口必须在 1 到 65535 之间");
+            return send_error_json(req, "400 Bad Request", error);
         }
-        config.mqtt_port = (uint16_t)item->valuedouble;
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_username")) && cJSON_IsString(item)) {
-        strlcpy(config.mqtt_username, item->valuestring, sizeof(config.mqtt_username));
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_password")) && cJSON_IsString(item)) {
-        strlcpy(config.mqtt_password, item->valuestring, sizeof(config.mqtt_password));
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "discovery_prefix")) && cJSON_IsString(item)) {
-        strlcpy(config.discovery_prefix, item->valuestring, sizeof(config.discovery_prefix));
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "topic_root")) && cJSON_IsString(item)) {
-        strlcpy(config.topic_root, item->valuestring, sizeof(config.topic_root));
-    }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "publish_interval_sec")) != NULL) {
-        if (!whole_number_in_range(item, PUBLISH_INTERVAL_MIN, PUBLISH_INTERVAL_MAX)) {
-            cJSON_Delete(json);
-            return send_error_json(req, "400 Bad Request", "发布间隔必须在 5 到 60 秒之间");
+    } else {
+        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_host")) && cJSON_IsString(item)) {
+            strlcpy(config.mqtt_host, item->valuestring, sizeof(config.mqtt_host));
         }
-        config.publish_interval_sec = (uint16_t)item->valuedouble;
+        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port")) != NULL) {
+            if (!whole_number_in_range(item, MQTT_PORT_MIN, MQTT_PORT_MAX)) {
+                cJSON_Delete(json);
+                return send_error_json(req, "400 Bad Request", "MQTT 端口必须在 1 到 65535 之间");
+            }
+            config.mqtt_port = (uint16_t)item->valuedouble;
+        }
+        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_username")) && cJSON_IsString(item)) {
+            strlcpy(config.mqtt_username, item->valuestring, sizeof(config.mqtt_username));
+        }
+        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_password")) && cJSON_IsString(item)) {
+            strlcpy(config.mqtt_password, item->valuestring, sizeof(config.mqtt_password));
+        }
     }
     if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_altitude_m")) != NULL) {
         if (!whole_number_in_range(item, SCD41_ALTITUDE_MIN, SCD41_ALTITUDE_MAX)) {

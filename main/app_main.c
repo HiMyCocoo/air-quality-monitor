@@ -262,32 +262,12 @@ static esp_err_t app_save_config(const device_config_t *config, void *user_ctx)
     (void)user_ctx;
     device_config_t updated = *config;
     updated.version = DEVICE_CONFIG_VERSION;
-    if (updated.device_name[0] == '\0') {
-        snprintf(updated.device_name, sizeof(updated.device_name), "aq-monitor-%.20s", s_app.device_id);
-    }
-    if (updated.discovery_prefix[0] == '\0') {
-        strlcpy(updated.discovery_prefix, "homeassistant", sizeof(updated.discovery_prefix));
-    }
-    if (updated.topic_root[0] == '\0') {
-        snprintf(updated.topic_root, sizeof(updated.topic_root), "air_quality_monitor/%s", s_app.device_id);
-    }
-    if (updated.publish_interval_sec < 5 || updated.publish_interval_sec > 60) {
-        updated.publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
-    }
-    if (updated.mqtt_port == 0) {
-        updated.mqtt_port = 1883;
-    }
-    if (updated.scd41_altitude_m > 3000) {
-        updated.scd41_altitude_m = 0;
-    }
-    if (updated.scd41_temp_offset_c < 0.0f || updated.scd41_temp_offset_c > 20.0f) {
-        updated.scd41_temp_offset_c = 4.0f;
-    }
 
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     updated.scd41_asc_enabled = s_app.config.scd41_asc_enabled;
     updated.pms_control_pins_enabled = s_app.config.pms_control_pins_enabled;
     xSemaphoreGive(s_app.lock);
+    platform_config_sanitize(&updated, s_app.device_id);
 
     ESP_RETURN_ON_ERROR(platform_config_save(&updated), TAG, "config save failed");
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
