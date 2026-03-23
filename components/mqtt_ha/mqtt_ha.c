@@ -9,6 +9,7 @@
 #include "cJSON.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "mqtt_client.h"
 
 static const char *TAG = "mqtt_ha";
@@ -45,10 +46,13 @@ static mqtt_ctx_t s_ctx;
 
 static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
+    {"co2_rating", "CO2 Rating", "co2_rating", NULL, NULL, NULL, NULL, false},
     {"temperature", "Temperature", "temperature", "°C", "temperature", "measurement", NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
     {"voc_index", "VOC Index", "voc_index", "index", NULL, "measurement", NULL, false},
+    {"voc_rating", "VOC Rating", "voc_rating", NULL, NULL, NULL, NULL, false},
     {"nox_index", "NOx Index", "nox_index", "index", NULL, "measurement", NULL, false},
+    {"nox_rating", "NOx Rating", "nox_rating", NULL, NULL, NULL, NULL, false},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
@@ -56,12 +60,19 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"us_aqi", "US AQI", "us_aqi", "AQI", NULL, "measurement", NULL, false},
     {"us_aqi_level", "US AQI Level", "us_aqi_level", NULL, NULL, NULL, NULL, false},
     {"us_aqi_primary_pollutant", "US AQI Primary Pollutant", "us_aqi_primary_pollutant", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality", "Overall Air Quality", "overall_air_quality", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_basis", "Overall Air Quality Basis", "overall_air_quality_basis", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_driver", "Overall Air Quality Driver", "overall_air_quality_driver", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_note", "Overall Air Quality Note", "overall_air_quality_note", NULL, NULL, NULL, NULL, false},
+    {"particle_profile", "Particle Profile", "particle_profile", NULL, NULL, NULL, NULL, false},
+    {"particle_profile_note", "Particle Profile Note", "particle_profile_note", NULL, NULL, NULL, NULL, false},
     {"particles_0_5um", "Particles >0.5µm", "particles_0_5um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_1_0um", "Particles >1.0µm", "particles_1_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_2_5um", "Particles >2.5µm", "particles_2_5um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_4_0um", "Particles >4.0µm", "particles_4_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_10_0um", "Particles >10µm", "particles_10_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"typical_particle_size_um", "Typical Particle Size", "typical_particle_size_um", "µm", NULL, "measurement", NULL, false},
+    {"sample_age_sec", "Sample Age", "sample_age_sec", "s", "duration", "measurement", "diagnostic", true},
     {"wifi_rssi", "Wi-Fi RSSI", "wifi_rssi", "dBm", "signal_strength", "measurement", "diagnostic", true},
     {"uptime_sec", "Uptime", "uptime_sec", "s", "duration", "measurement", "diagnostic", true},
     {"heap_free", "Heap Free", "heap_free", "B", "data_size", "measurement", "diagnostic", true},
@@ -438,31 +449,47 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         return ESP_ERR_INVALID_ARG;
     }
 
-    air_quality_us_aqi_t us_aqi = {0};
-    air_quality_compute_us_aqi(snapshot, &us_aqi);
+    air_quality_assessment_t assessment = {0};
+    air_quality_compute_overall_assessment(snapshot, &assessment);
+    air_quality_particle_insight_t particle = {0};
+    air_quality_compute_particle_insight(snapshot, &particle);
+    air_quality_signal_level_t co2_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
+    air_quality_signal_level_t voc_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
+    air_quality_signal_level_t nox_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
 
     cJSON *state = cJSON_CreateObject();
     if (snapshot->scd41_valid) {
+        co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
         cJSON_AddNumberToObject(state, "co2", snapshot->co2_ppm);
+        cJSON_AddStringToObject(state, "co2_rating", air_quality_signal_level_label(co2_rating));
         cJSON_AddNumberToObject(state, "temperature", snapshot->temperature_c);
         cJSON_AddNumberToObject(state, "humidity", snapshot->humidity_rh);
     } else {
         cJSON_AddNullToObject(state, "co2");
+        cJSON_AddNullToObject(state, "co2_rating");
         cJSON_AddNullToObject(state, "temperature");
         cJSON_AddNullToObject(state, "humidity");
     }
     if (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) {
+        voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
+        nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
         cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
+        cJSON_AddStringToObject(state, "voc_rating", air_quality_signal_level_label(voc_rating));
         cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
+        cJSON_AddStringToObject(state, "nox_rating", air_quality_signal_level_label(nox_rating));
     } else {
         cJSON_AddNullToObject(state, "voc_index");
+        cJSON_AddNullToObject(state, "voc_rating");
         cJSON_AddNullToObject(state, "nox_index");
+        cJSON_AddNullToObject(state, "nox_rating");
     }
     if (snapshot->pm_valid) {
         cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
         cJSON_AddNumberToObject(state, "pm2_5", snapshot->pm2_5);
         cJSON_AddNumberToObject(state, "pm4_0", snapshot->pm4_0);
         cJSON_AddNumberToObject(state, "pm10_0", snapshot->pm10_0);
+        cJSON_AddStringToObject(state, "particle_profile", air_quality_particle_profile_label(particle.profile));
+        cJSON_AddStringToObject(state, "particle_profile_note", particle.note[0] ? particle.note : "Unavailable");
         cJSON_AddNumberToObject(state, "particles_0_5um", snapshot->particles_0_5um);
         cJSON_AddNumberToObject(state, "particles_1_0um", snapshot->particles_1_0um);
         cJSON_AddNumberToObject(state, "particles_2_5um", snapshot->particles_2_5um);
@@ -474,6 +501,8 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "pm2_5");
         cJSON_AddNullToObject(state, "pm4_0");
         cJSON_AddNullToObject(state, "pm10_0");
+        cJSON_AddNullToObject(state, "particle_profile");
+        cJSON_AddNullToObject(state, "particle_profile_note");
         cJSON_AddNullToObject(state, "particles_0_5um");
         cJSON_AddNullToObject(state, "particles_1_0um");
         cJSON_AddNullToObject(state, "particles_2_5um");
@@ -481,20 +510,35 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "particles_10_0um");
         cJSON_AddNullToObject(state, "typical_particle_size_um");
     }
-    if (us_aqi.valid) {
-        cJSON_AddNumberToObject(state, "us_aqi", us_aqi.aqi);
-        cJSON_AddStringToObject(state, "us_aqi_level", air_quality_category_label(us_aqi.category));
-        cJSON_AddStringToObject(state, "us_aqi_primary_pollutant", air_quality_pollutant_label(us_aqi.dominant_pollutant));
+    if (assessment.us_aqi.valid) {
+        cJSON_AddNumberToObject(state, "us_aqi", assessment.us_aqi.aqi);
+        cJSON_AddStringToObject(state, "us_aqi_level", air_quality_category_label(assessment.us_aqi.category));
+        cJSON_AddStringToObject(state, "us_aqi_primary_pollutant", air_quality_pollutant_label(assessment.us_aqi.dominant_pollutant));
     } else {
         cJSON_AddNullToObject(state, "us_aqi");
         cJSON_AddNullToObject(state, "us_aqi_level");
         cJSON_AddNullToObject(state, "us_aqi_primary_pollutant");
     }
+    if (assessment.valid) {
+        cJSON_AddStringToObject(state, "overall_air_quality", air_quality_category_label(assessment.category));
+        cJSON_AddStringToObject(state, "overall_air_quality_driver", air_quality_factor_label(assessment.dominant_factor));
+    } else {
+        cJSON_AddNullToObject(state, "overall_air_quality");
+        cJSON_AddNullToObject(state, "overall_air_quality_driver");
+    }
+    cJSON_AddStringToObject(state, "overall_air_quality_basis", assessment.basis[0] ? assessment.basis : "Unavailable");
+    cJSON_AddStringToObject(state, "overall_air_quality_note", assessment.note[0] ? assessment.note : "Unavailable");
     cJSON_AddBoolToObject(state, "sps30_sleeping", snapshot->sps30_sleeping);
     cJSON_AddBoolToObject(state, "scd41_asc_enabled", s_ctx.scd41_asc_enabled);
     cJSON_AddNumberToObject(state, "scd41_frc_reference_ppm", s_ctx.frc_reference_ppm);
 
     cJSON *diag_json = cJSON_CreateObject();
+    int64_t now_ms = esp_timer_get_time() / 1000;
+    if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {
+        cJSON_AddNumberToObject(diag_json, "sample_age_sec", (now_ms - snapshot->updated_at_ms) / 1000);
+    } else {
+        cJSON_AddNullToObject(diag_json, "sample_age_sec");
+    }
     cJSON_AddNumberToObject(diag_json, "wifi_rssi", diag->wifi_rssi);
     cJSON_AddNumberToObject(diag_json, "uptime_sec", diag->uptime_sec);
     cJSON_AddNumberToObject(diag_json, "heap_free", diag->heap_free);

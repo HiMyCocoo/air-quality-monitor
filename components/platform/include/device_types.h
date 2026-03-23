@@ -69,6 +69,8 @@ typedef struct {
     bool scd41_ready;
     bool sgp41_ready;
     bool sps30_ready;
+    bool status_led_ready;
+    bool status_led_enabled;
     int wifi_rssi;
     uint32_t uptime_sec;
     uint32_t heap_free;
