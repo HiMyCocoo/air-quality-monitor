@@ -10,6 +10,8 @@
 
 #define CONFIG_NAMESPACE "airmon_cfg"
 #define CONFIG_KEY "config"
+#define DEFAULT_WIFI_SSID "ong"
+#define DEFAULT_WIFI_PASSWORD "jiajia990820"
 
 static const char *TAG = "platform_config";
 
@@ -52,6 +54,8 @@ void platform_config_apply_defaults(device_config_t *config, const char *device_
 {
     memset(config, 0, sizeof(*config));
     config->version = DEVICE_CONFIG_VERSION;
+    strlcpy(config->wifi_ssid, DEFAULT_WIFI_SSID, sizeof(config->wifi_ssid));
+    strlcpy(config->wifi_password, DEFAULT_WIFI_PASSWORD, sizeof(config->wifi_password));
     config->mqtt_port = 1883;
     config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     config->scd41_asc_enabled = true;
