@@ -966,6 +966,12 @@
       padding-top: 16px;
       border-top: 1px dashed rgba(0,0,0,0.1);
     }
+    .config-layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
 
     @media (max-width: 768px) {
       .tabs {
@@ -1004,6 +1010,9 @@
         grid-template-columns: 1fr;
       }
       .maintenance-layout {
+        grid-template-columns: 1fr;
+      }
+      .config-layout {
         grid-template-columns: 1fr;
       }
     }
@@ -1066,37 +1075,14 @@
     </section>
 
     <section id="tab-config" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" data-tab="config" hidden>
-      <div class="main-grid">
-        <section class="glass-panel span-2 panel-primary">
-          <h2>网络与 MQTT 配置</h2>
-          <div class="inner-stack">
-            <div class="inner-card">
-              <h3>设备与网络</h3>
-              <div class="field-grid">
-                <div class="field-span-2">
-                  <label>设备名称</label>
-                  <input id="device_name" type="text" placeholder="设置设备在网络中的名称"/>
-                </div>
-                <div>
-                  <label>Wi-Fi 名称 (SSID)</label>
-                  <input id="wifi_ssid" type="text" placeholder="2.4GHz Wi-Fi"/>
-                </div>
-                <div>
-                  <label>Wi-Fi 密码</label>
-                  <input id="wifi_password" type="password" placeholder="留空以维持不变"/>
-                </div>
-              </div>
-            </div>
-
-            <div class="inner-card">
-              <h3>MQTT 接入</h3>
-              <div class="field-grid">
-                <div class="field-span-2">
-                  <label>MQTT URL</label>
-                  <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883"/>
-                  <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
-                </div>
-              </div>
+      <div class="config-layout">
+        <section class="glass-panel panel-primary">
+          <h2>MQTT 接入</h2>
+          <div class="field-grid">
+            <div class="field-span-2">
+              <label>MQTT URL</label>
+              <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883"/>
+              <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
             </div>
           </div>
         </section>
@@ -1234,7 +1220,7 @@
   </div>
 
   <script>
-    const configFields=['device_name','wifi_ssid','wifi_password','mqtt_url','scd41_altitude_m','scd41_temp_offset_c'];
+    const configFields=['mqtt_url','scd41_altitude_m','scd41_temp_offset_c'];
     const configInputs=Object.fromEntries(configFields.map((id)=>[id,document.getElementById(id)]));
     const noticeEl=document.getElementById('notice');
     const overviewNetworkEl=document.getElementById('overviewNetwork');
@@ -1484,19 +1470,11 @@
       const body=parseMockJsonBody(options);
       if(url==='/api/config'){
         const previous=clone(mockStatus.config);
-        mockStatus.config.device_name=body.device_name||'';
-        mockStatus.config.wifi_ssid=body.wifi_ssid||'';
-        if(body.wifi_password) mockStatus.config.wifi_password=body.wifi_password;
-        mockStatus.config.mqtt_url=body.mqtt_url||'';
+        if(typeof body.mqtt_url==='string') mockStatus.config.mqtt_url=body.mqtt_url;
         mockStatus.config.scd41_altitude_m=Number.isFinite(body.scd41_altitude_m)?body.scd41_altitude_m:mockStatus.config.scd41_altitude_m;
         mockStatus.config.scd41_temp_offset_c=Number.isFinite(body.scd41_temp_offset_c)?body.scd41_temp_offset_c:mockStatus.config.scd41_temp_offset_c;
-        mockStatus.diag.provisioning_mode=!mockStatus.config.wifi_ssid;
-        mockStatus.diag.wifi_connected=!!mockStatus.config.wifi_ssid;
         mockStatus.diag.mqtt_connected=!!mockStatus.config.mqtt_url;
-        const restart=
-          previous.wifi_ssid!==mockStatus.config.wifi_ssid ||
-          previous.wifi_password!==mockStatus.config.wifi_password ||
-          previous.mqtt_url!==mockStatus.config.mqtt_url;
+        const restart=previous.mqtt_url!==mockStatus.config.mqtt_url;
         const runtime_applied=
           previous.scd41_altitude_m!==mockStatus.config.scd41_altitude_m ||
           previous.scd41_temp_offset_c!==mockStatus.config.scd41_temp_offset_c;
@@ -1703,9 +1681,6 @@
 
     async function saveConfig(){
       const payload={
-        device_name: configInputs.device_name.value,
-        wifi_ssid: configInputs.wifi_ssid.value,
-        wifi_password: configInputs.wifi_password.value,
         mqtt_url: configInputs.mqtt_url.value,
         scd41_altitude_m: Number(configInputs.scd41_altitude_m.value),
         scd41_temp_offset_c: Number(configInputs.scd41_temp_offset_c.value)
@@ -1714,12 +1689,12 @@
       if(!result) return;
       configDirty=false;
       if(result.restart && result.runtime_applied){
-        showNotice('success','配置已保存，系统将重启应用网络重连。SCD41 补偿参数已即时下发。');
+        showNotice('success','MQTT 配置已保存，系统将重启以重新连接服务端。SCD41 补偿参数已即时下发。');
         setTimeout(fetchStatus, 1500);
         return;
       }
       if(result.restart){
-        showNotice('success','网络 / MQTT 配置已保存，系统将重启应用网络重连。');
+        showNotice('success','MQTT 配置已保存，系统将重启以重新连接服务端。');
         setTimeout(fetchStatus, 1500);
         return;
       }
