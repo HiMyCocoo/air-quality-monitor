@@ -292,18 +292,25 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
     }
     snprintf(expected, sizeof(expected), "%s/scd41_asc", s_ctx.cmd_prefix);
     if (topic_equals(topic, topic_len, expected)) {
-        bool enabled = strcasecmp(payload, "ON") == 0;
-        s_ctx.scd41_asc_enabled = enabled;
-        if (s_ctx.callbacks.set_scd41_asc_requested != NULL) {
-            s_ctx.callbacks.set_scd41_asc_requested(enabled, s_ctx.user_ctx);
+        if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
+            bool enabled = strcasecmp(payload, "ON") == 0;
+            if (s_ctx.callbacks.set_scd41_asc_requested != NULL) {
+                if (s_ctx.callbacks.set_scd41_asc_requested(enabled, s_ctx.user_ctx) == ESP_OK) {
+                    s_ctx.scd41_asc_enabled = enabled;
+                }
+            } else {
+                s_ctx.scd41_asc_enabled = enabled;
+            }
         }
         return;
     }
     snprintf(expected, sizeof(expected), "%s/sps30_sleep", s_ctx.cmd_prefix);
     if (topic_equals(topic, topic_len, expected)) {
-        bool sleep = strcasecmp(payload, "ON") == 0;
-        if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
-            s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
+        if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
+            bool sleep = strcasecmp(payload, "ON") == 0;
+            if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
+                s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
+            }
         }
         return;
     }

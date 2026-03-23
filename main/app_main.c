@@ -287,10 +287,12 @@ static esp_err_t app_save_config(const device_config_t *config, void *user_ctx)
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     updated.scd41_asc_enabled = s_app.config.scd41_asc_enabled;
     updated.pms_control_pins_enabled = s_app.config.pms_control_pins_enabled;
-    s_app.config = updated;
     xSemaphoreGive(s_app.lock);
 
     ESP_RETURN_ON_ERROR(platform_config_save(&updated), TAG, "config save failed");
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.config = updated;
+    xSemaphoreGive(s_app.lock);
     app_schedule_action(false);
     return ESP_OK;
 }
@@ -328,12 +330,17 @@ static esp_err_t app_request_set_scd41_asc(bool enabled, void *user_ctx)
     if (err != ESP_OK) {
         return err;
     }
+    device_config_t persisted = {0};
     xSemaphoreTake(s_app.lock, portMAX_DELAY);
     s_app.config.scd41_asc_enabled = enabled;
+    persisted = s_app.config;
     mqtt_ha_set_control_state(enabled, s_app.frc_reference_ppm);
     s_app.publish_now = true;
-    platform_config_save(&s_app.config);
     xSemaphoreGive(s_app.lock);
+    esp_err_t save_err = platform_config_save(&persisted);
+    if (save_err != ESP_OK) {
+        ESP_LOGW(TAG, "failed to persist SCD41 ASC state: %d", save_err);
+    }
     return ESP_OK;
 }
 
@@ -508,10 +515,17 @@ static esp_err_t app_store_wifi_credentials(const wifi_sta_config_t *wifi_sta_cf
     updated = s_app.config;
     app_copy_wifi_string(updated.wifi_ssid, sizeof(updated.wifi_ssid), wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
     app_copy_wifi_string(updated.wifi_password, sizeof(updated.wifi_password), wifi_sta_cfg->password, sizeof(wifi_sta_cfg->password));
-    s_app.config = updated;
     xSemaphoreGive(s_app.lock);
 
-    return platform_config_save(&updated);
+    esp_err_t err = platform_config_save(&updated);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.config = updated;
+    xSemaphoreGive(s_app.lock);
+    return ESP_OK;
 }
 
 static esp_err_t app_start_ble_provisioning(void)
