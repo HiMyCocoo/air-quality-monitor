@@ -1710,13 +1710,10 @@
     const tabButtons = [...document.querySelectorAll('.nav-btn')];
     const tabPanels = [...document.querySelectorAll('.tab-panel')];
     const urlParams = new URLSearchParams(window.location.search);
-    const mockMode = urlParams.get('mock') === '1' || urlParams.get('demo') === '1';
 
     let configDirty = false;
     let noticeTimer = 0;
     const activeTabStorageKey = 'airmon-active-tab';
-    const mockSampleTimestamp = Date.now() - 18000;
-    let mockStatus = createMockStatus();
 
     const categoryLabels = { 'Good': '良好', 'Moderate': '一般', 'Unhealthy for Sensitive Groups': '敏感人群不健康', 'Unhealthy': '不健康', 'Very Unhealthy': '非常不健康', 'Hazardous': '危险', 'Unavailable': '暂不可用' };
     const signalLabels = { 'Good': '良好', 'Acceptable': '可接受', 'Elevated': '偏高', 'High': '高', 'Very High': '很高', 'Unavailable': '暂不可用' };
@@ -1771,84 +1768,6 @@
         .replace(/^以/, '')
         .replace(/为主，常见于/, '，常见于');
     }
-    function createMockStatus() {
-      return {
-        diag: {
-          provisioning_mode: false,
-          wifi_connected: true,
-          wifi_rssi: -48,
-          mqtt_connected: true,
-          scd41_ready: true,
-          sgp41_ready: true,
-          sps30_ready: true,
-          status_led_ready: true,
-          status_led_enabled: true,
-          device_id: 'AQM-S3-DEMO-01',
-          ip_addr: '192.168.31.88',
-          firmware_version: 'v0.9.4-mock',
-          heap_free: 241664
-        },
-        config: {
-          device_name: '客厅空气监测节点',
-          wifi_ssid: 'AirLab-2.4G',
-          wifi_password: '********',
-          mqtt_url: 'mqtt://demo:demo123@192.168.31.20:1883',
-          mqtt_host: '192.168.31.20',
-          mqtt_port: 1883,
-          mqtt_username: 'demo',
-          mqtt_password: 'demo123',
-          discovery_prefix: 'homeassistant',
-          topic_root: 'airmon/living-room',
-          publish_interval_sec: 15,
-          scd41_altitude_m: 36,
-          scd41_temp_offset_c: 1.6,
-          scd41_asc_enabled: true
-        },
-        snapshot: {
-          sample_age_sec: 18,
-          sps30_sleeping: false,
-          us_aqi: 74,
-          us_aqi_level: 'Moderate',
-          us_aqi_level_key: 'moderate',
-          us_aqi_primary_pollutant: 'PM2.5',
-          overall_air_quality: 'Moderate',
-          overall_air_quality_key: 'moderate',
-          overall_air_quality_driver: 'PM2.5',
-          overall_air_quality_basis: 'EPA AQI with U.S. indoor guidance',
-          overall_air_quality_note: 'PM2.5 偏高，建议开启新风或短时通风。',
-          co2_ppm: 862,
-          co2_rating: 'Acceptable',
-          temperature_c: 25.8,
-          temperature_rating: 'Acceptable',
-          humidity_rh: 57.4,
-          humidity_rating: 'Acceptable',
-          voc_index: 123,
-          voc_rating: 'Acceptable',
-          nox_index: 8,
-          nox_rating: 'Acceptable',
-          pm1_0: 18.4,
-          pm2_5: 28.6,
-          pm4_0: 34.8,
-          pm10_0: 41.2,
-          particle_profile: 'Fine-Dominant',
-          particle_profile_key: 'fine',
-          particle_profile_note: '以细颗粒物为主，常见于烹饪、室内扬尘或室外渗透。',
-          particles_0_5um: 162.3,
-          particles_1_0um: 81.4,
-          particles_2_5um: 26.8,
-          particles_4_0um: 7.9,
-          particles_10_0um: 1.6,
-          typical_particle_size_um: 0.78
-        },
-        frc_reference_ppm: 420
-      };
-    }
-
-    function getMockStatus() {
-      const next = clone(mockStatus);
-      next.snapshot.sample_age_sec = Math.max(1, Math.round((Date.now() - mockSampleTimestamp) / 1000));
-      return next;
-    }
 
     function wifiStatus(d) {
       if (d.diag.provisioning_mode) return '等待配网';
@@ -1887,12 +1806,6 @@
       }, 4500);
     }
     async function apiRequest(url, options, fallback, successMessage) {
-      if (mockMode) {
-        const result = handleMockRequest(url, options);
-        if (!result.ok) { showNotice('error', result.message || fallback); return false; }
-        if (successMessage) showNotice('success', successMessage);
-        return true;
-      }
       try {
         const r = await fetch(url, options);
         if (!r.ok) { showNotice('error', await getErrorMessage(r, fallback)); return false; }
@@ -1905,14 +1818,6 @@
     }
 
     async function apiRequestJson(url, options, fallback) {
-      if (mockMode) {
-        const result = handleMockRequest(url, options);
-        if (!result.ok) {
-          showNotice('error', result.message || fallback);
-          return null;
-        }
-        return result;
-      }
       try {
         const r = await fetch(url, options);
         if (!r.ok) {
@@ -1925,66 +1830,6 @@
         showNotice('error', fallback + ': ' + e.message);
         return null;
       }
-    }
-
-    function parseMockJsonBody(options) {
-      if (!options || typeof options.body !== 'string') return {};
-      try { return JSON.parse(options.body); }
-      catch (_) { return {}; }
-    }
-
-    function handleMockRequest(url, options) {
-      const body = parseMockJsonBody(options);
-      if (url === '/api/config') {
-        const previous = clone(mockStatus.config);
-        if (typeof body.mqtt_url === 'string') mockStatus.config.mqtt_url = body.mqtt_url;
-        mockStatus.config.scd41_altitude_m = Number.isFinite(body.scd41_altitude_m) ? body.scd41_altitude_m : mockStatus.config.scd41_altitude_m;
-        mockStatus.config.scd41_temp_offset_c = Number.isFinite(body.scd41_temp_offset_c) ? body.scd41_temp_offset_c : mockStatus.config.scd41_temp_offset_c;
-        mockStatus.diag.mqtt_connected = !!mockStatus.config.mqtt_url;
-        const restart = previous.mqtt_url !== mockStatus.config.mqtt_url;
-        const runtime_applied =
-          previous.scd41_altitude_m !== mockStatus.config.scd41_altitude_m ||
-          previous.scd41_temp_offset_c !== mockStatus.config.scd41_temp_offset_c;
-        return { ok: true, status: 'ok', restart, runtime_applied };
-      }
-      if (url === '/api/action/scd41-asc') {
-        mockStatus.config.scd41_asc_enabled = !!body.enabled;
-        return { ok: true };
-      }
-      if (url === '/api/action/sps30-sleep') {
-        mockStatus.snapshot.sps30_sleeping = !!body.sleep;
-        return { ok: true };
-      }
-      if (url === '/api/action/status-led') {
-        mockStatus.diag.status_led_enabled = !!body.enabled;
-        return { ok: true };
-      }
-      if (url === '/api/action/apply-frc') {
-        mockStatus.frc_reference_ppm = Number.isFinite(body.ppm) ? body.ppm : mockStatus.frc_reference_ppm;
-        return { ok: true };
-      }
-      if (url === '/api/action/republish-discovery') {
-        return mockStatus.diag.mqtt_connected ? { ok: true } : { ok: false, message: 'MQTT 未连接，无法重新发布 Discovery' };
-      }
-      if (url === '/api/action/restart') {
-        return { ok: true };
-      }
-      if (url === '/api/action/factory-reset') {
-        mockStatus = createMockStatus();
-        mockStatus.config.wifi_ssid = '';
-        mockStatus.config.wifi_password = '';
-        mockStatus.config.mqtt_url = '';
-        mockStatus.diag.provisioning_mode = true;
-        mockStatus.diag.wifi_connected = false;
-        mockStatus.diag.mqtt_connected = false;
-        mockStatus.diag.ip_addr = '192.168.4.1';
-        return { ok: true };
-      }
-      if (url === '/api/ota') {
-        mockStatus.diag.firmware_version = 'v0.9.5-mock';
-        return { ok: true };
-      }
-      return { ok: true };
     }
 
     function setConfigValues(d) {
@@ -2135,13 +1980,6 @@
     }
 
     async function fetchStatus() {
-      if (mockMode) {
-        const d = getMockStatus();
-        renderView(d);
-        syncActionAvailability(d);
-        setConfigValues(d);
-        return;
-      }
       try {
         const r = await fetch('/api/status');
         if (!r.ok) return;
