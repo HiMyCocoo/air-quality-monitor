@@ -26,6 +26,15 @@ typedef struct {
 } sensor_entity_t;
 
 typedef struct {
+    const char *object_id;
+    const char *name;
+    const char *json_key;
+    const char *device_class;
+    const char *entity_category;
+    bool diagnostic;
+} binary_sensor_entity_t;
+
+typedef struct {
     esp_mqtt_client_handle_t client;
     bool connected;
     bool scd41_asc_enabled;
@@ -44,66 +53,28 @@ typedef struct {
 
 static mqtt_ctx_t s_ctx;
 
-static const char *voc_rating_label_for_ha(air_quality_signal_level_t level)
-{
-    switch (level) {
-    case AIR_QUALITY_SIGNAL_GOOD:
-        return "Fresh Air";
-    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
-        return "Normal";
-    case AIR_QUALITY_SIGNAL_ELEVATED:
-        return "Light Pollution";
-    case AIR_QUALITY_SIGNAL_HIGH:
-        return "Moderate Pollution";
-    case AIR_QUALITY_SIGNAL_VERY_HIGH:
-        return "Heavy Pollution";
-    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
-    default:
-        return "Unavailable";
-    }
-}
-
-static const char *nox_rating_label_for_ha(air_quality_signal_level_t level)
-{
-    switch (level) {
-    case AIR_QUALITY_SIGNAL_GOOD:
-        return "Normal";
-    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
-        return "Slightly Elevated";
-    case AIR_QUALITY_SIGNAL_ELEVATED:
-        return "Light Pollution";
-    case AIR_QUALITY_SIGNAL_HIGH:
-        return "Moderate Pollution";
-    case AIR_QUALITY_SIGNAL_VERY_HIGH:
-        return "Heavy Pollution";
-    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
-    default:
-        return "Unavailable";
-    }
-}
-
 static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
-    {"co2_rating", "CO2 Rating", "co2_rating", NULL, NULL, NULL, NULL, false},
+    {"co2_rating", "CO2 Ventilation Status", "co2_rating", NULL, NULL, NULL, NULL, false},
     {"temperature", "Temperature", "temperature", "°C", "temperature", "measurement", NULL, false},
     {"temperature_rating", "Temperature Rating", "temperature_rating", NULL, NULL, NULL, NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
     {"humidity_rating", "Humidity Rating", "humidity_rating", NULL, NULL, NULL, NULL, false},
-    {"voc_index", "VOC Index", "voc_index", "points", NULL, "measurement", NULL, false},
-    {"voc_rating", "VOC Classification", "voc_rating", NULL, NULL, NULL, NULL, false},
-    {"nox_index", "NOx Index", "nox_index", "points", NULL, "measurement", NULL, false},
-    {"nox_rating", "NOx Classification", "nox_rating", NULL, NULL, NULL, NULL, false},
+    {"voc_index", "VOC Index (Sensirion)", "voc_index", NULL, NULL, "measurement", NULL, false},
+    {"voc_rating", "VOC Event Level (Sensirion)", "voc_rating", NULL, NULL, NULL, NULL, false},
+    {"nox_index", "NOx Index (Sensirion)", "nox_index", NULL, NULL, "measurement", NULL, false},
+    {"nox_rating", "NOx Event Level (Sensirion)", "nox_rating", NULL, NULL, NULL, NULL, false},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
     {"pm10_0", "PM10", "pm10_0", "µg/m³", "pm10", "measurement", NULL, false},
-    {"us_aqi", "US AQI", "us_aqi", "AQI", NULL, "measurement", NULL, false},
-    {"us_aqi_level", "US AQI Level", "us_aqi_level", NULL, NULL, NULL, NULL, false},
-    {"us_aqi_primary_pollutant", "US AQI Primary Pollutant", "us_aqi_primary_pollutant", NULL, NULL, NULL, NULL, false},
-    {"overall_air_quality", "Overall Air Quality", "overall_air_quality", NULL, NULL, NULL, NULL, false},
-    {"overall_air_quality_basis", "Overall Air Quality Basis", "overall_air_quality_basis", NULL, NULL, NULL, NULL, false},
-    {"overall_air_quality_driver", "Overall Air Quality Driver", "overall_air_quality_driver", NULL, NULL, NULL, NULL, false},
-    {"overall_air_quality_note", "Overall Air Quality Note", "overall_air_quality_note", NULL, NULL, NULL, NULL, false},
+    {"us_aqi", "PM AQI Estimate", "us_aqi", NULL, "aqi", "measurement", NULL, false},
+    {"us_aqi_level", "PM AQI Estimate Level", "us_aqi_level", NULL, NULL, NULL, NULL, false},
+    {"us_aqi_primary_pollutant", "PM AQI Dominant Pollutant", "us_aqi_primary_pollutant", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality", "Composite Air Quality", "overall_air_quality", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_basis", "Composite Air Quality Basis", "overall_air_quality_basis", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_driver", "Composite Air Quality Driver", "overall_air_quality_driver", NULL, NULL, NULL, NULL, false},
+    {"overall_air_quality_note", "Composite Air Quality Note", "overall_air_quality_note", NULL, NULL, NULL, NULL, false},
     {"particle_profile", "Particle Profile", "particle_profile", NULL, NULL, NULL, NULL, false},
     {"particle_profile_note", "Particle Profile Note", "particle_profile_note", NULL, NULL, NULL, NULL, false},
     {"particles_0_5um", "Particles >0.5µm", "particles_0_5um", "#/cm³", NULL, "measurement", NULL, false},
@@ -116,8 +87,29 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"wifi_rssi", "Wi-Fi RSSI", "wifi_rssi", "dBm", "signal_strength", "measurement", "diagnostic", true},
     {"uptime_sec", "Uptime", "uptime_sec", "s", "duration", "measurement", "diagnostic", true},
     {"heap_free", "Heap Free", "heap_free", "B", "data_size", "measurement", "diagnostic", true},
+    {"ip_addr", "IP Address", "ip_addr", NULL, NULL, NULL, "diagnostic", true},
+    {"ap_ssid", "Provisioning AP SSID", "ap_ssid", NULL, NULL, NULL, "diagnostic", true},
+    {"device_id", "Device ID", "device_id", NULL, NULL, NULL, "diagnostic", true},
     {"firmware_version", "Firmware Version", "firmware_version", NULL, NULL, NULL, "diagnostic", true},
     {"last_error", "Last Error", "last_error", NULL, NULL, NULL, "diagnostic", true},
+    {"us_aqi_level_key", "PM AQI Estimate Level Key", "us_aqi_level_key", NULL, NULL, NULL, "diagnostic", false},
+    {"overall_air_quality_key", "Composite Air Quality Key", "overall_air_quality_key", NULL, NULL, NULL, "diagnostic", false},
+    {"particle_profile_key", "Particle Profile Key", "particle_profile_key", NULL, NULL, NULL, "diagnostic", false},
+};
+
+static const binary_sensor_entity_t BINARY_SENSOR_ENTITIES[] = {
+    {"provisioning_mode", "Provisioning Mode", "provisioning_mode", "running", "diagnostic", true},
+    {"wifi_connected", "Wi-Fi Connected", "wifi_connected", "connectivity", "diagnostic", true},
+    {"mqtt_connected", "MQTT Connected", "mqtt_connected", "connectivity", "diagnostic", true},
+    {"sensors_ready", "All Sensors Ready", "sensors_ready", NULL, "diagnostic", true},
+    {"scd41_ready", "SCD41 Ready", "scd41_ready", "connectivity", "diagnostic", true},
+    {"sgp41_ready", "SGP41 Ready", "sgp41_ready", "connectivity", "diagnostic", true},
+    {"sps30_ready", "SPS30 Ready", "sps30_ready", "connectivity", "diagnostic", true},
+    {"status_led_ready", "Status LED Ready", "status_led_ready", NULL, "diagnostic", true},
+    {"scd41_valid", "SCD41 Sample Valid", "scd41_valid", NULL, "diagnostic", false},
+    {"sgp41_valid", "SGP41 Sample Valid", "sgp41_valid", NULL, "diagnostic", false},
+    {"sgp41_conditioning", "SGP41 Conditioning", "sgp41_conditioning", "running", "diagnostic", false},
+    {"pm_valid", "Particle Sample Valid", "pm_valid", NULL, "diagnostic", false},
 };
 
 static void build_topic(char *buffer, size_t buffer_len, const char *suffix)
@@ -188,6 +180,39 @@ static esp_err_t publish_sensor_discovery(const sensor_entity_t *entity)
     }
     if (entity->state_class != NULL) {
         cJSON_AddStringToObject(root, "stat_cla", entity->state_class);
+    }
+    if (entity->entity_category != NULL) {
+        cJSON_AddStringToObject(root, "ent_cat", entity->entity_category);
+    }
+
+    esp_err_t err = mqtt_publish_json(topic, root, true);
+    cJSON_Delete(root);
+    return err;
+}
+
+static esp_err_t publish_binary_sensor_discovery(const binary_sensor_entity_t *entity)
+{
+    char topic[128];
+    snprintf(topic, sizeof(topic), "%s/binary_sensor/%s/%s/config",
+             s_ctx.config.discovery_prefix, s_ctx.device_id, entity->object_id);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "name", entity->name);
+    char unique_id[96];
+    build_unique_id(unique_id, sizeof(unique_id), entity->object_id);
+    cJSON_AddStringToObject(root, "uniq_id", unique_id);
+    cJSON_AddStringToObject(root, "stat_t", entity->diagnostic ? s_ctx.diag_topic : s_ctx.state_topic);
+    add_device_object(root);
+    char value_template[96];
+    snprintf(value_template, sizeof(value_template), "{{ 'ON' if value_json.%s else 'OFF' }}", entity->json_key);
+    cJSON_AddStringToObject(root, "val_tpl", value_template);
+    cJSON_AddStringToObject(root, "pl_on", "ON");
+    cJSON_AddStringToObject(root, "pl_off", "OFF");
+    cJSON_AddStringToObject(root, "avty_t", s_ctx.availability_topic);
+    cJSON_AddStringToObject(root, "pl_avail", "online");
+    cJSON_AddStringToObject(root, "pl_not_avail", "offline");
+    if (entity->device_class != NULL) {
+        cJSON_AddStringToObject(root, "dev_cla", entity->device_class);
     }
     if (entity->entity_category != NULL) {
         cJSON_AddStringToObject(root, "ent_cat", entity->entity_category);
@@ -292,6 +317,7 @@ static void subscribe_commands(void)
         "republish_discovery",
         "scd41_asc",
         "sps30_sleep",
+        "status_led",
         "scd41_frc_reference_ppm",
         "apply_scd41_frc",
     };
@@ -350,6 +376,16 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
             bool sleep = strcasecmp(payload, "ON") == 0;
             if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
                 s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
+            }
+        }
+        return;
+    }
+    snprintf(expected, sizeof(expected), "%s/status_led", s_ctx.cmd_prefix);
+    if (topic_equals(topic, topic_len, expected)) {
+        if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
+            bool enabled = strcasecmp(payload, "ON") == 0;
+            if (s_ctx.callbacks.set_status_led_requested != NULL) {
+                s_ctx.callbacks.set_status_led_requested(enabled, s_ctx.user_ctx);
             }
         }
         return;
@@ -489,8 +525,12 @@ esp_err_t mqtt_ha_publish_discovery(void)
     for (size_t i = 0; i < sizeof(SENSOR_ENTITIES) / sizeof(SENSOR_ENTITIES[0]); ++i) {
         ESP_RETURN_ON_ERROR(publish_sensor_discovery(&SENSOR_ENTITIES[i]), TAG, "sensor discovery failed");
     }
+    for (size_t i = 0; i < sizeof(BINARY_SENSOR_ENTITIES) / sizeof(BINARY_SENSOR_ENTITIES[0]); ++i) {
+        ESP_RETURN_ON_ERROR(publish_binary_sensor_discovery(&BINARY_SENSOR_ENTITIES[i]), TAG, "binary sensor discovery failed");
+    }
     ESP_RETURN_ON_ERROR(publish_switch_discovery("scd41_asc", "SCD41 ASC", "scd41_asc_enabled", "scd41_asc"), TAG, "asc discovery failed");
     ESP_RETURN_ON_ERROR(publish_switch_discovery("sps30_sleep", "SPS30 Sleep", "sps30_sleeping", "sps30_sleep"), TAG, "sps30 discovery failed");
+    ESP_RETURN_ON_ERROR(publish_switch_discovery("status_led", "Status LED", "status_led_enabled", "status_led"), TAG, "status led discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("restart", "Restart", "restart"), TAG, "restart discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("factory_reset", "Factory Reset", "factory_reset"), TAG, "factory discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("republish_discovery", "Republish Discovery", "republish_discovery"), TAG, "republish discovery failed");
@@ -515,12 +555,16 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     const char *humidity_rating = "Unavailable";
 
     cJSON *state = cJSON_CreateObject();
+    cJSON_AddBoolToObject(state, "scd41_valid", snapshot->scd41_valid);
+    cJSON_AddBoolToObject(state, "sgp41_valid", snapshot->sgp41_valid);
+    cJSON_AddBoolToObject(state, "sgp41_conditioning", snapshot->sgp41_conditioning);
+    cJSON_AddBoolToObject(state, "pm_valid", snapshot->pm_valid);
     if (snapshot->scd41_valid) {
         co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
         temperature_rating = air_quality_rate_temperature_label(snapshot->temperature_c);
         humidity_rating = air_quality_rate_humidity_label(snapshot->humidity_rh);
         cJSON_AddNumberToObject(state, "co2", snapshot->co2_ppm);
-        cJSON_AddStringToObject(state, "co2_rating", air_quality_signal_level_label(co2_rating));
+        cJSON_AddStringToObject(state, "co2_rating", air_quality_co2_ventilation_label(co2_rating));
         cJSON_AddNumberToObject(state, "temperature", snapshot->temperature_c);
         cJSON_AddStringToObject(state, "temperature_rating", temperature_rating);
         cJSON_AddNumberToObject(state, "humidity", snapshot->humidity_rh);
@@ -537,9 +581,9 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
         nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
         cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
-        cJSON_AddStringToObject(state, "voc_rating", voc_rating_label_for_ha(voc_rating));
+        cJSON_AddStringToObject(state, "voc_rating", air_quality_voc_event_label(voc_rating));
         cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
-        cJSON_AddStringToObject(state, "nox_rating", nox_rating_label_for_ha(nox_rating));
+        cJSON_AddStringToObject(state, "nox_rating", air_quality_nox_event_label(nox_rating));
     } else {
         cJSON_AddNullToObject(state, "voc_index");
         cJSON_AddNullToObject(state, "voc_rating");
@@ -576,27 +620,41 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     if (assessment.us_aqi.valid) {
         cJSON_AddNumberToObject(state, "us_aqi", assessment.us_aqi.aqi);
         cJSON_AddStringToObject(state, "us_aqi_level", air_quality_category_label(assessment.us_aqi.category));
+        cJSON_AddStringToObject(state, "us_aqi_level_key", air_quality_category_key(assessment.us_aqi.category));
         cJSON_AddStringToObject(state, "us_aqi_primary_pollutant", air_quality_pollutant_label(assessment.us_aqi.dominant_pollutant));
     } else {
         cJSON_AddNullToObject(state, "us_aqi");
         cJSON_AddNullToObject(state, "us_aqi_level");
+        cJSON_AddStringToObject(state, "us_aqi_level_key", air_quality_category_key(AIR_QUALITY_CATEGORY_UNKNOWN));
         cJSON_AddNullToObject(state, "us_aqi_primary_pollutant");
     }
     if (assessment.valid) {
         cJSON_AddStringToObject(state, "overall_air_quality", air_quality_category_label(assessment.category));
+        cJSON_AddStringToObject(state, "overall_air_quality_key", air_quality_category_key(assessment.category));
         cJSON_AddStringToObject(state, "overall_air_quality_driver", air_quality_factor_label(assessment.dominant_factor));
     } else {
         cJSON_AddNullToObject(state, "overall_air_quality");
+        cJSON_AddStringToObject(state, "overall_air_quality_key", air_quality_category_key(AIR_QUALITY_CATEGORY_UNKNOWN));
         cJSON_AddNullToObject(state, "overall_air_quality_driver");
     }
     cJSON_AddStringToObject(state, "overall_air_quality_basis", assessment.basis[0] ? assessment.basis : "Unavailable");
     cJSON_AddStringToObject(state, "overall_air_quality_note", assessment.note[0] ? assessment.note : "Unavailable");
+    cJSON_AddStringToObject(state, "particle_profile_key", air_quality_particle_profile_key(particle.profile));
     cJSON_AddBoolToObject(state, "sps30_sleeping", snapshot->sps30_sleeping);
     cJSON_AddBoolToObject(state, "scd41_asc_enabled", s_ctx.scd41_asc_enabled);
+    cJSON_AddBoolToObject(state, "status_led_enabled", diag->status_led_enabled);
     cJSON_AddNumberToObject(state, "scd41_frc_reference_ppm", s_ctx.frc_reference_ppm);
 
     cJSON *diag_json = cJSON_CreateObject();
     int64_t now_ms = esp_timer_get_time() / 1000;
+    cJSON_AddBoolToObject(diag_json, "provisioning_mode", diag->provisioning_mode);
+    cJSON_AddBoolToObject(diag_json, "wifi_connected", diag->wifi_connected);
+    cJSON_AddBoolToObject(diag_json, "mqtt_connected", diag->mqtt_connected);
+    cJSON_AddBoolToObject(diag_json, "sensors_ready", diag->sensors_ready);
+    cJSON_AddBoolToObject(diag_json, "scd41_ready", diag->scd41_ready);
+    cJSON_AddBoolToObject(diag_json, "sgp41_ready", diag->sgp41_ready);
+    cJSON_AddBoolToObject(diag_json, "sps30_ready", diag->sps30_ready);
+    cJSON_AddBoolToObject(diag_json, "status_led_ready", diag->status_led_ready);
     if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {
         cJSON_AddNumberToObject(diag_json, "sample_age_sec", (now_ms - snapshot->updated_at_ms) / 1000);
     } else {
@@ -605,6 +663,9 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddNumberToObject(diag_json, "wifi_rssi", diag->wifi_rssi);
     cJSON_AddNumberToObject(diag_json, "uptime_sec", diag->uptime_sec);
     cJSON_AddNumberToObject(diag_json, "heap_free", diag->heap_free);
+    cJSON_AddStringToObject(diag_json, "ip_addr", diag->ip_addr);
+    cJSON_AddStringToObject(diag_json, "ap_ssid", diag->ap_ssid);
+    cJSON_AddStringToObject(diag_json, "device_id", diag->device_id);
     cJSON_AddStringToObject(diag_json, "firmware_version", diag->firmware_version);
     cJSON_AddStringToObject(diag_json, "last_error", diag->last_error[0] ? diag->last_error : "none");
 
