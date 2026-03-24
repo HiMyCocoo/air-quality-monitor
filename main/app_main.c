@@ -23,8 +23,8 @@
 #include "protocomm_security.h"
 #include "provisioning_web.h"
 #include "sensors.h"
-#include "wifi_provisioning/manager.h"
-#include "wifi_provisioning/scheme_ble.h"
+#include "network_provisioning/manager.h"
+#include "network_provisioning/scheme_ble.h"
 #include "led_strip_encoder.h"
 
 static const char *TAG = "app_main";
@@ -587,25 +587,25 @@ static esp_err_t app_start_ble_provisioning(void)
         return ESP_OK;
     }
 
-    wifi_prov_mgr_config_t config = {
-        .scheme = wifi_prov_scheme_ble,
-        .scheme_event_handler = WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
-        .app_event_handler = WIFI_PROV_EVENT_HANDLER_NONE,
-        .wifi_prov_conn_cfg = {
+    network_prov_mgr_config_t config = {
+        .scheme = network_prov_scheme_ble,
+        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
+        .app_event_handler = NETWORK_PROV_EVENT_HANDLER_NONE,
+        .network_prov_wifi_conn_cfg = {
             .wifi_conn_attempts = CONFIG_AIRMON_WIFI_MAX_RETRY,
         },
     };
 
     ESP_RETURN_ON_ERROR(platform_wifi_prepare_provisioning_sta(), TAG, "prepare provisioning STA failed");
-    ESP_RETURN_ON_ERROR(wifi_prov_mgr_init(config), TAG, "wifi_prov_mgr_init failed");
+    ESP_RETURN_ON_ERROR(network_prov_mgr_init(config), TAG, "network_prov_mgr_init failed");
     ESP_LOGW(TAG, "Starting BLE provisioning. Service name: %s, PoP: %s", s_app.prov_service_name, s_app.prov_pop);
 
-    esp_err_t err = wifi_prov_mgr_start_provisioning(WIFI_PROV_SECURITY_1,
-                                                     (const void *)s_app.prov_pop,
-                                                     s_app.prov_service_name,
-                                                     NULL);
+    esp_err_t err = network_prov_mgr_start_provisioning(NETWORK_PROV_SECURITY_1,
+                                                        (const void *)s_app.prov_pop,
+                                                        s_app.prov_service_name,
+                                                        NULL);
     if (err != ESP_OK) {
-        wifi_prov_mgr_deinit();
+        network_prov_mgr_deinit();
         xSemaphoreTake(s_app.lock, portMAX_DELAY);
         s_app.provisioning_mode = false;
         xSemaphoreGive(s_app.lock);
@@ -626,20 +626,20 @@ static void app_stop_ble_provisioning(void)
     xSemaphoreGive(s_app.lock);
 
     if (active) {
-        wifi_prov_mgr_stop_provisioning();
-        wifi_prov_mgr_wait();
+        network_prov_mgr_stop_provisioning();
+        network_prov_mgr_wait();
     }
 }
 
 static void app_prov_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
-    if (event_base == WIFI_PROV_EVENT) {
+    if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
-            case WIFI_PROV_START:
+            case NETWORK_PROV_START:
                 ESP_LOGI(TAG, "BLE provisioning started");
                 break;
-            case WIFI_PROV_CRED_RECV: {
+            case NETWORK_PROV_WIFI_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
                 char ssid[WIFI_SSID_LEN + 1] = {0};
                 app_copy_wifi_string(ssid, sizeof(ssid), wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
@@ -649,19 +649,19 @@ static void app_prov_event_handler(void *arg, esp_event_base_t event_base, int32
                 }
                 break;
             }
-            case WIFI_PROV_CRED_FAIL:
+            case NETWORK_PROV_WIFI_CRED_FAIL:
                 ESP_LOGW(TAG, "BLE provisioning Wi-Fi connect failed");
                 break;
-            case WIFI_PROV_CRED_SUCCESS:
+            case NETWORK_PROV_WIFI_CRED_SUCCESS:
                 ESP_LOGI(TAG, "BLE provisioning Wi-Fi connect succeeded");
                 break;
-            case WIFI_PROV_END:
+            case NETWORK_PROV_END:
                 ESP_LOGI(TAG, "BLE provisioning stopped");
                 xSemaphoreTake(s_app.lock, portMAX_DELAY);
                 s_app.ble_provisioning_active = false;
                 s_app.provisioning_mode = false;
                 xSemaphoreGive(s_app.lock);
-                wifi_prov_mgr_deinit();
+                network_prov_mgr_deinit();
                 break;
             default:
                 break;
@@ -815,7 +815,7 @@ void app_main(void)
     ESP_ERROR_CHECK(platform_config_init());
     platform_config_load(&s_app.config, s_app.device_id);
     ESP_ERROR_CHECK(platform_wifi_init(app_wifi_event, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
 
