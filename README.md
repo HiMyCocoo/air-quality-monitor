@@ -18,8 +18,8 @@
 - `SPS30`：`PM1.0 / PM2.5 / PM4.0 / PM10.0`
 - `SPS30`：`0.5 / 1.0 / 2.5 / 4.0 / 10 μm` 粒子数浓度
 - `SPS30`：`典型粒径`
-- 总体空气质量评估：优先使用 `EPA US AQI (PM2.5 / PM10)`，并补充 `CO2 / 湿度` 室内提示
-- 直观补充评级：为 `CO2 / VOC Index / NOx Index` 生成单独等级，方便快速判断当前状态
+- 总体空气质量评估：优先使用 `PM AQI` 估算（基于 `EPA PM AQI` 分段），并补充 `CO2 / 湿度` 室内提示
+- 直观补充评级：为 `CO2` 提供通风状态标签，为 `VOC / NOx Index` 提供 `Sensirion` 相对事件等级，方便快速判断当前状态
 - 颗粒物画像：综合 `PM1.0 / PM2.5 / PM4.0 / PM10 / 粒子数 / 典型粒径` 给出粒径分布描述
 - 本地网页：状态、遥测、`Wi-Fi / MQTT URL` 配置、传感器控制、`RGB` 灯控制、Discovery 重发、OTA、重启、恢复出厂
 - `Home Assistant`：自动发现传感器、按钮和控制开关
@@ -129,7 +129,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 网页控制台支持：
 
 - 查看设备状态、传感器在线状态、最近错误
-- 查看 `Overall Air Quality / US AQI / CO2 Rating / VOC Rating / NOx Rating / Particle Profile / 温湿度 / PM / 粒子数 / 典型粒径 / 样本年龄`
+- 查看 `Composite Air Quality / PM AQI 估算 / CO2 Ventilation Status / VOC Event Level / NOx Event Level / Particle Profile / 温湿度 / PM / 粒子数 / 典型粒径 / 样本年龄`
 - 修改 `Wi-Fi / MQTT URL` 配置
 - 设置 `SCD41` 海拔补偿和温度偏移
 - 控制 `SCD41 ASC`
@@ -170,25 +170,30 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 - `CO2 / 温度 / 相对湿度`
 - `VOC Index / NOx Index`
-- `CO2 Rating / VOC Rating / NOx Rating`
+- `CO2 Ventilation Status / VOC Event Level / NOx Event Level`
 - `Particle Profile / Particle Profile Note / Sample Age`
 - `PM1.0 / PM2.5 / PM4.0 / PM10.0`
 - `粒子数浓度`
 - `典型粒径`
-- `Overall Air Quality / Basis / Driver / Note`
-- `US AQI / AQI 等级 / 主要污染物`
-- `Wi-Fi RSSI / Uptime / Heap / Firmware Version / Last Error`
+- `Composite Air Quality / Basis / Driver / Note`
+- `PM AQI Estimate / AQI 等级 / 主要污染物`
+- `Wi-Fi RSSI / Uptime / Heap / Firmware Version / Last Error / IP / AP SSID / Device ID`
+- `Provisioning Mode / Wi-Fi Connected / MQTT Connected / Sensors Ready`
+- `SCD41 / SGP41 / SPS30 / RGB 状态灯` 在线状态
+- `SCD41 / SGP41 / PM` 数据有效状态，以及 `SGP41 Conditioning`
 - `SCD41 ASC`
 - `SPS30 Sleep`
+- `RGB Status LED`
 - `Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
 
 ## 运行说明
 
 - 缺少某一颗传感器时，系统仍会启动，其他在线传感器照常工作
 - `SGP41` 上电后会先经历一小段 `NOx` 调理期，随后进入算法学习阶段
-- 总体评估优先使用 `EPA AQI (PM2.5 / PM10)`，`CO2 / 湿度` 只作为美国室内指导补充提示
-- `CO2 Rating` 是通风感受分级；`VOC / NOx Rating` 基于 Sensirion 指数的相对强度，不代表绝对浓度
-- `Particle Profile` 会结合质量浓度分段、粒子数分段和典型粒径，判断当前更偏细颗粒、混合颗粒还是粗颗粒
+- 总体评估优先使用 `PM AQI` 估算（基于 `EPA PM AQI` 分段），`CO2 / 湿度` 只作为美国室内指导补充提示
+- `CO2 Ventilation Status` 是通风状态分级；`VOC / NOx Event Level` 基于 Sensirion 指数的相对事件强度，不代表绝对浓度
+- `Particle Profile` 现在优先看 `PM2.5 / PM10` 的细颗粒占比，再用 `SPS30` 的分段质量峰值、数量峰值和典型粒径做校正，更接近常见气溶胶里的细模态 / 粗模态判断
+- 其中 `PM2.5 / PM10 <= 0.35` 被视作明显偏粗颗粒信号，`>= 0.60` 视作明显偏细颗粒信号；这参考了公开文献里的粉尘事件经验值和 `EPA` 的细 / 粗颗粒分界，但仍然是工程解释层，不是官方分级标准
 - `VOC / NOx Index`、`PM1.0 / PM4.0`、粒子数和典型粒径会继续上报，但不参与 `EPA AQI`
 - 板载 `RGB` 现在直接跟随统一的总体评估结果
 - 传感器都还没准备好时，板载灯会进入等待态闪烁

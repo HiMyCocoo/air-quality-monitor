@@ -497,6 +497,7 @@ static esp_err_t app_start_mqtt(void)
         .republish_requested = app_request_republish,
         .set_scd41_asc_requested = app_request_set_scd41_asc,
         .set_sps30_sleep_requested = app_request_set_sps30_sleep,
+        .set_status_led_requested = app_request_set_status_led,
         .apply_scd41_frc_requested = app_request_apply_frc,
         .connected = app_mqtt_connected,
     };

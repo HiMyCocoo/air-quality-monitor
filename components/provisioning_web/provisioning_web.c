@@ -479,7 +479,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     if (snapshot.scd41_valid) {
         cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
         cJSON_AddStringToObject(snapshot_json, "co2_rating",
-                                air_quality_signal_level_label(air_quality_rate_co2(snapshot.co2_ppm)));
+                                air_quality_co2_ventilation_label(air_quality_rate_co2(snapshot.co2_ppm)));
         cJSON_AddNumberToObject(snapshot_json, "temperature_c", snapshot.temperature_c);
         cJSON_AddStringToObject(snapshot_json, "temperature_rating",
                                 air_quality_rate_temperature_label(snapshot.temperature_c));
@@ -497,10 +497,10 @@ static esp_err_t status_handler(httpd_req_t *req)
     if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
         cJSON_AddNumberToObject(snapshot_json, "voc_index", snapshot.voc_index);
         cJSON_AddStringToObject(snapshot_json, "voc_rating",
-                                air_quality_signal_level_label(air_quality_rate_voc_index(snapshot.voc_index)));
+                                air_quality_voc_event_label(air_quality_rate_voc_index(snapshot.voc_index)));
         cJSON_AddNumberToObject(snapshot_json, "nox_index", snapshot.nox_index);
         cJSON_AddStringToObject(snapshot_json, "nox_rating",
-                                air_quality_signal_level_label(air_quality_rate_nox_index(snapshot.nox_index)));
+                                air_quality_nox_event_label(air_quality_rate_nox_index(snapshot.nox_index)));
     } else {
         cJSON_AddNullToObject(snapshot_json, "voc_index");
         cJSON_AddNullToObject(snapshot_json, "voc_rating");

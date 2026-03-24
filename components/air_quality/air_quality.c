@@ -14,7 +14,7 @@ typedef struct {
 
 #define CO2_GOOD_MAX_PPM 800U
 #define CO2_ACCEPTABLE_MAX_PPM 1000U
-#define CO2_ELEVATED_MAX_PPM 1500U
+#define CO2_ELEVATED_MAX_PPM 1200U
 #define CO2_HIGH_MAX_PPM 2000U
 #define CO2_VENTILATION_PROXY_ALERT_PPM CO2_ACCEPTABLE_MAX_PPM
 #define HUMIDITY_RECOMMENDED_MIN_RH 30.0
@@ -23,12 +23,18 @@ typedef struct {
 #define TEMPERATURE_RECOMMENDED_MAX_C 26.0
 #define VOC_GOOD_MAX_INDEX 100
 #define VOC_ACCEPTABLE_MAX_INDEX 150
-#define VOC_ELEVATED_MAX_INDEX 200
-#define VOC_HIGH_MAX_INDEX 300
+#define VOC_ELEVATED_MAX_INDEX 230
+#define VOC_HIGH_MAX_INDEX 350
 #define NOX_GOOD_MAX_INDEX 2
-#define NOX_ACCEPTABLE_MAX_INDEX 10
-#define NOX_ELEVATED_MAX_INDEX 20
-#define NOX_HIGH_MAX_INDEX 50
+#define NOX_ACCEPTABLE_MAX_INDEX 20
+#define NOX_ELEVATED_MAX_INDEX 50
+#define NOX_HIGH_MAX_INDEX 100
+#define PARTICLE_FINE_RATIO_HIGH 0.60
+#define PARTICLE_FINE_RATIO_VERY_HIGH 0.70
+#define PARTICLE_COARSE_RATIO_HIGH 0.50
+#define PARTICLE_FINE_TO_PM10_DUST_LIKE_MAX 0.35
+#define PARTICLE_TYPICAL_FINE_MAX_UM 1.0f
+#define PARTICLE_TYPICAL_COARSE_MIN_UM 2.5f
 
 static const aqi_breakpoint_t PM2_5_BREAKPOINTS[] = {
     {0.0, 9.0, 0, 50},
@@ -215,8 +221,8 @@ static size_t find_max_index(const double *values, size_t count)
 
 void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air_quality_particle_insight_t *result)
 {
-    static const char *MASS_BANDS[] = {"0-1 um", "1-2.5 um", "2.5-4 um", "4-10 um"};
-    static const char *COUNT_BANDS[] = {"0.5-1.0 um", "1.0-2.5 um", "2.5-4.0 um", "4.0-10 um", ">10 um"};
+    static const char *MASS_BANDS[] = {"0.3-1.0 um", "1.0-2.5 um", "2.5-4.0 um", "4.0-10.0 um"};
+    static const char *COUNT_BANDS[] = {"0.3-0.5 um", "0.5-1.0 um", "1.0-2.5 um", "2.5-4.0 um", "4.0-10.0 um"};
 
     if (result == NULL) {
         return;
@@ -236,11 +242,11 @@ void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air
         nonnegative(snapshot->pm10_0 - snapshot->pm4_0),
     };
     double count_bins[] = {
-        nonnegative(snapshot->particles_0_5um - snapshot->particles_1_0um),
-        nonnegative(snapshot->particles_1_0um - snapshot->particles_2_5um),
-        nonnegative(snapshot->particles_2_5um - snapshot->particles_4_0um),
-        nonnegative(snapshot->particles_4_0um - snapshot->particles_10_0um),
-        nonnegative(snapshot->particles_10_0um),
+        nonnegative(snapshot->particles_0_5um),
+        nonnegative(snapshot->particles_1_0um - snapshot->particles_0_5um),
+        nonnegative(snapshot->particles_2_5um - snapshot->particles_1_0um),
+        nonnegative(snapshot->particles_4_0um - snapshot->particles_2_5um),
+        nonnegative(snapshot->particles_10_0um - snapshot->particles_4_0um),
     };
 
     size_t dominant_mass_index = find_max_index(mass_bins, sizeof(mass_bins) / sizeof(mass_bins[0]));
@@ -249,21 +255,43 @@ void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air
     strlcpy(result->dominant_count_band, COUNT_BANDS[dominant_count_index], sizeof(result->dominant_count_band));
 
     double total_pm10 = nonnegative(snapshot->pm10_0);
+    if (total_pm10 <= 0.0) {
+        return;
+    }
+
     double fine_mass = nonnegative(snapshot->pm2_5);
     double coarse_mass = nonnegative(snapshot->pm10_0 - snapshot->pm2_5);
-    double fine_ratio = total_pm10 > 0.0 ? fine_mass / total_pm10 : 0.0;
-    double coarse_ratio = total_pm10 > 0.0 ? coarse_mass / total_pm10 : 0.0;
+    double fine_ratio = fine_mass / total_pm10;
+    double coarse_ratio = coarse_mass / total_pm10;
+    bool fine_number_peak = dominant_count_index <= 1;
+    bool coarse_number_peak = dominant_count_index >= 3;
+    bool coarse_mass_peak = dominant_mass_index >= 2;
+    bool fine_typical = snapshot->typical_particle_size_um > 0.0f &&
+                        snapshot->typical_particle_size_um <= PARTICLE_TYPICAL_FINE_MAX_UM;
+    bool coarse_typical = snapshot->typical_particle_size_um >= PARTICLE_TYPICAL_COARSE_MIN_UM;
 
-    if (fine_ratio >= 0.75 && snapshot->typical_particle_size_um <= 1.2f) {
+    /*
+     * EPA/ATSDR use 2.5 um as the fine/coarse split. For interpretation we anchor the
+     * profile on the PM2.5 share of PM10, then use the SPS30 size-bin peaks and
+     * typical particle size as supporting evidence. The <= 0.35 dust-like threshold is
+     * drawn from event-separation literature; >= 0.60 is a conservative engineering
+     * cutoff for a fine-dominant episode rather than a formal standard.
+     */
+    if (fine_ratio >= PARTICLE_FINE_RATIO_VERY_HIGH ||
+        (fine_ratio >= PARTICLE_FINE_RATIO_HIGH && fine_number_peak && fine_typical)) {
         result->profile = AIR_QUALITY_PARTICLE_PROFILE_FINE;
-    } else if (coarse_ratio >= 0.50 || snapshot->typical_particle_size_um >= 2.5f || dominant_count_index >= 3) {
+    } else if (fine_ratio <= PARTICLE_FINE_TO_PM10_DUST_LIKE_MAX ||
+               (coarse_ratio >= PARTICLE_COARSE_RATIO_HIGH &&
+                (coarse_mass_peak || coarse_number_peak || coarse_typical))) {
         result->profile = AIR_QUALITY_PARTICLE_PROFILE_COARSE;
     } else {
         result->profile = AIR_QUALITY_PARTICLE_PROFILE_MIXED;
     }
 
     snprintf(result->note, sizeof(result->note),
-             "Mass is led by %s, counts are led by %s, typical size %.2f um.",
+             "PM2.5 is %.0f%% of PM10, PM10-2.5 is %.0f%%, mass peaks at %s, counts peak at %s, typical size %.2f um.",
+             fine_ratio * 100.0,
+             coarse_ratio * 100.0,
              result->dominant_mass_band,
              result->dominant_count_band,
              snapshot->typical_particle_size_um);
@@ -272,7 +300,11 @@ void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air
 
 air_quality_signal_level_t air_quality_rate_co2(uint16_t co2_ppm)
 {
-    /* CO2 is used here as a ventilation proxy for a user-facing comfort rating. */
+    /*
+     * CO2 is used here as a ventilation proxy, not a direct pollutant score.
+     * 800 ppm is a common "well ventilated" target, while roughly 1000-1200 ppm
+     * indicates visitor acceptability for human bioeffluents in typical offices.
+     */
     if (co2_ppm <= CO2_GOOD_MAX_PPM) {
         return AIR_QUALITY_SIGNAL_GOOD;
     }
@@ -291,9 +323,10 @@ air_quality_signal_level_t air_quality_rate_co2(uint16_t co2_ppm)
 air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index)
 {
     /*
-     * Sensirion maps the recent average VOC condition to 100 and commonly uses
-     * >150 as an example action threshold. The finer 5-band split below is a
-     * UI heuristic for this project, not an official Sensirion health standard.
+     * Sensirion maps the recent average VOC condition to 100 and uses >150 as
+     * an example action threshold. The 230 threshold is the default gating
+     * point in the Gas Index Algorithm. Any split above that remains a UI
+     * heuristic for intensity, not an absolute health standard.
      */
     if (voc_index <= 0) {
         return AIR_QUALITY_SIGNAL_UNAVAILABLE;
@@ -316,9 +349,9 @@ air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index)
 air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index)
 {
     /*
-     * Sensirion maps the recent average NOx condition to 1 and commonly uses
-     * >20 as an example action threshold. The finer 5-band split below is a
-     * UI heuristic for this project, not an official Sensirion health standard.
+     * Sensirion maps the recent average NOx condition to 1 and uses >20 as an
+     * example action threshold. The extra splits above that are UI heuristics
+     * for event intensity, not absolute concentration standards.
      */
     if (nox_index <= 0) {
         return AIR_QUALITY_SIGNAL_UNAVAILABLE;
@@ -336,6 +369,63 @@ air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index)
         return AIR_QUALITY_SIGNAL_HIGH;
     }
     return AIR_QUALITY_SIGNAL_VERY_HIGH;
+}
+
+const char *air_quality_co2_ventilation_label(air_quality_signal_level_t level)
+{
+    switch (level) {
+    case AIR_QUALITY_SIGNAL_GOOD:
+        return "Well Ventilated";
+    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
+        return "Acceptable Ventilation";
+    case AIR_QUALITY_SIGNAL_ELEVATED:
+        return "Stale Air";
+    case AIR_QUALITY_SIGNAL_HIGH:
+        return "Poor Ventilation";
+    case AIR_QUALITY_SIGNAL_VERY_HIGH:
+        return "Very Poor Ventilation";
+    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
+    default:
+        return "Unavailable";
+    }
+}
+
+const char *air_quality_voc_event_label(air_quality_signal_level_t level)
+{
+    switch (level) {
+    case AIR_QUALITY_SIGNAL_GOOD:
+        return "Below Baseline";
+    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
+        return "Near Baseline";
+    case AIR_QUALITY_SIGNAL_ELEVATED:
+        return "VOC Event";
+    case AIR_QUALITY_SIGNAL_HIGH:
+        return "Strong VOC Event";
+    case AIR_QUALITY_SIGNAL_VERY_HIGH:
+        return "Severe VOC Event";
+    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
+    default:
+        return "Unavailable";
+    }
+}
+
+const char *air_quality_nox_event_label(air_quality_signal_level_t level)
+{
+    switch (level) {
+    case AIR_QUALITY_SIGNAL_GOOD:
+        return "Background";
+    case AIR_QUALITY_SIGNAL_ACCEPTABLE:
+        return "Trace NOx Event";
+    case AIR_QUALITY_SIGNAL_ELEVATED:
+        return "NOx Event";
+    case AIR_QUALITY_SIGNAL_HIGH:
+        return "High NOx Event";
+    case AIR_QUALITY_SIGNAL_VERY_HIGH:
+        return "Severe NOx Event";
+    case AIR_QUALITY_SIGNAL_UNAVAILABLE:
+    default:
+        return "Unavailable";
+    }
 }
 
 const char *air_quality_rate_temperature_label(float temperature_c)
@@ -573,11 +663,11 @@ const char *air_quality_particle_profile_label(air_quality_particle_profile_t pr
 {
     switch (profile) {
     case AIR_QUALITY_PARTICLE_PROFILE_FINE:
-        return "Fine-Dominant";
+        return "Fine-Mode Dominant";
     case AIR_QUALITY_PARTICLE_PROFILE_MIXED:
-        return "Mixed";
+        return "Mixed-Mode";
     case AIR_QUALITY_PARTICLE_PROFILE_COARSE:
-        return "Coarse-Dominant";
+        return "Coarse-Mode Dominant";
     case AIR_QUALITY_PARTICLE_PROFILE_UNAVAILABLE:
     default:
         return "Unavailable";

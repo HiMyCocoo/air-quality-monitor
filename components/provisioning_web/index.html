@@ -1716,11 +1716,37 @@
     const activeTabStorageKey = 'airmon-active-tab';
 
     const categoryLabels = { 'Good': '良好', 'Moderate': '一般', 'Unhealthy for Sensitive Groups': '敏感人群不健康', 'Unhealthy': '不健康', 'Very Unhealthy': '非常不健康', 'Hazardous': '危险', 'Unavailable': '暂不可用' };
-    const signalLabels = { 'Good': '良好', 'Acceptable': '可接受', 'Elevated': '偏高', 'High': '高', 'Very High': '很高', 'Unavailable': '暂不可用' };
-    const vocSignalLabels = { 'Good': '优 / 新鲜空气', 'Acceptable': '正常', 'Elevated': '轻度污染', 'High': '中度污染', 'Very High': '重度污染', 'Unavailable': '暂不可用' };
-    const noxSignalLabels = { 'Good': '正常', 'Acceptable': '轻微升高', 'Elevated': '轻度污染', 'High': '中度污染', 'Very High': '重度污染', 'Unavailable': '暂不可用' };
+    const co2SignalLabels = {
+      'Well Ventilated': '通风良好',
+      'Acceptable Ventilation': '通风可接受',
+      'Stale Air': '空气发闷',
+      'Poor Ventilation': '通风较差',
+      'Very Poor Ventilation': '通风很差',
+      'Unavailable': '暂不可用'
+    };
+    const vocSignalLabels = {
+      'Below Baseline': '低于近期基线',
+      'Near Baseline': '接近近期基线',
+      'VOC Event': 'VOC 事件',
+      'Strong VOC Event': '明显 VOC 事件',
+      'Severe VOC Event': '强 VOC 事件',
+      'Unavailable': '暂不可用'
+    };
+    const noxSignalLabels = {
+      'Background': '背景水平',
+      'Trace NOx Event': '轻微 NOx 事件',
+      'NOx Event': 'NOx 事件',
+      'High NOx Event': '明显 NOx 事件',
+      'Severe NOx Event': '强 NOx 事件',
+      'Unavailable': '暂不可用'
+    };
     const comfortLabels = { 'Low': '偏低', 'Acceptable': '可接受', 'High': '偏高', 'Unavailable': '暂不可用' };
-    const profileLabels = { 'Fine-Dominant': '细颗粒主导', 'Mixed': '混合', 'Coarse-Dominant': '粗颗粒主导', 'Unavailable': '暂不可用' };
+    const profileLabels = {
+      'Fine-Mode Dominant': '细颗粒模态主导',
+      'Mixed-Mode': '细粗混合',
+      'Coarse-Mode Dominant': '粗颗粒模态主导',
+      'Unavailable': '暂不可用'
+    };
     const basisLabels = {
       'EPA AQI (PM2.5 / PM10)': 'EPA AQI（PM2.5 / PM10）',
       'EPA AQI unavailable': 'EPA AQI 暂不可用',
@@ -1763,7 +1789,18 @@
     function localizedOverall(value) { return translate(categoryLabels, value, '评估不可用'); }
     function compactParticleNote(note) {
       if (!note) return '';
-      return String(note)
+      const text = String(note).trim();
+      const scientificPattern = /^PM2\.5 is ([0-9.]+)% of PM10, PM10-2\.5 is ([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\.$/;
+      const scientificMatch = text.match(scientificPattern);
+      if (scientificMatch) {
+        return `PM2.5 约占 PM10 的 ${scientificMatch[1]}%，粗颗粒（PM10-2.5）约占 ${scientificMatch[2]}%，质量峰值在 ${scientificMatch[3]}，数量峰值在 ${scientificMatch[4]}，典型粒径 ${scientificMatch[5]} µm`;
+      }
+      const englishPattern = /^Mass is led by (.+), counts are led by (.+), typical size ([0-9.]+) um\.$/;
+      const match = text.match(englishPattern);
+      if (match) {
+        return `质量主导区间 ${match[1]}，数量主导区间 ${match[2]}，典型粒径 ${match[3]} µm`;
+      }
+      return text
         .replace(/。$/, '')
         .replace(/^以/, '')
         .replace(/为主，常见于/, '，常见于');
@@ -1940,22 +1977,22 @@
 
       airSummaryEl.innerHTML = shouldShowOverallSummary(d)
         ? summaryBanner(
-          `综合环境：${localizedOverall(d.snapshot.overall_air_quality)}`,
+          `综合空气评估：${localizedOverall(d.snapshot.overall_air_quality)}`,
           `${translate(basisLabels, d.snapshot.overall_air_quality_basis)}`,
           overallKey
         )
         : '';
 
       airMetricsPrimaryEl.innerHTML = [
-        metric('US AQI', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level), 'featured', 'AQI', d.snapshot.us_aqi_level_key || 'unavailable'),
-        metric('CO2 浓度', num(d.snapshot.co2_ppm), translate(signalLabels, d.snapshot.co2_rating), 'primary', 'ppm')
+        metric('PM AQI 估算', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level), 'featured', 'AQI', d.snapshot.us_aqi_level_key || 'unavailable'),
+        metric('CO2 浓度', num(d.snapshot.co2_ppm), translate(co2SignalLabels, d.snapshot.co2_rating), 'primary', 'ppm')
       ].join('');
 
       airMetricsSecondaryEl.innerHTML = [
         metric('室内温度', num(d.snapshot.temperature_c, 1), translate(comfortLabels, d.snapshot.temperature_rating, '--'), 'secondary', '°C'),
         metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
-        metric('VOC 指数', num(d.snapshot.voc_index), translate(vocSignalLabels, d.snapshot.voc_rating), 'secondary', 'points'),
-        metric('NOx 指数', num(d.snapshot.nox_index), translate(noxSignalLabels, d.snapshot.nox_rating), 'secondary', 'points')
+        metric('VOC 指数 (Sensirion)', num(d.snapshot.voc_index), translate(vocSignalLabels, d.snapshot.voc_rating), 'secondary', 'index'),
+        metric('NOx 指数 (Sensirion)', num(d.snapshot.nox_index), translate(noxSignalLabels, d.snapshot.nox_rating), 'secondary', 'index')
       ].join('');
 
       syncAscState(d.config.scd41_asc_enabled, d.diag.scd41_ready);
