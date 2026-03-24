@@ -4,6 +4,7 @@ managed_components/
 cmake-build-*/
 
 # Generated local configuration backup
+sdkconfig
 sdkconfig.old
 
 # Local IDE/editor files
