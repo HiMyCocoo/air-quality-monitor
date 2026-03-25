@@ -2,8 +2,9 @@ name: Build And Release Firmware
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - master
   workflow_dispatch:
     inputs:
       tag:
@@ -15,44 +16,102 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.meta.outputs.publish }}
+      create_tag: ${{ steps.meta.outputs.create_tag }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
 
-      - name: Switch to requested tag
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tag != ''
-        run: |
-          git checkout "${{ github.event.inputs.tag }}"
-
-      - name: Read version metadata
+      - name: Determine release target
         id: meta
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          version="$(bash scripts/get-project-version.sh)"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
-            tag="${{ github.event.inputs.tag }}"
-          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-            tag="${GITHUB_REF_NAME}"
+          set -euo pipefail
+
+          git fetch --tags origin
+          current_commit_tag="$(git tag --points-at HEAD --list 'v*' --sort=-v:refname | head -n1 || true)"
+
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            if ! git rev-parse "refs/tags/${INPUT_TAG}" >/dev/null 2>&1; then
+              echo "Tag ${INPUT_TAG} does not exist." >&2
+              exit 1
+            fi
+
+            git checkout "${INPUT_TAG}"
+            version="${INPUT_TAG#v}"
+            tag="${INPUT_TAG}"
+            publish="true"
+            create_tag="false"
+          elif [[ -n "${current_commit_tag}" ]]; then
+            version="${current_commit_tag#v}"
+            tag="${current_commit_tag}"
+            publish="true"
+            create_tag="false"
           else
+            version="$(bash scripts/get-next-release-version.sh)"
             tag="v${version}"
+            create_tag="true"
+            publish="true"
           fi
+
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "publish=${publish}" >> "${GITHUB_OUTPUT}"
+          echo "create_tag=${create_tag}" >> "${GITHUB_OUTPUT}"
 
-      - name: Validate tag matches PROJECT_VER
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create and push annotated tag
+        if: steps.meta.outputs.create_tag == 'true'
         run: |
-          expected="v${{ steps.meta.outputs.version }}"
-          actual="${{ steps.meta.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.meta.outputs.tag }}" -m "Release ${{ steps.meta.outputs.tag }}"
+          git push origin "${{ steps.meta.outputs.tag }}"
+
+      - name: Summary
+        run: |
+          if [[ "${{ steps.meta.outputs.publish }}" != "true" ]]; then
+            echo "Tag ${{ steps.meta.outputs.tag }} already exists, skip release."
+          elif [[ "${{ steps.meta.outputs.create_tag }}" == "true" ]]; then
+            echo "Created tag ${{ steps.meta.outputs.tag }} and will publish release."
+          else
+            echo "Will publish release for existing tag ${{ steps.meta.outputs.tag }}."
+          fi
+
+  release:
+    needs: prepare
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out release ref
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.tag }}
+          submodules: recursive
+
+      - name: Read version from tagged source
+        id: meta
+        run: |
+          set -euo pipefail
+          version="${{ needs.prepare.outputs.version }}"
+          bash scripts/set-project-version.sh "${version}"
+          expected="v${version}"
+          actual="${{ needs.prepare.outputs.tag }}"
           if [[ "${expected}" != "${actual}" ]]; then
             echo "Tag ${actual} does not match PROJECT_VER ${expected}" >&2
             exit 1
           fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Build firmware
         uses: espressif/esp-idf-ci-action@v1
@@ -68,12 +127,15 @@ jobs:
           target: esp32s3
           path: '.'
           command: >
-            esptool.py --chip esp32s3 merge_bin
-            -o build/air_quality_monitor-merged.bin
-            @build/flash_args
+            cd build &&
+            esptool --chip esp32s3 merge-bin
+            -o air_quality_monitor-merged.bin
+            @flash_args
 
       - name: Package release assets
         run: |
+          set -euo pipefail
+
           mkdir -p dist
           version="${{ steps.meta.outputs.version }}"
 
@@ -90,7 +152,6 @@ jobs:
           )
 
       - name: Create extra release notes
-        id: notes
         run: |
           cat > release-notes.md <<'EOF'
           ## Firmware Assets
@@ -106,26 +167,27 @@ jobs:
           sed -i.bak "s/<version>/${{ steps.meta.outputs.version }}/g" release-notes.md
           rm release-notes.md.bak
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          previous_tag="$(git tag --sort=-v:refname | grep '^v' | grep -vx "${{ steps.meta.outputs.tag }}" | head -n1 || true)"
+          tag="${{ needs.prepare.outputs.tag }}"
+          previous_tag="$(git tag --sort=-v:refname | grep '^v' | grep -vx "${tag}" | head -n1 || true)"
           notes_args=()
           if [[ -n "${previous_tag}" ]]; then
             notes_args+=(--notes-start-tag "${previous_tag}")
           fi
 
-          if gh release view "${{ steps.meta.outputs.tag }}" >/dev/null 2>&1; then
-            gh release upload "${{ steps.meta.outputs.tag }}" dist/* --clobber
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" dist/* --clobber
           else
-            gh release create "${{ steps.meta.outputs.tag }}" \
+            gh release create "${tag}" \
               dist/* \
               --verify-tag \
               --generate-notes \
               --notes "$(cat release-notes.md)" \
-              --title "${{ steps.meta.outputs.tag }}" \
+              --title "${tag}" \
               "${notes_args[@]}"
           fi

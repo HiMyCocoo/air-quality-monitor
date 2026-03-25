@@ -110,10 +110,11 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 仓库现在可以按 `PROJECT_VER` 自动发布：
 
-- 版本号来源是 `CMakeLists.txt` 里的 `PROJECT_VER`
-- 当你把提交推到 `main` 或 `master` 时，工作流会检查是否已有对应的 `v<PROJECT_VER>` tag
-- 如果还没有，就自动创建 annotated tag，例如 `v0.1.0`
-- tag 创建后会在同一个 workflow 里继续构建固件，并自动发布到 GitHub Release
+- `CMakeLists.txt` 里的 `PROJECT_VER` 现在作为版本基线使用
+- workflow 会读取它的 `主版本.次版本`，并自动递增 `patch`
+- 例如基线是 `0.1.0`，已有最新 tag 是 `v0.1.3`，下一次发布会自动变成 `v0.1.4`
+- 如果你把基线改成 `0.2.0`，后续发布就会切到 `0.2.x`
+- 然后在同一个 workflow 里继续构建固件，并自动发布到 GitHub Release
 - Release 会附带自动生成的更新日志和编译后的 `bin` 文件
 
 当前上传到 Release 的产物包括：
@@ -128,17 +129,16 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 对应配置文件：
 
-- 自动打 tag：`.github/workflows/tag-from-version.yml`
-- 自动构建并发布：`.github/workflows/release-on-tag.yml`
+- 自动打 tag、构建并发布：`.github/workflows/release-on-tag.yml`
 - Release notes 分类配置：`.github/release.yml`
 
 使用方式：
 
-1. 修改 `CMakeLists.txt` 里的 `PROJECT_VER`
-2. 提交并推送到 `main` 或 `master`
-3. 等待 GitHub Actions 自动创建 tag 和 Release
+1. 平时正常提交并推送到 `main` 或 `master`
+2. workflow 会自动计算下一个 patch 版本、创建 tag、构建并发布
+3. 只有当你想切换大版本或小版本时，才需要手动修改 `CMakeLists.txt` 里的 `PROJECT_VER`
 
-如果你只是普通提交但没有改版本号，工作流会跳过，不会重复创建同一个 Release。
+如果某个提交已经有对应的 `v*` tag，workflow 会复用这个 tag，不会在同一个提交上继续递增出新的 patch 版本。
 
 如果某个 tag 已经存在，但之前因为工作流失败没有成功上传资产，也可以手动运行 `Build And Release Firmware`，并在可选输入里填上对应 tag（例如 `v0.1.0`）来补发 Release 资产。
 
