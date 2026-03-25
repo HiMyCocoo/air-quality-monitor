@@ -106,6 +106,40 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 建议优先使用板子右侧 `USB to UART` 口烧录和看日志。
 
+## 自动发布到 GitHub Release
+
+仓库现在可以按 `PROJECT_VER` 自动发布：
+
+- 版本号来源是 `CMakeLists.txt` 里的 `PROJECT_VER`
+- 当你把提交推到 `main` 或 `master` 时，工作流会检查是否已有对应的 `v<PROJECT_VER>` tag
+- 如果还没有，就自动创建 annotated tag，例如 `v0.1.0`
+- tag 创建后会触发固件构建，并自动发布到 GitHub Release
+- Release 会附带自动生成的更新日志和编译后的 `bin` 文件
+
+当前上传到 Release 的产物包括：
+
+- 应用固件 `air_quality_monitor-<version>.bin`
+- 完整合并镜像 `air_quality_monitor-<version>-merged.bin`
+- `bootloader.bin`
+- `partition-table.bin`
+- `ota_data_initial.bin`
+- `flasher_args.json`
+- `SHA256SUMS.txt`
+
+对应配置文件：
+
+- 自动打 tag：`.github/workflows/tag-from-version.yml`
+- 自动构建并发布：`.github/workflows/release-on-tag.yml`
+- Release notes 分类配置：`.github/release.yml`
+
+使用方式：
+
+1. 修改 `CMakeLists.txt` 里的 `PROJECT_VER`
+2. 提交并推送到 `main` 或 `master`
+3. 等待 GitHub Actions 自动创建 tag 和 Release
+
+如果你只是普通提交但没有改版本号，工作流会跳过，不会重复创建同一个 Release。
+
 ## 首次上电与配网
 
 ### 1. 默认联网尝试
