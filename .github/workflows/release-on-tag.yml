@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish, for example v0.1.0
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -20,11 +25,18 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Switch to requested tag
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tag != ''
+        run: |
+          git checkout "${{ github.event.inputs.tag }}"
+
       - name: Read version metadata
         id: meta
         run: |
           version="$(bash scripts/get-project-version.sh)"
-          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
+            tag="${{ github.event.inputs.tag }}"
+          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
           else
             tag="v${version}"

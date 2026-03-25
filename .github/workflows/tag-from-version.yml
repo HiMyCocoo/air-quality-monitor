@@ -13,6 +13,10 @@ permissions:
 jobs:
   create_tag:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.tag_check.outputs.created }}
 
     steps:
       - name: Check out repository
@@ -32,8 +36,10 @@ jobs:
         run: |
           if git rev-parse "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
             echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "created=false" >> "${GITHUB_OUTPUT}"
           else
             echo "exists=false" >> "${GITHUB_OUTPUT}"
+            echo "created=true" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Create and push annotated tag
@@ -50,4 +56,92 @@ jobs:
             echo "Tag ${{ steps.version.outputs.tag }} already exists, skip."
           else
             echo "Created tag ${{ steps.version.outputs.tag }}."
+          fi
+
+  build_release:
+    needs: create_tag
+    if: needs.create_tag.outputs.created == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.create_tag.outputs.tag }}
+          submodules: recursive
+
+      - name: Build firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0
+          target: esp32s3
+          path: '.'
+
+      - name: Build merged firmware image
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0
+          target: esp32s3
+          path: '.'
+          command: >
+            esptool.py --chip esp32s3 merge_bin
+            -o build/air_quality_monitor-merged.bin
+            @build/flash_args
+
+      - name: Package release assets
+        run: |
+          mkdir -p dist
+          version="${{ needs.create_tag.outputs.version }}"
+
+          cp build/air_quality_monitor.bin "dist/air_quality_monitor-${version}.bin"
+          cp build/air_quality_monitor-merged.bin "dist/air_quality_monitor-${version}-merged.bin"
+          cp build/bootloader/bootloader.bin "dist/bootloader-${version}.bin"
+          cp build/partition_table/partition-table.bin "dist/partition-table-${version}.bin"
+          cp build/ota_data_initial.bin "dist/ota_data_initial-${version}.bin"
+          cp build/flasher_args.json "dist/flasher_args-${version}.json"
+
+          (
+            cd dist
+            shasum -a 256 ./* > SHA256SUMS.txt
+          )
+
+      - name: Create extra release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## Firmware Assets
+
+          - `air_quality_monitor-<version>.bin`: 应用固件
+          - `air_quality_monitor-<version>-merged.bin`: 合并后的整包镜像，适合完整刷机
+          - `bootloader-<version>.bin`: Bootloader
+          - `partition-table-<version>.bin`: 分区表
+          - `ota_data_initial-<version>.bin`: OTA 数据初始化镜像
+          - `flasher_args-<version>.json`: ESP-IDF 烧录参数
+          - `SHA256SUMS.txt`: 所有发布文件的校验值
+          EOF
+          sed -i.bak "s/<version>/${{ needs.create_tag.outputs.version }}/g" release-notes.md
+          rm release-notes.md.bak
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          previous_tag="$(git tag --sort=-v:refname | grep '^v' | grep -vx "${{ needs.create_tag.outputs.tag }}" | head -n1 || true)"
+          notes_args=()
+          if [[ -n "${previous_tag}" ]]; then
+            notes_args+=(--notes-start-tag "${previous_tag}")
+          fi
+
+          if gh release view "${{ needs.create_tag.outputs.tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ needs.create_tag.outputs.tag }}" dist/* --clobber
+          else
+            gh release create "${{ needs.create_tag.outputs.tag }}" \
+              dist/* \
+              --verify-tag \
+              --generate-notes \
+              --notes "$(cat release-notes.md)" \
+              --title "${{ needs.create_tag.outputs.tag }}" \
+              "${notes_args[@]}"
           fi
