@@ -148,13 +148,6 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 如果设备里还没有已保存的配置，当前固件会先尝试连接编译时默认 `Wi-Fi`。
 
-默认值如果仍然沿用仓库配置，则是：
-
-- `SSID: <your-wifi-ssid>`
-- `Password: <your-wifi-password>`
-
-如果你不希望固件带默认凭据，应在构建前改掉。
-
 ### 2. BLE 配网回退
 
 没有可用 `Wi-Fi`、默认 `Wi-Fi` 连接失败、或离线超时后，设备会进入 `ESP BLE Prov`。
