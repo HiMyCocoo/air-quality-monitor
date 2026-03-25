@@ -20,6 +20,7 @@
 #define SGP41_CONDITIONING_SEC 10
 #define SGP41_DEFAULT_HUMIDITY_TICKS 0x8000
 #define SGP41_DEFAULT_TEMPERATURE_TICKS 0x6666
+#define SPS30_FAN_CLEANING_DURATION_MS (10000LL)
 
 static const char *TAG = "sensors";
 
@@ -823,6 +824,33 @@ esp_err_t sensors_set_sps30_sleep(bool sleep)
                 (esp_timer_get_time() / 1000) + (CONFIG_AIRMON_SPS30_WARMUP_SEC * 1000LL);
             sensors_mark_sps30_invalid_locked();
         }
+    }
+    xSemaphoreGive(s_ctx.lock);
+    return err;
+}
+
+esp_err_t sensors_start_sps30_fan_cleaning(void)
+{
+    if (!s_ctx.sps30_initialized || s_ctx.lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    if (s_ctx.sps30_sleeping) {
+        xSemaphoreGive(s_ctx.lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = sps30_start_fan_cleaning(&s_ctx.sps30);
+    if (err == ESP_OK) {
+        int64_t now_ms = esp_timer_get_time() / 1000;
+
+        s_ctx.pm_history_count = 0;
+        s_ctx.pm_history_index = 0;
+        sensors_mark_sps30_invalid_locked();
+        s_ctx.sps30_warmup_until_ms = now_ms + SPS30_FAN_CLEANING_DURATION_MS;
+        /* SPS30 does not publish fresh measurements during the 10 s cleaning cycle. */
+        s_ctx.sps30.last_measurement_request_ms = now_ms + SPS30_FAN_CLEANING_DURATION_MS - 1000;
     }
     xSemaphoreGive(s_ctx.lock);
     return err;

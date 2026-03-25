@@ -161,6 +161,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - `SCD41 ASC`
 - `SCD41 FRC`
 - `SPS30` 休眠 / 唤醒
+- `SPS30` 手动触发自动风扇清洁
 - 板载 `RGB` 状态灯开关
 - `Home Assistant Discovery` 重发
 - `OTA` 升级
@@ -213,6 +214,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - `CO2` 补偿来源：`bmp390 / altitude_fallback / none`
 - `SCD41 ASC`
 - `SPS30 Sleep`
+- `SPS30 Fan Cleaning`
 - `RGB Status LED`
 - `Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
 

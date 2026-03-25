@@ -766,6 +766,18 @@ static esp_err_t sps30_sleep_handler(httpd_req_t *req)
     return send_ok_json(req);
 }
 
+static esp_err_t sps30_fan_cleaning_handler(httpd_req_t *req)
+{
+    if (s_ctx.callbacks.request_start_sps30_fan_cleaning != NULL) {
+        esp_err_t err = s_ctx.callbacks.request_start_sps30_fan_cleaning(s_ctx.user_ctx);
+        if (err == ESP_ERR_INVALID_STATE) {
+            return send_error_json(req, "409 Conflict", "SPS30 当前不可用，或正处于休眠中");
+        }
+        ESP_RETURN_ON_ERROR(err, TAG, "sps30 fan cleaning action failed");
+    }
+    return send_ok_json(req);
+}
+
 static esp_err_t status_led_handler(httpd_req_t *req)
 {
     cJSON *json = NULL;
@@ -881,6 +893,7 @@ esp_err_t provisioning_web_start(const char *device_id,
         {.uri = "/api/action/republish-discovery", .method = HTTP_POST, .handler = republish_handler, .user_ctx = NULL},
         {.uri = "/api/action/scd41-asc", .method = HTTP_POST, .handler = scd41_asc_handler, .user_ctx = NULL},
         {.uri = "/api/action/sps30-sleep", .method = HTTP_POST, .handler = sps30_sleep_handler, .user_ctx = NULL},
+        {.uri = "/api/action/sps30-fan-cleaning", .method = HTTP_POST, .handler = sps30_fan_cleaning_handler, .user_ctx = NULL},
         {.uri = "/api/action/status-led", .method = HTTP_POST, .handler = status_led_handler, .user_ctx = NULL},
         {.uri = "/api/action/apply-frc", .method = HTTP_POST, .handler = frc_handler, .user_ctx = NULL},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_handler, .user_ctx = NULL},

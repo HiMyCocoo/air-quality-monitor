@@ -1620,6 +1620,18 @@
             </div>
 
             <div class="maintenance-tool-block">
+              <h3>SPS30 自动风扇清洁</h3>
+              <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
+                <div>
+                  <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">手动触发 SPS30 内置自动风扇清洁流程。仅在传感器运行中可用，执行约 10 秒，期间 PM 数据会短暂失效。</p>
+                </div>
+                <div style="display:flex; align-items:flex-end; justify-content: flex-end;">
+                  <button id="sps30_fan_cleaning_btn" class="ghost no-wrap" onclick="startSps30FanCleaning()">执行风扇清洁</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="maintenance-tool-block">
               <h3>FRC 强制校准</h3>
               <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
                 <div>
@@ -1703,6 +1715,7 @@
     const ascStatusText = document.getElementById('asc_status_text');
     const sps30Toggle = document.getElementById('sps30_toggle');
     const sps30StatusText = document.getElementById('sps30_status_text');
+    const sps30FanCleaningBtn = document.getElementById('sps30_fan_cleaning_btn');
     const statusLedToggle = document.getElementById('status_led_toggle');
     const statusLedText = document.getElementById('status_led_text');
     const frcApplyBtn = document.getElementById('frc_apply_btn');
@@ -1819,9 +1832,11 @@
     function syncActionAvailability(d) {
       const scd41Ready = !!d.diag.scd41_ready;
       const sps30Ready = !!d.diag.sps30_ready;
+      const sps30CanClean = sps30Ready && !d.snapshot.sps30_sleeping;
       const ledReady = !!d.diag.status_led_ready;
       ascToggle.disabled = !scd41Ready; frcApplyBtn.disabled = !scd41Ready;
       sps30Toggle.disabled = !sps30Ready;
+      sps30FanCleaningBtn.disabled = !sps30CanClean;
       statusLedToggle.disabled = !ledReady;
       republishBtn.disabled = !d.diag.mqtt_connected;
     }
@@ -2070,6 +2085,14 @@
       const ok = await apiRequest('/api/action/status-led', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) }, '操作失败', enabled ? '指示灯开启' : '指示灯关闭');
       await fetchStatus();
       return ok;
+    }
+    async function startSps30FanCleaning() {
+      sps30FanCleaningBtn.disabled = true;
+      try {
+        await apiRequest('/api/action/sps30-fan-cleaning', { method: 'POST' }, '风扇清洁启动失败', 'SPS30 风扇清洁已启动，约 10 秒内 PM 数据会短暂失效');
+      } finally {
+        await fetchStatus();
+      }
     }
     async function applyFrc() { await apiRequest('/api/action/apply-frc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ppm: Number(frcInput.value) }) }, 'FRC校准失败', '已强制校准'); fetchStatus(); }
     async function republishDiscovery() { await apiRequest('/api/action/republish-discovery', { method: 'POST' }, '请求失败', '已重新发送 Discovery 报文'); }

@@ -21,3 +21,4 @@ esp_err_t sensors_set_scd41_compensation(uint16_t altitude_m,
 esp_err_t sensors_set_scd41_asc(bool enabled);
 esp_err_t sensors_set_scd41_forced_recalibration(uint16_t reference_ppm);
 esp_err_t sensors_set_sps30_sleep(bool sleep);
+esp_err_t sensors_start_sps30_fan_cleaning(void);

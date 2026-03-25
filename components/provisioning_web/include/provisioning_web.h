@@ -14,6 +14,7 @@ typedef struct {
     esp_err_t (*request_republish_discovery)(void *user_ctx);
     esp_err_t (*request_set_scd41_asc)(bool enabled, void *user_ctx);
     esp_err_t (*request_set_sps30_sleep)(bool sleep, void *user_ctx);
+    esp_err_t (*request_start_sps30_fan_cleaning)(void *user_ctx);
     esp_err_t (*request_set_status_led)(bool enabled, void *user_ctx);
     esp_err_t (*request_apply_frc)(uint16_t ppm, void *user_ctx);
 } provisioning_web_callbacks_t;

@@ -318,6 +318,7 @@ static void subscribe_commands(void)
         "republish_discovery",
         "scd41_asc",
         "sps30_sleep",
+        "sps30_fan_cleaning",
         "status_led",
         "scd41_frc_reference_ppm",
         "apply_scd41_frc",
@@ -378,6 +379,10 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
             if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
                 s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
             }
+        }
+    } else if (CMD_IS("sps30_fan_cleaning")) {
+        if (s_ctx.callbacks.start_sps30_fan_cleaning_requested != NULL && strcmp(payload, "PRESS") == 0) {
+            s_ctx.callbacks.start_sps30_fan_cleaning_requested(s_ctx.user_ctx);
         }
     } else if (CMD_IS("status_led")) {
         if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
@@ -528,6 +533,9 @@ esp_err_t mqtt_ha_publish_discovery(void)
     ESP_RETURN_ON_ERROR(publish_button_discovery("restart", "Restart", "restart"), TAG, "restart discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("factory_reset", "Factory Reset", "factory_reset"), TAG, "factory discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("republish_discovery", "Republish Discovery", "republish_discovery"), TAG, "republish discovery failed");
+    ESP_RETURN_ON_ERROR(publish_button_discovery("sps30_fan_cleaning", "SPS30 Fan Cleaning", "sps30_fan_cleaning"),
+                        TAG,
+                        "sps30 fan cleaning discovery failed");
     ESP_RETURN_ON_ERROR(publish_button_discovery("apply_scd41_frc", "Apply SCD41 FRC", "apply_scd41_frc"), TAG, "frc button discovery failed");
     return publish_number_discovery();
 }
