@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -93,7 +93,7 @@ jobs:
 
     steps:
       - name: Check out release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.tag }}
@@ -139,8 +139,8 @@ jobs:
           mkdir -p dist
           version="${{ steps.meta.outputs.version }}"
 
-          cp build/air_quality_monitor.bin "dist/air_quality_monitor-${version}.bin"
-          cp build/air_quality_monitor-merged.bin "dist/air_quality_monitor-${version}-merged.bin"
+          cp build/air_quality_monitor.bin "dist/air_quality_monitor-ota-${version}.bin"
+          cp build/air_quality_monitor-merged.bin "dist/air_quality_monitor-full-${version}.bin"
           cp build/bootloader/bootloader.bin "dist/bootloader-${version}.bin"
           cp build/partition_table/partition-table.bin "dist/partition-table-${version}.bin"
           cp build/ota_data_initial.bin "dist/ota_data_initial-${version}.bin"
@@ -156,8 +156,8 @@ jobs:
           cat > release-notes.md <<'EOF'
           ## Firmware Assets
 
-          - `air_quality_monitor-<version>.bin`: 应用固件
-          - `air_quality_monitor-<version>-merged.bin`: 合并后的整包镜像，适合完整刷机
+          - `air_quality_monitor-ota-<version>.bin`: OTA 升级用的应用固件
+          - `air_quality_monitor-full-<version>.bin`: 串口完整刷机用的整包镜像
           - `bootloader-<version>.bin`: Bootloader
           - `partition-table-<version>.bin`: 分区表
           - `ota_data_initial-<version>.bin`: OTA 数据初始化镜像

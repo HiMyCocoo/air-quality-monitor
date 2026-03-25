@@ -618,7 +618,7 @@ static esp_err_t app_start_ble_provisioning(void)
 
     ESP_RETURN_ON_ERROR(platform_wifi_prepare_provisioning_sta(), TAG, "prepare provisioning STA failed");
     ESP_RETURN_ON_ERROR(network_prov_mgr_init(config), TAG, "network_prov_mgr_init failed");
-    ESP_LOGW(TAG, "Starting BLE provisioning. Service name: %s, PoP: %s", s_app.prov_service_name, s_app.prov_pop);
+    ESP_LOGW(TAG, "Starting BLE provisioning. Service name: %s", s_app.prov_service_name);
 
     esp_err_t err = network_prov_mgr_start_provisioning(NETWORK_PROV_SECURITY_1,
                                                         (const void *)s_app.prov_pop,
@@ -661,9 +661,7 @@ static void app_prov_event_handler(void *arg, esp_event_base_t event_base, int32
                 break;
             case NETWORK_PROV_WIFI_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
-                char ssid[WIFI_SSID_LEN + 1] = {0};
-                app_copy_wifi_string(ssid, sizeof(ssid), wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
-                ESP_LOGI(TAG, "Provisioning received Wi-Fi SSID: %s", ssid);
+                ESP_LOGI(TAG, "Provisioning received Wi-Fi credentials");
                 if (app_store_wifi_credentials(wifi_sta_cfg) != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to persist provisioned Wi-Fi credentials");
                 }

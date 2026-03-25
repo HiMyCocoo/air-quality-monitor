@@ -119,8 +119,8 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 当前上传到 Release 的产物包括：
 
-- 应用固件 `air_quality_monitor-<version>.bin`
-- 完整合并镜像 `air_quality_monitor-<version>-merged.bin`
+- OTA 应用固件 `air_quality_monitor-ota-<version>.bin`
+- 完整刷机镜像 `air_quality_monitor-full-<version>.bin`
 - `bootloader.bin`
 - `partition-table.bin`
 - `ota_data_initial.bin`
@@ -146,8 +146,9 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 ### 1. 默认联网尝试
 
-如果设备里还没有已保存的配置，当前固件会先尝试连接编译时默认 `Wi-Fi`。
+如果设备里还没有已保存的配置，当前仓库默认不会内置 `Wi-Fi` 凭据。
 
+也就是说，首次上电通常会进入 `BLE` 配网流程；只有你自己在私有构建里额外加了默认凭据，设备才会先尝试自动联网。
 ### 2. BLE 配网回退
 
 没有可用 `Wi-Fi`、默认 `Wi-Fi` 连接失败、或离线超时后，设备会进入 `ESP BLE Prov`。

@@ -1511,7 +1511,7 @@
             <div class="field-span-2">
               <label>MQTT URL</label>
               <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883" />
-              <div class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
+              <div id="mqtt_privacy_hint" class="hint" style="margin-top: 8px;">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
             </div>
           </div>
         </div>
@@ -1711,6 +1711,7 @@
     const firmwareNameEl = document.getElementById('firmware_name');
     const firmwareVersionTextEl = document.getElementById('firmware_version_text');
     const deviceIdTextEl = document.getElementById('device_id_text');
+    const mqttPrivacyHintEl = document.getElementById('mqtt_privacy_hint');
     const ascToggle = document.getElementById('asc_toggle');
     const ascStatusText = document.getElementById('asc_status_text');
     const sps30Toggle = document.getElementById('sps30_toggle');
@@ -1725,6 +1726,7 @@
     const urlParams = new URLSearchParams(window.location.search);
 
     let configDirty = false;
+    let mqttUrlDirty = false;
     let noticeTimer = 0;
     const activeTabStorageKey = 'airmon-active-tab';
 
@@ -1891,6 +1893,9 @@
           if (el) el.value = d.config[k] == null ? '' : d.config[k];
         }
       }
+      mqttPrivacyHintEl.textContent = d.config.mqtt_auth_configured
+        ? '已保存 MQTT 认证信息。出于安全原因，页面不会回显用户名或密码；如需修改，请重新输入完整 MQTT URL。'
+        : '格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。';
       if (document.activeElement !== frcInput) {
         frcInput.value = d.frc_reference_ppm;
       }
@@ -2044,13 +2049,16 @@
 
     async function saveConfig() {
       const payload = {
-        mqtt_url: configInputs.mqtt_url.value,
         scd41_altitude_m: Number(configInputs.scd41_altitude_m.value),
         scd41_temp_offset_c: Number(configInputs.scd41_temp_offset_c.value)
       };
+      if (mqttUrlDirty) {
+        payload.mqtt_url = configInputs.mqtt_url.value;
+      }
       const result = await apiRequestJson('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, '配置保存失败');
       if (!result) return;
       configDirty = false;
+      mqttUrlDirty = false;
       if (result.restart && result.runtime_applied) {
         showNotice('success', 'MQTT 配置已保存，系统将重启以重新连接服务端。SCD41 补偿参数已即时下发。');
         setTimeout(fetchStatus, 1500);
@@ -2104,7 +2112,15 @@
       if (await apiRequest('/api/ota', { method: 'POST', body: file }, 'OTA 升级失败')) { showNotice('success', '固件上传及校验成功，即将重启！'); }
     }
 
-    for (const key of configFields) { const el = document.getElementById(key); if (el) el.addEventListener('input', () => configDirty = true); }
+    for (const key of configFields) {
+      const el = document.getElementById(key);
+      if (el) {
+        el.addEventListener('input', () => {
+          configDirty = true;
+          if (key === 'mqtt_url') mqttUrlDirty = true;
+        });
+      }
+    }
     firmwareInput.addEventListener('change', syncFirmwareLabel);
     ascToggle.addEventListener('change', async () => {
       const nextValue = ascToggle.checked;

@@ -161,37 +161,6 @@ static void trim_ascii_whitespace(char *text)
     }
 }
 
-static bool mqtt_url_is_unreserved(char ch)
-{
-    return isalnum((unsigned char)ch) || ch == '-' || ch == '.' || ch == '_' || ch == '~';
-}
-
-static bool mqtt_url_encode_component(const char *src, char *dst, size_t dst_len)
-{
-    size_t used = 0;
-    for (const unsigned char *cursor = (const unsigned char *)src; cursor != NULL && *cursor != '\0'; cursor++) {
-        if (mqtt_url_is_unreserved((char)*cursor)) {
-            if (used + 1 >= dst_len) {
-                return false;
-            }
-            dst[used++] = (char)*cursor;
-            continue;
-        }
-
-        if (used + 3 >= dst_len) {
-            return false;
-        }
-        snprintf(dst + used, dst_len - used, "%%%02X", *cursor);
-        used += 3;
-    }
-
-    if (dst_len == 0) {
-        return false;
-    }
-    dst[used] = '\0';
-    return true;
-}
-
 static int mqtt_url_hex_value(char ch)
 {
     if (ch >= '0' && ch <= '9') {
@@ -386,7 +355,7 @@ static bool parse_mqtt_url_string(const char *input, device_config_t *config, ch
     return true;
 }
 
-static void build_mqtt_url_string(const device_config_t *config, char *buffer, size_t buffer_len)
+static void build_public_mqtt_url_string(const device_config_t *config, char *buffer, size_t buffer_len)
 {
     if (buffer_len == 0) {
         return;
@@ -397,27 +366,8 @@ static void build_mqtt_url_string(const device_config_t *config, char *buffer, s
         return;
     }
 
-    char username[MQTT_USER_LEN * 3 + 1] = {0};
-    char password[MQTT_PASSWORD_LEN * 3 + 1] = {0};
     uint16_t port = config->mqtt_port ? config->mqtt_port : MQTT_DEFAULT_PORT;
-    if (!mqtt_url_encode_component(config->mqtt_username, username, sizeof(username)) ||
-        !mqtt_url_encode_component(config->mqtt_password, password, sizeof(password))) {
-        return;
-    }
-
-    int written = 0;
-    if (config->mqtt_username[0] != '\0' || config->mqtt_password[0] != '\0') {
-        if (config->mqtt_password[0] != '\0') {
-            written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s:%s@%s:%u",
-                               username, password, config->mqtt_host, port);
-        } else {
-            written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s@%s:%u",
-                               username, config->mqtt_host, port);
-        }
-    } else {
-        written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s:%u", config->mqtt_host, port);
-    }
-
+    int written = snprintf(buffer, buffer_len, MQTT_SCHEME "%s:%u", config->mqtt_host, port);
     if (written < 0 || (size_t)written >= buffer_len) {
         buffer[0] = '\0';
     }
@@ -454,7 +404,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     air_quality_particle_insight_t particle = {0};
     air_quality_compute_particle_insight(&snapshot, &particle);
     int64_t now_ms = esp_timer_get_time() / 1000;
-    build_mqtt_url_string(&config, mqtt_url, sizeof(mqtt_url));
+    build_public_mqtt_url_string(&config, mqtt_url, sizeof(mqtt_url));
 
     cJSON *root = cJSON_CreateObject();
     cJSON *diag_json = cJSON_AddObjectToObject(root, "diag");
@@ -580,13 +530,10 @@ static esp_err_t status_handler(httpd_req_t *req)
 
     cJSON *config_json = cJSON_AddObjectToObject(root, "config");
     cJSON_AddStringToObject(config_json, "device_name", config.device_name);
-    cJSON_AddStringToObject(config_json, "wifi_ssid", config.wifi_ssid);
-    cJSON_AddStringToObject(config_json, "wifi_password", config.wifi_password);
     cJSON_AddStringToObject(config_json, "mqtt_url", mqtt_url);
-    cJSON_AddStringToObject(config_json, "mqtt_host", config.mqtt_host);
-    cJSON_AddNumberToObject(config_json, "mqtt_port", config.mqtt_port);
-    cJSON_AddStringToObject(config_json, "mqtt_username", config.mqtt_username);
-    cJSON_AddStringToObject(config_json, "mqtt_password", config.mqtt_password);
+    cJSON_AddBoolToObject(config_json, "wifi_configured", config.wifi_ssid[0] != '\0');
+    cJSON_AddBoolToObject(config_json, "mqtt_auth_configured",
+                          config.mqtt_username[0] != '\0' || config.mqtt_password[0] != '\0');
     cJSON_AddStringToObject(config_json, "discovery_prefix", config.discovery_prefix);
     cJSON_AddStringToObject(config_json, "topic_root", config.topic_root);
     cJSON_AddNumberToObject(config_json, "publish_interval_sec", config.publish_interval_sec);
