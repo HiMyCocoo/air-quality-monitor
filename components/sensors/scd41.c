@@ -182,15 +182,23 @@ esp_err_t scd41_read_measurement(scd41_t *sensor, uint16_t *co2_ppm,
 esp_err_t scd41_perform_forced_recalibration(scd41_t *sensor,
                                              uint16_t target_ppm,
                                              uint16_t *correction_ppm) {
-  uint16_t response = 0;
   ESP_RETURN_ON_ERROR(
       scd41_write_command_word(sensor, CMD_PERFORM_FRC, target_ppm), "scd41",
       "frc write failed");
   vTaskDelay(pdMS_TO_TICKS(400));
-  ESP_RETURN_ON_ERROR(scd41_read_words(sensor, CMD_PERFORM_FRC, &response, 1),
-                      "scd41", "frc read failed");
-  if (correction_ppm != NULL) {
-    *correction_ppm = response;
+
+  /* Read 1 word (3 bytes: MSB, LSB, CRC) without re-sending the command. */
+  uint8_t response[3] = {0};
+  ESP_RETURN_ON_ERROR(
+      i2c_master_receive(sensor->dev_handle, response, sizeof(response),
+                         pdMS_TO_TICKS(I2C_TIMEOUT_MS)),
+      "scd41", "frc read failed");
+  uint16_t value = ((uint16_t)response[0] << 8) | response[1];
+  if (response[2] != scd41_crc_word(value)) {
+    return ESP_ERR_INVALID_CRC;
   }
-  return response == 0xFFFF ? ESP_FAIL : ESP_OK;
+  if (correction_ppm != NULL) {
+    *correction_ppm = value;
+  }
+  return value == 0xFFFF ? ESP_FAIL : ESP_OK;
 }

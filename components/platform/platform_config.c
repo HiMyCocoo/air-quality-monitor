@@ -30,7 +30,9 @@ void platform_config_sanitize(device_config_t *config, const char *device_id)
     if (config->mqtt_port == 0) {
         config->mqtt_port = 1883;
     }
-    config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
+    if (config->publish_interval_sec == 0) {
+        config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
+    }
     if (config->scd41_temp_offset_c < 0.0f || config->scd41_temp_offset_c > 20.0f) {
         config->scd41_temp_offset_c = 4.0f;
     }

@@ -10,7 +10,7 @@
 esp_err_t sensors_start(const device_config_t *config);
 void sensors_stop(void);
 esp_err_t sensors_get_snapshot(sensor_snapshot_t *snapshot);
-bool sensors_is_ready(void);
+bool sensors_any_ready(void);
 bool sensors_is_scd41_ready(void);
 bool sensors_is_sgp41_ready(void);
 bool sensors_is_sps30_ready(void);

@@ -1,5 +1,6 @@
 #include "mqtt_ha.h"
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,9 +37,9 @@ typedef struct {
 
 typedef struct {
     esp_mqtt_client_handle_t client;
-    bool connected;
-    bool scd41_asc_enabled;
-    uint16_t frc_reference_ppm;
+    _Atomic bool connected;
+    _Atomic bool scd41_asc_enabled;
+    _Atomic uint16_t frc_reference_ppm;
     device_config_t config;
     mqtt_ha_callbacks_t callbacks;
     void *user_ctx;
@@ -334,30 +335,33 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
     size_t copy_len = (size_t)data_len < sizeof(payload) - 1 ? (size_t)data_len : sizeof(payload) - 1;
     memcpy(payload, data, copy_len);
 
-    char expected[128];
-    snprintf(expected, sizeof(expected), "%s/restart", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    /* Extract command suffix after "cmd_prefix/" */
+    size_t prefix_len = strlen(s_ctx.cmd_prefix);
+    if ((int)prefix_len + 1 >= topic_len || topic[prefix_len] != '/') {
+        return;
+    }
+    if (strncmp(topic, s_ctx.cmd_prefix, prefix_len) != 0) {
+        return;
+    }
+    const char *suffix = topic + prefix_len + 1;
+    int suffix_len = topic_len - (int)prefix_len - 1;
+
+    /* Helper macro for concise suffix matching. */
+    #define CMD_IS(name) (suffix_len == (int)strlen(name) && strncmp(suffix, name, suffix_len) == 0)
+
+    if (CMD_IS("restart")) {
         if (s_ctx.callbacks.restart_requested != NULL && strcmp(payload, "PRESS") == 0) {
             s_ctx.callbacks.restart_requested(s_ctx.user_ctx);
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/factory_reset", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("factory_reset")) {
         if (s_ctx.callbacks.factory_reset_requested != NULL && strcmp(payload, "PRESS") == 0) {
             s_ctx.callbacks.factory_reset_requested(s_ctx.user_ctx);
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/republish_discovery", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("republish_discovery")) {
         if (s_ctx.callbacks.republish_requested != NULL && strcmp(payload, "PRESS") == 0) {
             s_ctx.callbacks.republish_requested(s_ctx.user_ctx);
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/scd41_asc", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("scd41_asc")) {
         if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
             bool enabled = strcasecmp(payload, "ON") == 0;
             if (s_ctx.callbacks.set_scd41_asc_requested != NULL) {
@@ -368,42 +372,32 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
                 s_ctx.scd41_asc_enabled = enabled;
             }
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/sps30_sleep", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("sps30_sleep")) {
         if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
             bool sleep = strcasecmp(payload, "ON") == 0;
             if (s_ctx.callbacks.set_sps30_sleep_requested != NULL) {
                 s_ctx.callbacks.set_sps30_sleep_requested(sleep, s_ctx.user_ctx);
             }
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/status_led", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("status_led")) {
         if (strcasecmp(payload, "ON") == 0 || strcasecmp(payload, "OFF") == 0) {
             bool enabled = strcasecmp(payload, "ON") == 0;
             if (s_ctx.callbacks.set_status_led_requested != NULL) {
                 s_ctx.callbacks.set_status_led_requested(enabled, s_ctx.user_ctx);
             }
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/scd41_frc_reference_ppm", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("scd41_frc_reference_ppm")) {
         uint32_t ppm = (uint32_t)strtoul(payload, NULL, 10);
         if (ppm >= 400 && ppm <= 2000) {
             s_ctx.frc_reference_ppm = (uint16_t)ppm;
         }
-        return;
-    }
-    snprintf(expected, sizeof(expected), "%s/apply_scd41_frc", s_ctx.cmd_prefix);
-    if (topic_equals(topic, topic_len, expected)) {
+    } else if (CMD_IS("apply_scd41_frc")) {
         if (s_ctx.callbacks.apply_scd41_frc_requested != NULL && strcmp(payload, "PRESS") == 0) {
             s_ctx.callbacks.apply_scd41_frc_requested(s_ctx.frc_reference_ppm, s_ctx.user_ctx);
         }
     }
+
+    #undef CMD_IS
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)

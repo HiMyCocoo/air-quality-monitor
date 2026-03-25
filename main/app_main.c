@@ -27,6 +27,10 @@
 #include "network_provisioning/scheme_ble.h"
 #include "led_strip_encoder.h"
 
+#ifndef MAX_BLE_DEVNAME_LEN
+#define MAX_BLE_DEVNAME_LEN 29
+#endif
+
 static const char *TAG = "app_main";
 
 #define STATUS_LED_GPIO 48
@@ -86,6 +90,7 @@ static esp_err_t app_status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
         return ESP_OK;
     }
 
+    /* WS2812B-compatible LED with GBR byte order (verify for your LED variant). */
     uint8_t pixels[3] = {
         app_status_led_scale(g),
         app_status_led_scale(b),
@@ -196,7 +201,7 @@ static void app_status_led_update(void)
     }
 
     bool blink_on = ((esp_timer_get_time() / 1000 / STATUS_LED_UPDATE_MS) % 2) == 0;
-    if (sensors_is_ready()) {
+    if (sensors_any_ready()) {
         blue = blink_on ? 255 : 0;
     } else {
         red = blink_on ? 255 : 0;
@@ -220,7 +225,7 @@ static void app_fill_diag(device_diag_t *diag)
     diag->provisioning_mode = s_app.provisioning_mode;
     diag->wifi_connected = platform_wifi_is_connected();
     diag->mqtt_connected = mqtt_ha_is_connected();
-    diag->sensors_ready = sensors_is_ready();
+    diag->sensors_ready = sensors_any_ready();
     diag->scd41_ready = sensors_is_scd41_ready();
     diag->sgp41_ready = sensors_is_sgp41_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
@@ -754,43 +759,54 @@ static void supervisor_task(void *arg)
     (void)arg;
     while (true) {
         int64_t now_ms = esp_timer_get_time() / 1000;
+        bool do_factory_reset = false;
+        bool do_restart = false;
+        bool do_start_mqtt = false;
+        bool do_ble_fallback = false;
 
         xSemaphoreTake(s_app.lock, portMAX_DELAY);
         if (s_app.pending_factory_reset && now_ms >= s_app.action_at_ms) {
-            xSemaphoreGive(s_app.lock);
-            platform_config_reset();
-            esp_restart();
-        }
-        if (s_app.pending_restart && now_ms >= s_app.action_at_ms) {
-            xSemaphoreGive(s_app.lock);
-            esp_restart();
+            do_factory_reset = true;
+        } else if (s_app.pending_restart && now_ms >= s_app.action_at_ms) {
+            do_restart = true;
         }
 
-        if (!s_app.provisioning_mode) {
+        if (!do_factory_reset && !do_restart && !s_app.provisioning_mode) {
             if (platform_wifi_is_connected()) {
                 s_app.wifi_offline_since_ms = 0;
                 if (!s_app.mqtt_started) {
-                    xSemaphoreGive(s_app.lock);
-                    app_start_mqtt();
-                    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+                    do_start_mqtt = true;
                 }
             } else {
                 if (s_app.wifi_offline_since_ms == 0) {
                     s_app.wifi_offline_since_ms = now_ms;
                 } else if ((now_ms - s_app.wifi_offline_since_ms) > (CONFIG_AIRMON_AP_FALLBACK_TIMEOUT_SEC * 1000LL)) {
-                    xSemaphoreGive(s_app.lock);
-                    ESP_LOGW(TAG, "Wi-Fi offline too long, switching back to BLE provisioning");
-                    app_stop_mqtt();
-                    app_stop_web();
-                    app_stop_ble_provisioning();
-                    app_start_ble_provisioning();
-                    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+                    do_ble_fallback = true;
                     s_app.provisioning_mode = true;
                     s_app.wifi_offline_since_ms = 0;
                 }
             }
         }
         xSemaphoreGive(s_app.lock);
+
+        if (do_factory_reset) {
+            platform_config_reset();
+            esp_restart();
+        }
+        if (do_restart) {
+            esp_restart();
+        }
+        if (do_start_mqtt) {
+            app_start_mqtt();
+        }
+        if (do_ble_fallback) {
+            ESP_LOGW(TAG, "Wi-Fi offline too long, switching back to BLE provisioning");
+            app_stop_mqtt();
+            app_stop_web();
+            app_stop_ble_provisioning();
+            app_start_ble_provisioning();
+        }
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

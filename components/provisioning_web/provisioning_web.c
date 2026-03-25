@@ -21,6 +21,8 @@ static const char *TAG = "provisioning_web";
 #define MQTT_DEFAULT_PORT 1883
 #define MQTT_URL_BUFFER_LEN 512
 #define MQTT_SCHEME "mqtt://"
+#define MAX_REQUEST_BODY_LEN 4096
+#define OTA_MAX_FIRMWARE_SIZE (2 * 1024 * 1024)
 #define SCD41_ALTITUDE_MIN 0
 #define SCD41_ALTITUDE_MAX 3000
 #define SCD41_TEMP_OFFSET_MIN 0.0
@@ -51,6 +53,9 @@ static esp_err_t send_json(httpd_req_t *req, cJSON *json)
 
 static char *read_body(httpd_req_t *req)
 {
+    if (req->content_len > MAX_REQUEST_BODY_LEN) {
+        return NULL;
+    }
     char *body = calloc(1, req->content_len + 1);
     if (body == NULL) {
         return NULL;
@@ -815,6 +820,10 @@ static esp_err_t frc_handler(httpd_req_t *req)
 
 static esp_err_t ota_handler(httpd_req_t *req)
 {
+    if (req->content_len <= 0 || req->content_len > OTA_MAX_FIRMWARE_SIZE) {
+        return send_error_json(req, "400 Bad Request", "固件大小无效或超过 2MB 限制");
+    }
+
     const esp_partition_t *partition = esp_ota_get_next_update_partition(NULL);
     ESP_RETURN_ON_FALSE(partition != NULL, ESP_FAIL, TAG, "no ota partition");
 
@@ -829,7 +838,12 @@ static esp_err_t ota_handler(httpd_req_t *req)
             esp_ota_abort(ota_handle);
             return ESP_FAIL;
         }
-        ESP_RETURN_ON_ERROR(esp_ota_write(ota_handle, chunk, read), TAG, "ota write failed");
+        esp_err_t write_err = esp_ota_write(ota_handle, chunk, read);
+        if (write_err != ESP_OK) {
+            ESP_LOGE(TAG, "ota write failed: %d", write_err);
+            esp_ota_abort(ota_handle);
+            return write_err;
+        }
         remaining -= read;
     }
 

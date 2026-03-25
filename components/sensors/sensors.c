@@ -372,6 +372,7 @@ static esp_err_t sensors_init_sps30(void)
 
 static void sensors_apply_pm_average(const sps30_measurement_t *measurement)
 {
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     s_ctx.pm_history[s_ctx.pm_history_index] = *measurement;
     s_ctx.pm_history_index = (s_ctx.pm_history_index + 1) % PM_HISTORY_LEN;
     if (s_ctx.pm_history_count < PM_HISTORY_LEN) {
@@ -401,7 +402,6 @@ static void sensors_apply_pm_average(const sps30_measurement_t *measurement)
         tps += s_ctx.pm_history[i].typical_particle_size_um;
     }
 
-    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     s_ctx.snapshot.pm_valid = true;
     s_ctx.snapshot.pm1_0 = (float)(pm1 / s_ctx.pm_history_count);
     s_ctx.snapshot.pm2_5 = (float)(pm25 / s_ctx.pm_history_count);
@@ -646,7 +646,7 @@ esp_err_t sensors_get_snapshot(sensor_snapshot_t *snapshot)
     return ESP_OK;
 }
 
-bool sensors_is_ready(void)
+bool sensors_any_ready(void)
 {
     return s_ctx.scd41_initialized || s_ctx.sgp41_initialized || s_ctx.sps30_initialized;
 }
