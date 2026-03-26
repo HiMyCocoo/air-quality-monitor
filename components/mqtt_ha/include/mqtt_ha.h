@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "device_types.h"
@@ -31,3 +32,4 @@ uint16_t mqtt_ha_get_frc_reference_ppm(void);
 esp_err_t mqtt_ha_publish_discovery(void);
 esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_diag_t *diag);
 esp_err_t mqtt_ha_publish_availability(bool online);
+void mqtt_ha_get_last_error(char *buffer, size_t buffer_len);

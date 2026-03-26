@@ -1,6 +1,8 @@
 #include "mqtt_ha.h"
 
+#include <errno.h>
 #include <stdatomic.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,9 +52,41 @@ typedef struct {
     char availability_topic[TOPIC_ROOT_LEN + 32];
     char cmd_prefix[TOPIC_ROOT_LEN + 32];
     char broker_uri[128];
+    char last_error[LAST_ERROR_LEN];
 } mqtt_ctx_t;
 
 static mqtt_ctx_t s_ctx;
+
+static void mqtt_set_last_error(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(s_ctx.last_error, sizeof(s_ctx.last_error), fmt, args);
+    va_end(args);
+}
+
+static void mqtt_clear_last_error(void)
+{
+    s_ctx.last_error[0] = '\0';
+}
+
+static const char *mqtt_connect_return_code_text(int code)
+{
+    switch (code) {
+    case 0x01:
+        return "unacceptable protocol version";
+    case 0x02:
+        return "client id rejected";
+    case 0x03:
+        return "server unavailable";
+    case 0x04:
+        return "bad username or password";
+    case 0x05:
+        return "not authorized";
+    default:
+        return "unknown";
+    }
+}
 
 static const char *co2_compensation_source_key(co2_compensation_source_t source)
 {
@@ -438,10 +472,14 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
+    (void)handler_args;
+    (void)base;
     esp_mqtt_event_handle_t event = event_data;
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         s_ctx.connected = true;
+        mqtt_clear_last_error();
+        ESP_LOGI(TAG, "connected to %s", s_ctx.broker_uri);
         subscribe_commands();
         mqtt_ha_publish_availability(true);
         mqtt_ha_publish_discovery();
@@ -451,9 +489,39 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         s_ctx.connected = false;
+        if (s_ctx.last_error[0] == '\0') {
+            mqtt_set_last_error("MQTT: disconnected from broker");
+        }
+        ESP_LOGW(TAG, "disconnected from %s", s_ctx.broker_uri);
         break;
     case MQTT_EVENT_DATA:
         handle_command(event->topic, event->topic_len, event->data, event->data_len);
+        break;
+    case MQTT_EVENT_ERROR:
+        s_ctx.connected = false;
+        if (event != NULL && event->error_handle != NULL) {
+            if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+                int sock_errno = event->error_handle->esp_transport_sock_errno;
+                const char *sock_text = sock_errno ? strerror(sock_errno) : "n/a";
+                mqtt_set_last_error("MQTT: tcp error errno=%d (%s)", sock_errno, sock_text);
+                ESP_LOGW(TAG,
+                         "MQTT transport error: esp-tls=0x%x tls=0x%x errno=%d (%s)",
+                         event->error_handle->esp_tls_last_esp_err,
+                         event->error_handle->esp_tls_stack_err,
+                         sock_errno,
+                         sock_text);
+            } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+                int code = event->error_handle->connect_return_code;
+                mqtt_set_last_error("MQTT: connect refused (%s)", mqtt_connect_return_code_text(code));
+                ESP_LOGW(TAG, "MQTT connection refused: code=0x%x (%s)", code, mqtt_connect_return_code_text(code));
+            } else {
+                mqtt_set_last_error("MQTT: error type=%d", event->error_handle->error_type);
+                ESP_LOGW(TAG, "MQTT error type=%d", event->error_handle->error_type);
+            }
+        } else {
+            mqtt_set_last_error("MQTT: unknown client error");
+            ESP_LOGW(TAG, "MQTT event error without details");
+        }
         break;
     default:
         break;
@@ -483,6 +551,7 @@ esp_err_t mqtt_ha_start(const device_config_t *config,
     build_topic(s_ctx.cmd_prefix, sizeof(s_ctx.cmd_prefix), "cmd");
 
     snprintf(s_ctx.broker_uri, sizeof(s_ctx.broker_uri), "mqtt://%s:%u", config->mqtt_host, config->mqtt_port);
+    ESP_LOGI(TAG, "starting MQTT client for %s", s_ctx.broker_uri);
 
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = s_ctx.broker_uri,
@@ -515,6 +584,14 @@ void mqtt_ha_stop(void)
 bool mqtt_ha_is_connected(void)
 {
     return s_ctx.connected;
+}
+
+void mqtt_ha_get_last_error(char *buffer, size_t buffer_len)
+{
+    if (buffer == NULL || buffer_len == 0) {
+        return;
+    }
+    strlcpy(buffer, s_ctx.last_error, buffer_len);
 }
 
 void mqtt_ha_set_control_state(bool scd41_asc_enabled, uint16_t frc_reference_ppm)

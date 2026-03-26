@@ -168,9 +168,12 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 ### 1. 默认联网尝试
 
-如果设备里还没有已保存的配置，当前仓库默认不会内置 `Wi-Fi` 凭据。
+如果设备里还没有已保存的配置，固件会先尝试使用内置默认 `Wi-Fi` 凭据联网：
 
-也就是说，首次上电通常会进入 `BLE` 配网流程；只有你自己在私有构建里额外加了默认凭据，设备才会先尝试自动联网。
+- SSID：`<your-wifi-ssid>`
+- 密码：`<your-wifi-password>`
+
+如果默认 `Wi-Fi` 不可用或连接失败，设备才会回退到 `BLE` 配网流程。
 ### 2. BLE 配网回退
 
 没有可用 `Wi-Fi`、默认 `Wi-Fi` 连接失败、或离线超时后，设备会进入 `ESP BLE Prov`。

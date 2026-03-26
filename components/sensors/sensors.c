@@ -250,22 +250,8 @@ static void sensors_mark_sgp41_invalid(void)
     xSemaphoreGive(s_ctx.lock);
 }
 
-static void sensors_reset_scd41(void)
+static void sensors_deinit_scd41_locked(void)
 {
-    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    if (s_ctx.sgp41_initialized && !s_ctx.sgp41.owns_bus && s_ctx.sgp41.bus_handle == s_ctx.scd41.bus_handle) {
-        sgp41_deinit(&s_ctx.sgp41);
-        memset(&s_ctx.sgp41, 0, sizeof(s_ctx.sgp41));
-        s_ctx.sgp41_initialized = false;
-        s_ctx.sgp41_conditioning_remaining_s = 0;
-        sensors_mark_sgp41_invalid_locked();
-    }
-    if (s_ctx.bmp390_initialized && !s_ctx.bmp390.owns_bus && s_ctx.bmp390.bus_handle == s_ctx.scd41.bus_handle) {
-        bmp390_deinit(&s_ctx.bmp390);
-        memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
-        s_ctx.bmp390_initialized = false;
-        sensors_mark_bmp390_invalid_locked();
-    }
     if (s_ctx.scd41.dev_handle != NULL || s_ctx.scd41.bus_handle != NULL) {
         scd41_deinit(&s_ctx.scd41);
     }
@@ -273,18 +259,10 @@ static void sensors_reset_scd41(void)
     s_ctx.scd41_initialized = false;
     s_ctx.scd41_measurement_started_ms = 0;
     sensors_mark_scd41_invalid_locked();
-    xSemaphoreGive(s_ctx.lock);
 }
 
-static void sensors_reset_sgp41(void)
+static void sensors_deinit_sgp41_locked(void)
 {
-    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    if (s_ctx.bmp390_initialized && !s_ctx.bmp390.owns_bus && s_ctx.bmp390.bus_handle == s_ctx.sgp41.bus_handle) {
-        bmp390_deinit(&s_ctx.bmp390);
-        memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
-        s_ctx.bmp390_initialized = false;
-        sensors_mark_bmp390_invalid_locked();
-    }
     if (s_ctx.sgp41.dev_handle != NULL || s_ctx.sgp41.bus_handle != NULL) {
         sgp41_deinit(&s_ctx.sgp41);
     }
@@ -293,6 +271,45 @@ static void sensors_reset_sgp41(void)
     s_ctx.sgp41_conditioning_remaining_s = 0;
     s_ctx.sgp41_measurement_started_ms = 0;
     sensors_mark_sgp41_invalid_locked();
+}
+
+static void sensors_deinit_bmp390_locked(void)
+{
+    if (s_ctx.bmp390.dev_handle != NULL || s_ctx.bmp390.bus_handle != NULL) {
+        bmp390_deinit(&s_ctx.bmp390);
+    }
+    memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
+    s_ctx.bmp390_initialized = false;
+    sensors_mark_bmp390_invalid_locked();
+}
+
+static void sensors_reset_scd41(void)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    if (s_ctx.scd41.owns_bus) {
+        if (s_ctx.sgp41_initialized && !s_ctx.sgp41.owns_bus && s_ctx.sgp41.bus_handle == s_ctx.scd41.bus_handle) {
+            sensors_deinit_sgp41_locked();
+        }
+        if (s_ctx.bmp390_initialized && !s_ctx.bmp390.owns_bus && s_ctx.bmp390.bus_handle == s_ctx.scd41.bus_handle) {
+            sensors_deinit_bmp390_locked();
+        }
+    }
+    sensors_deinit_scd41_locked();
+    xSemaphoreGive(s_ctx.lock);
+}
+
+static void sensors_reset_sgp41(void)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    if (s_ctx.sgp41.owns_bus) {
+        if (s_ctx.scd41_initialized && !s_ctx.scd41.owns_bus && s_ctx.scd41.bus_handle == s_ctx.sgp41.bus_handle) {
+            sensors_deinit_scd41_locked();
+        }
+        if (s_ctx.bmp390_initialized && !s_ctx.bmp390.owns_bus && s_ctx.bmp390.bus_handle == s_ctx.sgp41.bus_handle) {
+            sensors_deinit_bmp390_locked();
+        }
+    }
+    sensors_deinit_sgp41_locked();
     xSemaphoreGive(s_ctx.lock);
 }
 
@@ -357,18 +374,56 @@ static void sensors_update_sgp41_validity_locked(int64_t now_ms)
 static void sensors_reset_bmp390(void)
 {
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    if (s_ctx.bmp390.dev_handle != NULL || s_ctx.bmp390.bus_handle != NULL) {
-        bmp390_deinit(&s_ctx.bmp390);
+    if (s_ctx.bmp390.owns_bus) {
+        if (s_ctx.scd41_initialized && !s_ctx.scd41.owns_bus && s_ctx.scd41.bus_handle == s_ctx.bmp390.bus_handle) {
+            sensors_deinit_scd41_locked();
+        }
+        if (s_ctx.sgp41_initialized && !s_ctx.sgp41.owns_bus && s_ctx.sgp41.bus_handle == s_ctx.bmp390.bus_handle) {
+            sensors_deinit_sgp41_locked();
+        }
     }
-    memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
-    s_ctx.bmp390_initialized = false;
-    sensors_mark_bmp390_invalid_locked();
+    sensors_deinit_bmp390_locked();
     xSemaphoreGive(s_ctx.lock);
 }
 
 static bool sensors_i2c_config_matches(int port_a, int sda_a, int scl_a, int port_b, int sda_b, int scl_b)
 {
     return port_a == port_b && sda_a == sda_b && scl_a == scl_b;
+}
+
+static i2c_master_bus_handle_t sensors_find_shared_i2c_bus_locked(int target_port, int target_sda, int target_scl)
+{
+    if (s_ctx.scd41_initialized &&
+        s_ctx.scd41.bus_handle != NULL &&
+        sensors_i2c_config_matches(target_port,
+                                   target_sda,
+                                   target_scl,
+                                   CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
+                                   CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
+                                   CONFIG_AIRMON_SCD41_I2C_SCL_GPIO)) {
+        return s_ctx.scd41.bus_handle;
+    }
+    if (s_ctx.sgp41_initialized &&
+        s_ctx.sgp41.bus_handle != NULL &&
+        sensors_i2c_config_matches(target_port,
+                                   target_sda,
+                                   target_scl,
+                                   CONFIG_AIRMON_SGP41_I2C_PORT_NUM,
+                                   CONFIG_AIRMON_SGP41_I2C_SDA_GPIO,
+                                   CONFIG_AIRMON_SGP41_I2C_SCL_GPIO)) {
+        return s_ctx.sgp41.bus_handle;
+    }
+    if (s_ctx.bmp390_initialized &&
+        s_ctx.bmp390.bus_handle != NULL &&
+        sensors_i2c_config_matches(target_port,
+                                   target_sda,
+                                   target_scl,
+                                   CONFIG_AIRMON_BMP390_I2C_PORT_NUM,
+                                   CONFIG_AIRMON_BMP390_I2C_SDA_GPIO,
+                                   CONFIG_AIRMON_BMP390_I2C_SCL_GPIO)) {
+        return s_ctx.bmp390.bus_handle;
+    }
+    return NULL;
 }
 
 static void sensors_get_sgp41_compensation_ticks(uint16_t *humidity_ticks, uint16_t *temperature_ticks)
@@ -426,6 +481,7 @@ static esp_err_t sensors_update_scd41_ambient_pressure_locked(float pressure_hpa
 static esp_err_t sensors_init_scd41(void)
 {
     esp_err_t err = ESP_OK;
+    i2c_master_bus_handle_t shared_bus = NULL;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     if (s_ctx.scd41_initialized) {
@@ -435,11 +491,18 @@ static esp_err_t sensors_init_scd41(void)
 
     memset(&s_ctx.scd41, 0, sizeof(s_ctx.scd41));
     sensors_mark_scd41_invalid_locked();
+    shared_bus = sensors_find_shared_i2c_bus_locked(CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
+                                                    CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
+                                                    CONFIG_AIRMON_SCD41_I2C_SCL_GPIO);
 
-    err = scd41_init(&s_ctx.scd41,
-                     CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
-                     CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
-                     CONFIG_AIRMON_SCD41_I2C_SCL_GPIO);
+    if (shared_bus != NULL) {
+        err = scd41_init_on_bus(&s_ctx.scd41, shared_bus);
+    } else {
+        err = scd41_init(&s_ctx.scd41,
+                         CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
+                         CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
+                         CONFIG_AIRMON_SCD41_I2C_SCL_GPIO);
+    }
     if (err == ESP_OK) {
         err = scd41_stop_periodic_measurement(&s_ctx.scd41);
     }
@@ -475,6 +538,7 @@ static esp_err_t sensors_init_sgp41(void)
 {
     uint16_t serial_number[3] = {0};
     esp_err_t err = ESP_OK;
+    i2c_master_bus_handle_t shared_bus = NULL;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     if (s_ctx.sgp41_initialized) {
@@ -484,15 +548,12 @@ static esp_err_t sensors_init_sgp41(void)
 
     memset(&s_ctx.sgp41, 0, sizeof(s_ctx.sgp41));
     sensors_mark_sgp41_invalid_locked();
+    shared_bus = sensors_find_shared_i2c_bus_locked(CONFIG_AIRMON_SGP41_I2C_PORT_NUM,
+                                                    CONFIG_AIRMON_SGP41_I2C_SDA_GPIO,
+                                                    CONFIG_AIRMON_SGP41_I2C_SCL_GPIO);
 
-    if (s_ctx.scd41_initialized &&
-        sensors_i2c_config_matches(CONFIG_AIRMON_SGP41_I2C_PORT_NUM,
-                                   CONFIG_AIRMON_SGP41_I2C_SDA_GPIO,
-                                   CONFIG_AIRMON_SGP41_I2C_SCL_GPIO,
-                                   CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
-                                   CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
-                                   CONFIG_AIRMON_SCD41_I2C_SCL_GPIO)) {
-        err = sgp41_init_on_bus(&s_ctx.sgp41, s_ctx.scd41.bus_handle);
+    if (shared_bus != NULL) {
+        err = sgp41_init_on_bus(&s_ctx.sgp41, shared_bus);
     } else {
         err = sgp41_init(&s_ctx.sgp41,
                          CONFIG_AIRMON_SGP41_I2C_PORT_NUM,
@@ -524,6 +585,7 @@ static esp_err_t sensors_init_sgp41(void)
 static esp_err_t sensors_init_bmp390(void)
 {
     esp_err_t err = ESP_OK;
+    i2c_master_bus_handle_t shared_bus = NULL;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     if (s_ctx.bmp390_initialized) {
@@ -533,23 +595,12 @@ static esp_err_t sensors_init_bmp390(void)
 
     memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
     sensors_mark_bmp390_invalid_locked();
+    shared_bus = sensors_find_shared_i2c_bus_locked(CONFIG_AIRMON_BMP390_I2C_PORT_NUM,
+                                                    CONFIG_AIRMON_BMP390_I2C_SDA_GPIO,
+                                                    CONFIG_AIRMON_BMP390_I2C_SCL_GPIO);
 
-    if (s_ctx.scd41_initialized &&
-        sensors_i2c_config_matches(CONFIG_AIRMON_BMP390_I2C_PORT_NUM,
-                                   CONFIG_AIRMON_BMP390_I2C_SDA_GPIO,
-                                   CONFIG_AIRMON_BMP390_I2C_SCL_GPIO,
-                                   CONFIG_AIRMON_SCD41_I2C_PORT_NUM,
-                                   CONFIG_AIRMON_SCD41_I2C_SDA_GPIO,
-                                   CONFIG_AIRMON_SCD41_I2C_SCL_GPIO)) {
-        err = bmp390_init_on_bus(&s_ctx.bmp390, s_ctx.scd41.bus_handle, CONFIG_AIRMON_BMP390_I2C_ADDRESS);
-    } else if (s_ctx.sgp41_initialized &&
-               sensors_i2c_config_matches(CONFIG_AIRMON_BMP390_I2C_PORT_NUM,
-                                          CONFIG_AIRMON_BMP390_I2C_SDA_GPIO,
-                                          CONFIG_AIRMON_BMP390_I2C_SCL_GPIO,
-                                          CONFIG_AIRMON_SGP41_I2C_PORT_NUM,
-                                          CONFIG_AIRMON_SGP41_I2C_SDA_GPIO,
-                                          CONFIG_AIRMON_SGP41_I2C_SCL_GPIO)) {
-        err = bmp390_init_on_bus(&s_ctx.bmp390, s_ctx.sgp41.bus_handle, CONFIG_AIRMON_BMP390_I2C_ADDRESS);
+    if (shared_bus != NULL) {
+        err = bmp390_init_on_bus(&s_ctx.bmp390, shared_bus, CONFIG_AIRMON_BMP390_I2C_ADDRESS);
     } else {
         err = bmp390_init(&s_ctx.bmp390,
                           CONFIG_AIRMON_BMP390_I2C_PORT_NUM,

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "esp_check.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -42,6 +43,8 @@ typedef struct {
     uint8_t state;
     uint8_t data_len;
 } sps30_shdlc_rx_header_t;
+
+static const char *TAG = "sps30";
 
 static uint8_t sps30_shdlc_crc(uint8_t header_sum, uint8_t data_len, const uint8_t *data)
 {
@@ -295,20 +298,40 @@ void sps30_deinit(sps30_t *sensor)
 
 esp_err_t sps30_start_measurement(sps30_t *sensor)
 {
-    sps30_shdlc_rx_header_t header = {0};
     uint8_t payload[2] = {SPS30_SUBCMD_MEASUREMENT_START_0, SPS30_SUBCMD_MEASUREMENT_START_1};
+    sps30_shdlc_rx_header_t header = {0};
+    esp_err_t err = ESP_OK;
 
-    ESP_RETURN_ON_ERROR(sps30_shdlc_xcv(sensor,
-                                        SPS30_SHDLC_ADDR,
-                                        SPS30_CMD_START_MEASUREMENT,
-                                        sizeof(payload),
-                                        payload,
-                                        0,
-                                        &header,
-                                        NULL),
-                        "sps30",
-                        "start measurement failed");
-    ESP_RETURN_ON_FALSE(header.state == 0, ESP_FAIL, "sps30", "start measurement rejected");
+    err = sps30_shdlc_xcv(sensor,
+                          SPS30_SHDLC_ADDR,
+                          SPS30_CMD_START_MEASUREMENT,
+                          sizeof(payload),
+                          payload,
+                          0,
+                          &header,
+                          NULL);
+    ESP_RETURN_ON_ERROR(err, "sps30", "start measurement failed");
+    if (header.state != 0) {
+        ESP_LOGW(TAG, "start measurement returned state 0x%02x, attempting recovery", header.state);
+
+        err = sps30_stop_measurement(sensor);
+        if (err != ESP_OK) {
+            err = sps30_wake_up_sequence(sensor);
+        }
+        if (err == ESP_OK) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            err = sps30_shdlc_xcv(sensor,
+                                  SPS30_SHDLC_ADDR,
+                                  SPS30_CMD_START_MEASUREMENT,
+                                  sizeof(payload),
+                                  payload,
+                                  0,
+                                  &header,
+                                  NULL);
+        }
+        ESP_RETURN_ON_ERROR(err, "sps30", "start measurement recovery failed");
+    }
+    ESP_RETURN_ON_FALSE(header.state == 0, ESP_ERR_INVALID_STATE, "sps30", "start measurement rejected");
     sensor->measuring = true;
     sensor->sleeping = false;
     sensor->last_measurement_request_ms = esp_timer_get_time() / 1000;

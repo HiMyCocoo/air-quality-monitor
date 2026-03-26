@@ -221,6 +221,9 @@ static void status_led_task(void *arg)
 
 static void app_fill_diag(device_diag_t *diag)
 {
+    char sensor_error[LAST_ERROR_LEN] = {0};
+    char mqtt_error[LAST_ERROR_LEN] = {0};
+
     memset(diag, 0, sizeof(*diag));
     diag->provisioning_mode = s_app.provisioning_mode;
     diag->wifi_connected = platform_wifi_is_connected();
@@ -239,7 +242,18 @@ static void app_fill_diag(device_diag_t *diag)
     strlcpy(diag->device_id, s_app.device_id, sizeof(diag->device_id));
     strlcpy(diag->firmware_version, s_app.firmware_version, sizeof(diag->firmware_version));
     platform_wifi_get_ip(diag->ip_addr, sizeof(diag->ip_addr));
-    sensors_get_last_error(diag->last_error, sizeof(diag->last_error));
+    sensors_get_last_error(sensor_error, sizeof(sensor_error));
+    mqtt_ha_get_last_error(mqtt_error, sizeof(mqtt_error));
+
+    if (mqtt_error[0] != '\0') {
+        strlcpy(diag->last_error, mqtt_error, sizeof(diag->last_error));
+    }
+    if (sensor_error[0] != '\0') {
+        if (diag->last_error[0] != '\0') {
+            strlcat(diag->last_error, " | ", sizeof(diag->last_error));
+        }
+        strlcat(diag->last_error, sensor_error, sizeof(diag->last_error));
+    }
 }
 
 static void app_fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, device_config_t *config, uint16_t *frc_ppm, void *user_ctx)

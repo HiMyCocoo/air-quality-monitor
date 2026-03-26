@@ -4,10 +4,13 @@
 #include <string.h>
 
 #include "esp_check.h"
+#include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 
 #define BMP390_I2C_TIMEOUT_MS 1000
+
+static const char *TAG = "bmp390";
 
 static esp_err_t bmp390_result_to_esp_err(int8_t result)
 {
@@ -139,10 +142,41 @@ static esp_err_t bmp390_attach_device(bmp390_t *sensor, i2c_master_bus_handle_t 
     return err;
 }
 
+static uint8_t bmp390_alternate_address(uint8_t address)
+{
+    return address == 0x76 ? 0x77 : 0x76;
+}
+
+static esp_err_t bmp390_attach_with_fallback(bmp390_t *sensor, i2c_master_bus_handle_t bus_handle, uint8_t preferred_address)
+{
+    esp_err_t err = bmp390_attach_device(sensor, bus_handle, false, preferred_address);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "initialized on I2C address 0x%02x", sensor->address);
+        return ESP_OK;
+    }
+
+    if (err != ESP_ERR_NOT_FOUND && err != ESP_FAIL) {
+        return err;
+    }
+
+    uint8_t alternate_address = bmp390_alternate_address(preferred_address);
+    ESP_LOGW(TAG,
+             "init failed on I2C address 0x%02x (%s), trying 0x%02x",
+             preferred_address,
+             esp_err_to_name(err),
+             alternate_address);
+
+    err = bmp390_attach_device(sensor, bus_handle, false, alternate_address);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "initialized on fallback I2C address 0x%02x", sensor->address);
+    }
+    return err;
+}
+
 esp_err_t bmp390_init_on_bus(bmp390_t *sensor, i2c_master_bus_handle_t bus_handle, uint8_t address)
 {
     ESP_RETURN_ON_FALSE(sensor != NULL && bus_handle != NULL, ESP_ERR_INVALID_ARG, "bmp390", "invalid arguments");
-    return bmp390_attach_device(sensor, bus_handle, false, address);
+    return bmp390_attach_with_fallback(sensor, bus_handle, address);
 }
 
 esp_err_t bmp390_init(bmp390_t *sensor, int i2c_port, int sda_gpio, int scl_gpio, uint8_t address)
@@ -159,7 +193,15 @@ esp_err_t bmp390_init(bmp390_t *sensor, int i2c_port, int sda_gpio, int scl_gpio
         .flags.enable_internal_pullup = true,
     };
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_config, &bus_handle), "bmp390", "new bus failed");
-    return bmp390_attach_device(sensor, bus_handle, true, address);
+
+    esp_err_t err = bmp390_attach_with_fallback(sensor, bus_handle, address);
+    if (err != ESP_OK) {
+        i2c_del_master_bus(bus_handle);
+        return err;
+    }
+
+    sensor->owns_bus = true;
+    return ESP_OK;
 }
 
 void bmp390_deinit(bmp390_t *sensor)
