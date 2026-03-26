@@ -6,8 +6,7 @@
 
 - `SPS30` 保留 `UART`
 - `SCD41`、`SGP41`、`BMP390` 通过 `I2C` 分线器共用一条 `I2C` 总线接入 `ESP32-S3`
-- `BMP390` 提供温度和气压，气压优先用于 `SCD41` 的 `CO2` 运行时补偿
-- `BMP390` 不可用时，`SCD41` 回退到后台配置的备用海拔补偿
+- `BMP390` 提供温度和气压，当前用于本地管理后台、诊断状态和 `Home Assistant` 遥测展示
 - 设备连网后提供本地管理后台，并通过 `MQTT Discovery` 接入 `Home Assistant`
 
 旧版“双 I2C 总线”接法不再作为当前项目方案。
@@ -21,7 +20,7 @@
 - `SPS30`：`0.5 / 1.0 / 2.5 / 4.0 / 10 μm` 粒子数浓度
 - `SPS30`：`典型粒径`
 - 总体空气质量评估：优先使用 `PM AQI` 估算，并补充 `CO2 / 湿度 / VOC / NOx` 的解释性状态
-- 管理后台和 `Home Assistant` 同时展示 `BMP390` 温度、气压、传感器状态以及 `CO2` 补偿来源
+- 管理后台和 `Home Assistant` 同时展示 `BMP390` 温度、气压、传感器状态
 - 允许缺少部分传感器继续运行；单个传感器异常时，其余在线传感器继续上报
 - 板载 `WS2812 RGB`（`GPIO48`）用于实时空气质量状态指示
 
@@ -79,18 +78,16 @@
 - 所有 `GND` 必须共地
 - 板载 `RGB` 是开发板自带的，不需要外接
 
-## CO2 气压补偿策略
+## SCD41 补偿说明
 
-`SCD41` 的补偿策略分两层：
+当前固件对 `SCD41` 已接入的补偿项有两项：
 
-1. 启动或重置时先应用 `SCD41` 温度偏移和备用海拔补偿
-2. 运行过程中如果 `BMP390` 有有效气压，则优先用当前气压对 `CO2` 做补偿
+1. `SCD41` 海拔补偿
+2. `SCD41` 温度偏移
 
-这意味着：
+它们会在启动时加载，并在你通过管理后台保存配置后立即下发到传感器。
 
-- `BMP390` 正常时，`CO2` 补偿来源是 `BMP390`
-- `BMP390` 缺失、未就绪或读数无效时，`CO2` 继续输出，但补偿来源回退到备用海拔补偿
-- 后台里原本的 `SCD41` 海拔配置，现在语义是“仅在 `BMP390` 不可用时使用的备用海拔补偿”
+当前 `BMP390` 已经完成采集、状态诊断、本地页面展示和 `MQTT / Home Assistant` 上报，但还没有接入 `SCD41` 的运行时 `CO2` 气压补偿链路。
 
 ## 烧录
 
@@ -184,10 +181,9 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - 设备状态、联网状态、最近错误
 - `CO2 / 温度 / 相对湿度 / VOC / NOx / PM / 粒子数 / 典型粒径`
 - `BMP390` 温度、当前气压、`BMP390 Ready`、`BMP390 Valid`
-- `CO2` 补偿来源和当前补偿状态
 - `Wi-Fi / MQTT URL` 配置
 - `SCD41` 温度偏移
-- `SCD41` 备用海拔补偿
+- `SCD41` 海拔补偿
 - `SCD41 ASC`
 - `SCD41 FRC`
 - `SPS30` 休眠 / 唤醒
@@ -200,7 +196,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 配置语义说明：
 
 - `SCD41 温度偏移`：始终生效
-- `SCD41 备用海拔补偿`：仅在 `BMP390` 气压不可用时作为回退补偿
+- `SCD41 海拔补偿`：当前直接作为 `SCD41` 的补偿配置项使用
 
 当前网页管理端口不带登录认证，只适合你信任的局域网。
 
@@ -241,7 +237,6 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 - `SCD41 / SGP41 / BMP390 / SPS30 / RGB 状态灯` 在线状态
 - `SCD41 / SGP41 / BMP390 / PM` 数据有效状态
 - `BMP390 Ready / BMP390 Valid`
-- `CO2` 补偿来源：`bmp390 / altitude_fallback / none`
 - `SCD41 ASC`
 - `SPS30 Sleep`
 - `SPS30 Fan Cleaning`
@@ -251,7 +246,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 ## 运行说明
 
 - 缺少某一颗传感器时，系统仍会启动，其他在线传感器继续工作
-- `BMP390` 不可用不会阻断 `CO2` 输出，只会让补偿策略回退到备用海拔补偿
+- `BMP390` 不可用不会阻断其他传感器上报；本地后台和 `MQTT` 中的气压 / `BMP390` 温度字段会显示为空，`BMP390 Ready / Valid` 会反映当前状态
 - `SGP41` 上电后会先经历一小段 `NOx` 调理期，随后进入算法学习阶段
 - `All Sensors Ready` 的语义应理解为四个物理传感器都 ready：`SCD41 / SGP41 / BMP390 / SPS30`
 - `CO2 Ventilation Status` 是通风状态分级；`VOC / NOx Event Level` 基于 `Sensirion` 指数的相对事件强度，不代表绝对浓度

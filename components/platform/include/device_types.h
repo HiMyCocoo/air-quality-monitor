@@ -41,11 +41,14 @@ typedef struct {
   bool scd41_valid;
   bool sgp41_valid;
   bool sgp41_conditioning;
+  bool bmp390_valid;
   bool pm_valid;
   bool sps30_sleeping;
   uint16_t co2_ppm;
   float temperature_c;
   float humidity_rh;
+  float bmp390_temperature_c;
+  float pressure_hpa;
   int32_t voc_index;
   int32_t nox_index;
   float pm1_0;
@@ -68,6 +71,7 @@ typedef struct {
   bool sensors_ready;
   bool scd41_ready;
   bool sgp41_ready;
+  bool bmp390_ready;
   bool sps30_ready;
   bool status_led_ready;
   bool status_led_enabled;

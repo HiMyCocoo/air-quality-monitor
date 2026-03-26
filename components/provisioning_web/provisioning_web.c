@@ -414,6 +414,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(diag_json, "sensors_ready", diag.sensors_ready);
     cJSON_AddBoolToObject(diag_json, "scd41_ready", diag.scd41_ready);
     cJSON_AddBoolToObject(diag_json, "sgp41_ready", diag.sgp41_ready);
+    cJSON_AddBoolToObject(diag_json, "bmp390_ready", diag.bmp390_ready);
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag.sps30_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_ready", diag.status_led_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_enabled", diag.status_led_enabled);
@@ -430,6 +431,7 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(snapshot_json, "scd41_valid", snapshot.scd41_valid);
     cJSON_AddBoolToObject(snapshot_json, "sgp41_valid", snapshot.sgp41_valid);
     cJSON_AddBoolToObject(snapshot_json, "sgp41_conditioning", snapshot.sgp41_conditioning);
+    cJSON_AddBoolToObject(snapshot_json, "bmp390_valid", snapshot.bmp390_valid);
     cJSON_AddBoolToObject(snapshot_json, "pm_valid", snapshot.pm_valid);
     if (snapshot.scd41_valid) {
         cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
@@ -461,6 +463,13 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNullToObject(snapshot_json, "voc_rating");
         cJSON_AddNullToObject(snapshot_json, "nox_index");
         cJSON_AddNullToObject(snapshot_json, "nox_rating");
+    }
+    if (snapshot.bmp390_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "bmp390_temperature_c", snapshot.bmp390_temperature_c);
+        cJSON_AddNumberToObject(snapshot_json, "pressure_hpa", snapshot.pressure_hpa);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "bmp390_temperature_c");
+        cJSON_AddNullToObject(snapshot_json, "pressure_hpa");
     }
     if (snapshot.pm_valid) {
         cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);

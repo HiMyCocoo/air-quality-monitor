@@ -26,6 +26,24 @@ config AIRMON_SGP41_I2C_SCL_GPIO
     int "SGP41 I2C SCL GPIO"
     default 12
 
+config AIRMON_BMP390_I2C_PORT_NUM
+    int "BMP390 I2C port"
+    range 0 1
+    default 0
+
+config AIRMON_BMP390_I2C_SDA_GPIO
+    int "BMP390 I2C SDA GPIO"
+    default 8
+
+config AIRMON_BMP390_I2C_SCL_GPIO
+    int "BMP390 I2C SCL GPIO"
+    default 9
+
+config AIRMON_BMP390_I2C_ADDRESS
+    hex "BMP390 I2C address"
+    range 0x76 0x77
+    default 0x77
+
 config AIRMON_SPS30_UART_PORT_NUM
     int "SPS30 UART port"
     range 0 2

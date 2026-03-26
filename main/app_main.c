@@ -225,9 +225,10 @@ static void app_fill_diag(device_diag_t *diag)
     diag->provisioning_mode = s_app.provisioning_mode;
     diag->wifi_connected = platform_wifi_is_connected();
     diag->mqtt_connected = mqtt_ha_is_connected();
-    diag->sensors_ready = sensors_any_ready();
+    diag->sensors_ready = sensors_all_ready();
     diag->scd41_ready = sensors_is_scd41_ready();
     diag->sgp41_ready = sensors_is_sgp41_ready();
+    diag->bmp390_ready = sensors_is_bmp390_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
     diag->status_led_ready = s_status_led.initialized;
     diag->status_led_enabled = s_app.status_led_enabled;

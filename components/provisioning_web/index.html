@@ -1981,6 +1981,7 @@
       overviewModulesEl.innerHTML = [
         kv('SCD41', d.diag.scd41_ready ? '在线' : '离线'),
         kv('SGP41', d.diag.sgp41_ready ? '在线' : '离线'),
+        kv('BMP390', d.diag.bmp390_ready ? (d.snapshot.bmp390_valid ? '在线' : '已连接') : '离线'),
         kv('SPS30', d.diag.sps30_ready ? (d.snapshot.sps30_sleeping ? '休眠中' : '在线') : '离线'),
         kv('RGB 灯', d.diag.status_led_ready ? (d.diag.status_led_enabled ? '开启' : '关闭') : '不可用')
       ].join('');
@@ -1988,6 +1989,7 @@
       overviewSystemEl.innerHTML = [
         kv('设备标识', d.diag.device_id),
         kv('固件版本', d.diag.firmware_version),
+        kv('当前气压', num(d.snapshot.pressure_hpa, 1, ' hPa')),
         kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec)),
         kv('系统内存', `${(d.diag.heap_free / 1024).toFixed(1)} KB 空闲`)
       ].join('');
@@ -2011,6 +2013,8 @@
       airMetricsSecondaryEl.innerHTML = [
         metric('室内温度', num(d.snapshot.temperature_c, 1), translate(comfortLabels, d.snapshot.temperature_rating, '--'), 'secondary', '°C'),
         metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
+        metric('当前气压', num(d.snapshot.pressure_hpa, 1), d.snapshot.bmp390_valid ? 'BMP390' : (d.diag.bmp390_ready ? '已连接' : '离线'), 'secondary', 'hPa'),
+        metric('BMP390 温度', num(d.snapshot.bmp390_temperature_c, 1), d.snapshot.bmp390_valid ? '气压传感器' : '暂不可用', 'secondary', '°C'),
         metric('VOC 指数 (Sensirion)', num(d.snapshot.voc_index), translate(vocSignalLabels, d.snapshot.voc_rating), 'secondary', 'index'),
         metric('NOx 指数 (Sensirion)', num(d.snapshot.nox_index), translate(noxSignalLabels, d.snapshot.nox_rating), 'secondary', 'index')
       ].join('');

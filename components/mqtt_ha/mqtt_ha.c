@@ -61,6 +61,8 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"temperature_rating", "Temperature Rating", "temperature_rating", NULL, NULL, NULL, NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
     {"humidity_rating", "Humidity Rating", "humidity_rating", NULL, NULL, NULL, NULL, false},
+    {"bmp390_temperature", "BMP390 Temperature", "bmp390_temperature", "°C", "temperature", "measurement", NULL, false},
+    {"pressure", "Pressure", "pressure", "hPa", "atmospheric_pressure", "measurement", NULL, false},
     {"voc_index", "VOC Index (Sensirion)", "voc_index", NULL, NULL, "measurement", NULL, false},
     {"voc_rating", "VOC Event Level (Sensirion)", "voc_rating", NULL, NULL, NULL, NULL, false},
     {"nox_index", "NOx Index (Sensirion)", "nox_index", NULL, NULL, "measurement", NULL, false},
@@ -105,22 +107,19 @@ static const binary_sensor_entity_t BINARY_SENSOR_ENTITIES[] = {
     {"sensors_ready", "All Sensors Ready", "sensors_ready", NULL, "diagnostic", true},
     {"scd41_ready", "SCD41 Ready", "scd41_ready", "connectivity", "diagnostic", true},
     {"sgp41_ready", "SGP41 Ready", "sgp41_ready", "connectivity", "diagnostic", true},
+    {"bmp390_ready", "BMP390 Ready", "bmp390_ready", "connectivity", "diagnostic", true},
     {"sps30_ready", "SPS30 Ready", "sps30_ready", "connectivity", "diagnostic", true},
     {"status_led_ready", "Status LED Ready", "status_led_ready", NULL, "diagnostic", true},
     {"scd41_valid", "SCD41 Sample Valid", "scd41_valid", NULL, "diagnostic", false},
     {"sgp41_valid", "SGP41 Sample Valid", "sgp41_valid", NULL, "diagnostic", false},
     {"sgp41_conditioning", "SGP41 Conditioning", "sgp41_conditioning", "running", "diagnostic", false},
+    {"bmp390_valid", "BMP390 Sample Valid", "bmp390_valid", NULL, "diagnostic", false},
     {"pm_valid", "Particle Sample Valid", "pm_valid", NULL, "diagnostic", false},
 };
 
 static void build_topic(char *buffer, size_t buffer_len, const char *suffix)
 {
     snprintf(buffer, buffer_len, "%s/%s", s_ctx.config.topic_root, suffix);
-}
-
-static bool topic_equals(const char *topic, int topic_len, const char *expected)
-{
-    return (int)strlen(expected) == topic_len && strncmp(topic, expected, topic_len) == 0;
 }
 
 static char *json_to_string(cJSON *json)
@@ -560,6 +559,7 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(state, "scd41_valid", snapshot->scd41_valid);
     cJSON_AddBoolToObject(state, "sgp41_valid", snapshot->sgp41_valid);
     cJSON_AddBoolToObject(state, "sgp41_conditioning", snapshot->sgp41_conditioning);
+    cJSON_AddBoolToObject(state, "bmp390_valid", snapshot->bmp390_valid);
     cJSON_AddBoolToObject(state, "pm_valid", snapshot->pm_valid);
     if (snapshot->scd41_valid) {
         co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
@@ -591,6 +591,13 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "voc_rating");
         cJSON_AddNullToObject(state, "nox_index");
         cJSON_AddNullToObject(state, "nox_rating");
+    }
+    if (snapshot->bmp390_valid) {
+        cJSON_AddNumberToObject(state, "bmp390_temperature", snapshot->bmp390_temperature_c);
+        cJSON_AddNumberToObject(state, "pressure", snapshot->pressure_hpa);
+    } else {
+        cJSON_AddNullToObject(state, "bmp390_temperature");
+        cJSON_AddNullToObject(state, "pressure");
     }
     if (snapshot->pm_valid) {
         cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
@@ -655,6 +662,7 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(diag_json, "sensors_ready", diag->sensors_ready);
     cJSON_AddBoolToObject(diag_json, "scd41_ready", diag->scd41_ready);
     cJSON_AddBoolToObject(diag_json, "sgp41_ready", diag->sgp41_ready);
+    cJSON_AddBoolToObject(diag_json, "bmp390_ready", diag->bmp390_ready);
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag->sps30_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_ready", diag->status_led_ready);
     if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {
