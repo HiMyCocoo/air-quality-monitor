@@ -37,6 +37,12 @@ typedef struct {
   bool pms_control_pins_enabled;
 } device_config_t;
 
+typedef enum {
+  CO2_COMPENSATION_SOURCE_NONE = 0,
+  CO2_COMPENSATION_SOURCE_ALTITUDE,
+  CO2_COMPENSATION_SOURCE_BMP390,
+} co2_compensation_source_t;
+
 typedef struct {
   bool scd41_valid;
   bool sgp41_valid;
@@ -44,6 +50,7 @@ typedef struct {
   bool bmp390_valid;
   bool pm_valid;
   bool sps30_sleeping;
+  co2_compensation_source_t co2_compensation_source;
   uint16_t co2_ppm;
   float temperature_c;
   float humidity_rh;

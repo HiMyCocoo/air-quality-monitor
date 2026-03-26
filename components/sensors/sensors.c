@@ -18,6 +18,7 @@
 
 #define PM_HISTORY_LEN 6
 #define SCD41_FRC_STABILIZATION_MS (180000LL)
+#define SCD41_PRESSURE_COMPENSATION_FALLBACK_MS (15000LL)
 #define SGP41_CONDITIONING_SEC 10
 #define SGP41_DEFAULT_HUMIDITY_TICKS 0x8000
 #define SGP41_DEFAULT_TEMPERATURE_TICKS 0x6666
@@ -51,11 +52,34 @@ typedef struct {
     size_t pm_history_count;
     size_t pm_history_index;
     int64_t scd41_measurement_started_ms;
+    int64_t co2_compensation_updated_at_ms;
     int64_t sps30_warmup_until_ms;
+    uint32_t co2_compensation_pressure_pa;
     uint8_t sgp41_conditioning_remaining_s;
 } sensors_ctx_t;
 
 static sensors_ctx_t s_ctx;
+
+static void sensors_clear_co2_compensation_locked(void)
+{
+    s_ctx.snapshot.co2_compensation_source = CO2_COMPENSATION_SOURCE_NONE;
+    s_ctx.co2_compensation_pressure_pa = 0;
+    s_ctx.co2_compensation_updated_at_ms = 0;
+}
+
+static void sensors_set_static_co2_compensation_locked(void)
+{
+    s_ctx.snapshot.co2_compensation_source = CO2_COMPENSATION_SOURCE_ALTITUDE;
+    s_ctx.co2_compensation_pressure_pa = 0;
+    s_ctx.co2_compensation_updated_at_ms = 0;
+}
+
+static void sensors_set_bmp390_co2_compensation_locked(uint32_t pressure_pa, int64_t now_ms)
+{
+    s_ctx.snapshot.co2_compensation_source = CO2_COMPENSATION_SOURCE_BMP390;
+    s_ctx.co2_compensation_pressure_pa = pressure_pa;
+    s_ctx.co2_compensation_updated_at_ms = now_ms;
+}
 
 static void sensors_refresh_last_error_locked(void)
 {
@@ -90,6 +114,7 @@ static void sensors_refresh_last_error_locked(void)
 static void sensors_mark_scd41_invalid_locked(void)
 {
     s_ctx.snapshot.scd41_valid = false;
+    sensors_clear_co2_compensation_locked();
     s_ctx.snapshot.co2_ppm = 0;
     s_ctx.snapshot.temperature_c = 0.0f;
     s_ctx.snapshot.humidity_rh = 0.0f;
@@ -323,6 +348,31 @@ static void sensors_get_sgp41_compensation_ticks(uint16_t *humidity_ticks, uint1
     *temperature_ticks = (uint16_t)(((temperature + 45.0f) * 65535.0f) / 175.0f + 0.5f);
 }
 
+static esp_err_t sensors_update_scd41_ambient_pressure_locked(float pressure_hpa, int64_t now_ms)
+{
+    if (!s_ctx.scd41_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    uint32_t pressure_pa = (uint32_t)(pressure_hpa * 100.0f + 0.5f);
+    if (pressure_pa < 70000U || pressure_pa > 120000U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint32_t applied_pressure_pa = ((pressure_pa + 50U) / 100U) * 100U;
+    if (s_ctx.snapshot.co2_compensation_source == CO2_COMPENSATION_SOURCE_BMP390 &&
+        s_ctx.co2_compensation_pressure_pa == applied_pressure_pa) {
+        s_ctx.co2_compensation_updated_at_ms = now_ms;
+        return ESP_OK;
+    }
+
+    esp_err_t err = scd41_set_ambient_pressure(&s_ctx.scd41, pressure_pa);
+    if (err == ESP_OK) {
+        sensors_set_bmp390_co2_compensation_locked(applied_pressure_pa, now_ms);
+    }
+    return err;
+}
+
 static esp_err_t sensors_init_scd41(void)
 {
     esp_err_t err = ESP_OK;
@@ -357,6 +407,7 @@ static esp_err_t sensors_init_scd41(void)
     }
     if (err == ESP_OK) {
         s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
+        sensors_set_static_co2_compensation_locked();
         s_ctx.scd41_initialized = true;
     } else if (s_ctx.scd41.dev_handle != NULL || s_ctx.scd41.bus_handle != NULL) {
         scd41_deinit(&s_ctx.scd41);
@@ -646,12 +697,49 @@ static void sensor_task(void *arg)
             }
             xSemaphoreGive(s_ctx.lock);
 
-            if (err == ESP_OK && ready && measurement_ok) {
+        if (err == ESP_OK && ready && measurement_ok) {
+                bool scd41_ready = false;
+                esp_err_t compensation_err = ESP_OK;
+
+                xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+                scd41_ready = s_ctx.scd41_initialized;
+                if (scd41_ready) {
+                    compensation_err = sensors_update_scd41_ambient_pressure_locked(pressure, now_ms);
+                }
+                xSemaphoreGive(s_ctx.lock);
+
                 sensors_apply_bmp390_measurement(temperature, pressure, now_ms);
                 sensors_clear_bmp390_error();
+                if (scd41_ready && compensation_err != ESP_OK) {
+                    sensors_set_scd41_error(compensation_err == ESP_ERR_INVALID_ARG
+                                                ? "ambient pressure out of range"
+                                                : "ambient pressure update failed");
+                }
             } else if (err != ESP_OK) {
                 sensors_reset_bmp390();
                 sensors_set_bmp390_error(ready ? "read failed" : "ready check failed");
+            }
+        }
+
+        uint16_t fallback_altitude_m = 0;
+        float fallback_temp_offset_c = 0.0f;
+        bool restore_static_compensation = false;
+
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+        if (s_ctx.scd41_initialized &&
+            s_ctx.snapshot.co2_compensation_source == CO2_COMPENSATION_SOURCE_BMP390 &&
+            s_ctx.co2_compensation_updated_at_ms > 0 &&
+            (now_ms - s_ctx.co2_compensation_updated_at_ms) >= SCD41_PRESSURE_COMPENSATION_FALLBACK_MS) {
+            fallback_altitude_m = s_ctx.config.scd41_altitude_m;
+            fallback_temp_offset_c = s_ctx.config.scd41_temp_offset_c;
+            restore_static_compensation = true;
+        }
+        xSemaphoreGive(s_ctx.lock);
+
+        if (restore_static_compensation) {
+            if (sensors_set_scd41_compensation(fallback_altitude_m, fallback_temp_offset_c) != ESP_OK) {
+                sensors_reset_scd41();
+                sensors_set_scd41_error("fallback compensation restore failed");
             }
         }
 
@@ -945,6 +1033,7 @@ esp_err_t sensors_set_scd41_compensation(uint16_t altitude_m, float temp_offset_
         s_ctx.config.scd41_altitude_m = altitude_m;
         s_ctx.config.scd41_temp_offset_c = temp_offset_c;
         s_ctx.scd41_measurement_started_ms = esp_timer_get_time() / 1000;
+        sensors_set_static_co2_compensation_locked();
     }
     xSemaphoreGive(s_ctx.lock);
 

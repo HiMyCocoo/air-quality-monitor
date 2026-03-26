@@ -20,6 +20,7 @@ esp_err_t scd41_stop_periodic_measurement(scd41_t *sensor);
 esp_err_t scd41_start_periodic_measurement(scd41_t *sensor);
 esp_err_t scd41_set_temperature_offset(scd41_t *sensor, float offset_c);
 esp_err_t scd41_set_sensor_altitude(scd41_t *sensor, uint16_t altitude_m);
+esp_err_t scd41_set_ambient_pressure(scd41_t *sensor, uint32_t ambient_pressure_pa);
 esp_err_t scd41_set_automatic_self_calibration(scd41_t *sensor, bool enabled);
 esp_err_t scd41_data_ready(scd41_t *sensor, bool *ready);
 esp_err_t scd41_read_measurement(scd41_t *sensor, uint16_t *co2_ppm,

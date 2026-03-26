@@ -384,6 +384,19 @@ static void fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, device
     }
 }
 
+static const char *co2_compensation_source_key(co2_compensation_source_t source)
+{
+    switch (source) {
+    case CO2_COMPENSATION_SOURCE_ALTITUDE:
+        return "altitude";
+    case CO2_COMPENSATION_SOURCE_BMP390:
+        return "bmp390";
+    case CO2_COMPENSATION_SOURCE_NONE:
+    default:
+        return "none";
+    }
+}
+
 static esp_err_t root_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
@@ -433,6 +446,8 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(snapshot_json, "sgp41_conditioning", snapshot.sgp41_conditioning);
     cJSON_AddBoolToObject(snapshot_json, "bmp390_valid", snapshot.bmp390_valid);
     cJSON_AddBoolToObject(snapshot_json, "pm_valid", snapshot.pm_valid);
+    cJSON_AddStringToObject(snapshot_json, "co2_compensation_source",
+                            co2_compensation_source_key(snapshot.co2_compensation_source));
     if (snapshot.scd41_valid) {
         cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
         cJSON_AddStringToObject(snapshot_json, "co2_rating",

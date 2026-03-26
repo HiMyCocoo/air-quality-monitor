@@ -54,9 +54,23 @@ typedef struct {
 
 static mqtt_ctx_t s_ctx;
 
+static const char *co2_compensation_source_key(co2_compensation_source_t source)
+{
+    switch (source) {
+    case CO2_COMPENSATION_SOURCE_ALTITUDE:
+        return "altitude";
+    case CO2_COMPENSATION_SOURCE_BMP390:
+        return "bmp390";
+    case CO2_COMPENSATION_SOURCE_NONE:
+    default:
+        return "none";
+    }
+}
+
 static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
     {"co2_rating", "CO2 Ventilation Status", "co2_rating", NULL, NULL, NULL, NULL, false},
+    {"co2_compensation_source", "CO2 Compensation Source", "co2_compensation_source", NULL, NULL, NULL, "diagnostic", true},
     {"temperature", "Temperature", "temperature", "°C", "temperature", "measurement", NULL, false},
     {"temperature_rating", "Temperature Rating", "temperature_rating", NULL, NULL, NULL, NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
@@ -561,6 +575,8 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(state, "sgp41_conditioning", snapshot->sgp41_conditioning);
     cJSON_AddBoolToObject(state, "bmp390_valid", snapshot->bmp390_valid);
     cJSON_AddBoolToObject(state, "pm_valid", snapshot->pm_valid);
+    cJSON_AddStringToObject(state, "co2_compensation_source",
+                            co2_compensation_source_key(snapshot->co2_compensation_source));
     if (snapshot->scd41_valid) {
         co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
         temperature_rating = air_quality_rate_temperature_label(snapshot->temperature_c);
@@ -663,6 +679,8 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(diag_json, "scd41_ready", diag->scd41_ready);
     cJSON_AddBoolToObject(diag_json, "sgp41_ready", diag->sgp41_ready);
     cJSON_AddBoolToObject(diag_json, "bmp390_ready", diag->bmp390_ready);
+    cJSON_AddStringToObject(diag_json, "co2_compensation_source",
+                            co2_compensation_source_key(snapshot->co2_compensation_source));
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag->sps30_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_ready", diag->status_led_ready);
     if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {

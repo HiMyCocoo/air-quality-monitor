@@ -16,6 +16,7 @@
 #define CMD_GET_DATA_READY_STATUS 0xE4B8
 #define CMD_SET_TEMPERATURE_OFFSET 0x241D
 #define CMD_SET_SENSOR_ALTITUDE 0x2427
+#define CMD_SET_AMBIENT_PRESSURE 0xE000
 #define CMD_SET_ASC 0x2416
 #define CMD_PERFORM_FRC 0x362F
 
@@ -153,6 +154,14 @@ esp_err_t scd41_set_temperature_offset(scd41_t *sensor, float offset_c) {
 
 esp_err_t scd41_set_sensor_altitude(scd41_t *sensor, uint16_t altitude_m) {
   return scd41_write_command_word(sensor, CMD_SET_SENSOR_ALTITUDE, altitude_m);
+}
+
+esp_err_t scd41_set_ambient_pressure(scd41_t *sensor, uint32_t ambient_pressure_pa) {
+  if (ambient_pressure_pa < 70000U || ambient_pressure_pa > 120000U) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  uint16_t raw = (uint16_t)((ambient_pressure_pa + 50U) / 100U);
+  return scd41_write_command_word(sensor, CMD_SET_AMBIENT_PRESSURE, raw);
 }
 
 esp_err_t scd41_set_automatic_self_calibration(scd41_t *sensor, bool enabled) {

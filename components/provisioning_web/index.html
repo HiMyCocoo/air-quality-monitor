@@ -1830,6 +1830,13 @@
       if (!d.config.mqtt_url) return '未配置';
       return d.diag.mqtt_connected ? '已连接' : '未连接';
     }
+    function co2CompensationLabel(d) {
+      switch (d.snapshot.co2_compensation_source) {
+        case 'bmp390': return 'BMP390 动态气压';
+        case 'altitude': return 'SCD41 海拔补偿';
+        default: return d.diag.scd41_ready ? '未生效' : 'SCD41 离线';
+      }
+    }
 
     function syncActionAvailability(d) {
       const scd41Ready = !!d.diag.scd41_ready;
@@ -1989,6 +1996,7 @@
       overviewSystemEl.innerHTML = [
         kv('设备标识', d.diag.device_id),
         kv('固件版本', d.diag.firmware_version),
+        kv('CO2 补偿', co2CompensationLabel(d)),
         kv('当前气压', num(d.snapshot.pressure_hpa, 1, ' hPa')),
         kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec)),
         kv('系统内存', `${(d.diag.heap_free / 1024).toFixed(1)} KB 空闲`)
