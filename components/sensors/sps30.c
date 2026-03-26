@@ -17,12 +17,15 @@
 #define SPS30_CMD_SLEEP 0x10
 #define SPS30_CMD_WAKE_UP 0x11
 #define SPS30_CMD_START_FAN_CLEANING 0x56
+#define SPS30_CMD_AUTO_CLEANING_INTERVAL 0x80
 
 #define SPS30_SUBCMD_MEASUREMENT_START_0 0x01
 #define SPS30_SUBCMD_MEASUREMENT_START_1 0x03
+#define SPS30_SUBCMD_AUTO_CLEANING_INTERVAL 0x00
 
 #define SPS30_UART_RX_TIMEOUT_MS 120
 #define SPS30_UART_TX_TIMEOUT_MS 100
+#define SPS30_MEASUREMENT_INTERVAL_MS 1040LL
 #define SPS30_MEASUREMENT_FLOAT_COUNT 10
 #define SPS30_MEASUREMENT_RESPONSE_LEN (SPS30_MEASUREMENT_FLOAT_COUNT * 4)
 
@@ -107,6 +110,22 @@ static float sps30_bytes_to_float(const uint8_t *bytes)
                bytes[3],
     };
     return value.f32;
+}
+
+static uint32_t sps30_bytes_to_u32_be(const uint8_t *bytes)
+{
+    return ((uint32_t)bytes[0] << 24) |
+           ((uint32_t)bytes[1] << 16) |
+           ((uint32_t)bytes[2] << 8) |
+           (uint32_t)bytes[3];
+}
+
+static void sps30_u32_to_bytes_be(uint32_t value, uint8_t *bytes)
+{
+    bytes[0] = (uint8_t)(value >> 24);
+    bytes[1] = (uint8_t)(value >> 16);
+    bytes[2] = (uint8_t)(value >> 8);
+    bytes[3] = (uint8_t)value;
 }
 
 static esp_err_t sps30_uart_write_raw(sps30_t *sensor, const uint8_t *data, size_t data_len)
@@ -331,7 +350,7 @@ esp_err_t sps30_data_ready(sps30_t *sensor, bool *ready)
      * we pace read attempts at 1 Hz.
      */
     now_ms = esp_timer_get_time() / 1000;
-    *ready = (now_ms - sensor->last_measurement_request_ms) >= 1000;
+    *ready = (now_ms - sensor->last_measurement_request_ms) >= SPS30_MEASUREMENT_INTERVAL_MS;
     return ESP_OK;
 }
 
@@ -352,6 +371,9 @@ esp_err_t sps30_read_measurement(sps30_t *sensor, sps30_measurement_t *measureme
                         "sps30",
                         "read measurement failed");
     ESP_RETURN_ON_FALSE(header.state == 0, ESP_FAIL, "sps30", "measurement rejected");
+    if (header.data_len == 0) {
+        return ESP_ERR_NOT_FINISHED;
+    }
     ESP_RETURN_ON_FALSE(header.data_len == sizeof(data), ESP_ERR_INVALID_RESPONSE, "sps30", "bad measurement len");
 
     measurement->pm1_0 = sps30_bytes_to_float(&data[0]);
@@ -365,6 +387,50 @@ esp_err_t sps30_read_measurement(sps30_t *sensor, sps30_measurement_t *measureme
     measurement->particles_10_0um = sps30_bytes_to_float(&data[32]);
     measurement->typical_particle_size_um = sps30_bytes_to_float(&data[36]);
     sensor->last_measurement_request_ms = esp_timer_get_time() / 1000;
+    return ESP_OK;
+}
+
+esp_err_t sps30_read_auto_cleaning_interval(sps30_t *sensor, uint32_t *interval_sec)
+{
+    sps30_shdlc_rx_header_t header = {0};
+    uint8_t payload = SPS30_SUBCMD_AUTO_CLEANING_INTERVAL;
+    uint8_t data[4] = {0};
+
+    ESP_RETURN_ON_FALSE(interval_sec != NULL, ESP_ERR_INVALID_ARG, "sps30", "interval null");
+    ESP_RETURN_ON_ERROR(sps30_shdlc_xcv(sensor,
+                                        SPS30_SHDLC_ADDR,
+                                        SPS30_CMD_AUTO_CLEANING_INTERVAL,
+                                        sizeof(payload),
+                                        &payload,
+                                        sizeof(data),
+                                        &header,
+                                        data),
+                        "sps30",
+                        "read auto cleaning interval failed");
+    ESP_RETURN_ON_FALSE(header.state == 0, ESP_FAIL, "sps30", "read auto cleaning interval rejected");
+    ESP_RETURN_ON_FALSE(header.data_len == sizeof(data), ESP_ERR_INVALID_RESPONSE, "sps30", "bad auto cleaning len");
+
+    *interval_sec = sps30_bytes_to_u32_be(data);
+    return ESP_OK;
+}
+
+esp_err_t sps30_set_auto_cleaning_interval(sps30_t *sensor, uint32_t interval_sec)
+{
+    sps30_shdlc_rx_header_t header = {0};
+    uint8_t payload[5] = {SPS30_SUBCMD_AUTO_CLEANING_INTERVAL, 0, 0, 0, 0};
+
+    sps30_u32_to_bytes_be(interval_sec, payload + 1);
+    ESP_RETURN_ON_ERROR(sps30_shdlc_xcv(sensor,
+                                        SPS30_SHDLC_ADDR,
+                                        SPS30_CMD_AUTO_CLEANING_INTERVAL,
+                                        sizeof(payload),
+                                        payload,
+                                        0,
+                                        &header,
+                                        NULL),
+                        "sps30",
+                        "write auto cleaning interval failed");
+    ESP_RETURN_ON_FALSE(header.state == 0, ESP_FAIL, "sps30", "write auto cleaning interval rejected");
     return ESP_OK;
 }
 

@@ -36,5 +36,7 @@ esp_err_t sps30_start_measurement(sps30_t *sensor);
 esp_err_t sps30_stop_measurement(sps30_t *sensor);
 esp_err_t sps30_data_ready(sps30_t *sensor, bool *ready);
 esp_err_t sps30_read_measurement(sps30_t *sensor, sps30_measurement_t *measurement);
+esp_err_t sps30_read_auto_cleaning_interval(sps30_t *sensor, uint32_t *interval_sec);
+esp_err_t sps30_set_auto_cleaning_interval(sps30_t *sensor, uint32_t interval_sec);
 esp_err_t sps30_set_sleep(sps30_t *sensor, bool sleep);
 esp_err_t sps30_start_fan_cleaning(sps30_t *sensor);

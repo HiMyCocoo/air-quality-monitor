@@ -1837,6 +1837,41 @@
         default: return d.diag.scd41_ready ? '未生效' : 'SCD41 离线';
       }
     }
+    function sgp41ModuleStatus(d) {
+      if (!d.diag.sgp41_ready) return '离线';
+      if (d.snapshot.sgp41_conditioning) return '预热中';
+      if (d.snapshot.sgp41_voc_valid && d.snapshot.sgp41_nox_valid) return '在线';
+      if (d.snapshot.sgp41_voc_valid) return 'VOC 就绪 / NOx 学习中';
+      if (d.snapshot.sgp41_nox_valid) return 'NOx 就绪 / VOC 学习中';
+      return '学习中';
+    }
+    function sgp41MetricState(d, indexKey, validKey, remainingKey, ratingKey, labelMap) {
+      if (!d.diag.sgp41_ready) {
+        return { value: '--', meta: 'SGP41 离线', unit: '', tone: 'unavailable' };
+      }
+      if (d.snapshot.sgp41_conditioning) {
+        return { value: '--', meta: '预热中，随后进入算法学习', unit: '', tone: 'unavailable' };
+      }
+      if (d.snapshot[validKey]) {
+        return {
+          value: num(d.snapshot[indexKey]),
+          meta: translate(labelMap, d.snapshot[ratingKey]),
+          unit: 'index',
+          tone: ''
+        };
+      }
+
+      const remaining = Number(d.snapshot[remainingKey] || 0);
+      if (remaining > 0) {
+        return {
+          value: '--',
+          meta: `算法学习中，预计还需 ${fmtAge(remaining)}`,
+          unit: '',
+          tone: 'unavailable'
+        };
+      }
+      return { value: '--', meta: '等待稳定样本', unit: '', tone: 'unavailable' };
+    }
 
     function syncActionAvailability(d) {
       const scd41Ready = !!d.diag.scd41_ready;
@@ -1977,6 +2012,22 @@
 
     function renderView(d) {
       const overallKey = d.snapshot.overall_air_quality_key || 'neutral';
+      const vocMetric = sgp41MetricState(
+        d,
+        'voc_index',
+        'sgp41_voc_valid',
+        'sgp41_voc_stabilization_remaining_s',
+        'voc_rating',
+        vocSignalLabels
+      );
+      const noxMetric = sgp41MetricState(
+        d,
+        'nox_index',
+        'sgp41_nox_valid',
+        'sgp41_nox_stabilization_remaining_s',
+        'nox_rating',
+        noxSignalLabels
+      );
 
       overviewNetworkEl.innerHTML = [
         kv('运行模式', d.diag.provisioning_mode ? 'BLE 配网' : '局域网运行'),
@@ -1987,7 +2038,7 @@
 
       overviewModulesEl.innerHTML = [
         kv('SCD41', d.diag.scd41_ready ? '在线' : '离线'),
-        kv('SGP41', d.diag.sgp41_ready ? '在线' : '离线'),
+        kv('SGP41', sgp41ModuleStatus(d)),
         kv('BMP390', d.diag.bmp390_ready ? (d.snapshot.bmp390_valid ? '在线' : '已连接') : '离线'),
         kv('SPS30', d.diag.sps30_ready ? (d.snapshot.sps30_sleeping ? '休眠中' : '在线') : '离线'),
         kv('RGB 灯', d.diag.status_led_ready ? (d.diag.status_led_enabled ? '开启' : '关闭') : '不可用')
@@ -2023,8 +2074,8 @@
         metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
         metric('当前气压', num(d.snapshot.pressure_hpa, 1), d.snapshot.bmp390_valid ? 'BMP390' : (d.diag.bmp390_ready ? '已连接' : '离线'), 'secondary', 'hPa'),
         metric('BMP390 温度', num(d.snapshot.bmp390_temperature_c, 1), d.snapshot.bmp390_valid ? '气压传感器' : '暂不可用', 'secondary', '°C'),
-        metric('VOC 指数 (Sensirion)', num(d.snapshot.voc_index), translate(vocSignalLabels, d.snapshot.voc_rating), 'secondary', 'index'),
-        metric('NOx 指数 (Sensirion)', num(d.snapshot.nox_index), translate(noxSignalLabels, d.snapshot.nox_rating), 'secondary', 'index')
+        metric('VOC 指数 (Sensirion)', vocMetric.value, vocMetric.meta, 'secondary', vocMetric.unit, vocMetric.tone),
+        metric('NOx 指数 (Sensirion)', noxMetric.value, noxMetric.meta, 'secondary', noxMetric.unit, noxMetric.tone)
       ].join('');
 
       syncAscState(d.config.scd41_asc_enabled, d.diag.scd41_ready);

@@ -47,10 +47,14 @@ typedef struct {
   bool scd41_valid;
   bool sgp41_valid;
   bool sgp41_conditioning;
+  bool sgp41_voc_valid;
+  bool sgp41_nox_valid;
   bool bmp390_valid;
   bool pm_valid;
   bool sps30_sleeping;
   co2_compensation_source_t co2_compensation_source;
+  uint32_t sgp41_voc_stabilization_remaining_s;
+  uint32_t sgp41_nox_stabilization_remaining_s;
   uint16_t co2_ppm;
   float temperature_c;
   float humidity_rh;

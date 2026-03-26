@@ -518,7 +518,7 @@ void air_quality_compute_overall_assessment(const sensor_snapshot_t *snapshot, a
     }
 
     result->has_supplemental_only_metrics =
-        (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) || snapshot->pm_valid;
+        snapshot->sgp41_voc_valid || snapshot->sgp41_nox_valid || snapshot->pm_valid;
 
     if (result->uses_us_aqi && (result->co2_ventilation_alert || result->humidity_alert)) {
         strlcpy(result->basis, "EPA AQI with U.S. indoor guidance", sizeof(result->basis));
@@ -546,7 +546,7 @@ void air_quality_compute_overall_assessment(const sensor_snapshot_t *snapshot, a
                     "Relative humidity is outside the recommended 30%-60% range.");
     }
 
-    if (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) {
+    if (snapshot->sgp41_voc_valid || snapshot->sgp41_nox_valid) {
         append_note(result->note, sizeof(result->note),
                     "VOC/NOx indexes are reported separately and are not EPA AQI pollutants.");
     }

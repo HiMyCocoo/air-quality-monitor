@@ -444,10 +444,18 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(snapshot_json, "scd41_valid", snapshot.scd41_valid);
     cJSON_AddBoolToObject(snapshot_json, "sgp41_valid", snapshot.sgp41_valid);
     cJSON_AddBoolToObject(snapshot_json, "sgp41_conditioning", snapshot.sgp41_conditioning);
+    cJSON_AddBoolToObject(snapshot_json, "sgp41_voc_valid", snapshot.sgp41_voc_valid);
+    cJSON_AddBoolToObject(snapshot_json, "sgp41_nox_valid", snapshot.sgp41_nox_valid);
     cJSON_AddBoolToObject(snapshot_json, "bmp390_valid", snapshot.bmp390_valid);
     cJSON_AddBoolToObject(snapshot_json, "pm_valid", snapshot.pm_valid);
     cJSON_AddStringToObject(snapshot_json, "co2_compensation_source",
                             co2_compensation_source_key(snapshot.co2_compensation_source));
+    cJSON_AddNumberToObject(snapshot_json,
+                            "sgp41_voc_stabilization_remaining_s",
+                            snapshot.sgp41_voc_stabilization_remaining_s);
+    cJSON_AddNumberToObject(snapshot_json,
+                            "sgp41_nox_stabilization_remaining_s",
+                            snapshot.sgp41_nox_stabilization_remaining_s);
     if (snapshot.scd41_valid) {
         cJSON_AddNumberToObject(snapshot_json, "co2_ppm", snapshot.co2_ppm);
         cJSON_AddStringToObject(snapshot_json, "co2_rating",
@@ -466,16 +474,19 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNullToObject(snapshot_json, "humidity_rh");
         cJSON_AddNullToObject(snapshot_json, "humidity_rating");
     }
-    if (snapshot.sgp41_valid && !snapshot.sgp41_conditioning) {
+    if (snapshot.sgp41_voc_valid) {
         cJSON_AddNumberToObject(snapshot_json, "voc_index", snapshot.voc_index);
         cJSON_AddStringToObject(snapshot_json, "voc_rating",
                                 air_quality_voc_event_label(air_quality_rate_voc_index(snapshot.voc_index)));
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "voc_index");
+        cJSON_AddNullToObject(snapshot_json, "voc_rating");
+    }
+    if (snapshot.sgp41_nox_valid) {
         cJSON_AddNumberToObject(snapshot_json, "nox_index", snapshot.nox_index);
         cJSON_AddStringToObject(snapshot_json, "nox_rating",
                                 air_quality_nox_event_label(air_quality_rate_nox_index(snapshot.nox_index)));
     } else {
-        cJSON_AddNullToObject(snapshot_json, "voc_index");
-        cJSON_AddNullToObject(snapshot_json, "voc_rating");
         cJSON_AddNullToObject(snapshot_json, "nox_index");
         cJSON_AddNullToObject(snapshot_json, "nox_rating");
     }

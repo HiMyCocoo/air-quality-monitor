@@ -34,7 +34,7 @@ void platform_config_sanitize(device_config_t *config, const char *device_id)
         config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     }
     if (config->scd41_temp_offset_c < 0.0f || config->scd41_temp_offset_c > 20.0f) {
-        config->scd41_temp_offset_c = 4.0f;
+        config->scd41_temp_offset_c = 0.0f;
     }
     if (config->scd41_altitude_m > 3000) {
         config->scd41_altitude_m = 0;
@@ -59,9 +59,9 @@ void platform_config_apply_defaults(device_config_t *config, const char *device_
     strlcpy(config->wifi_password, DEFAULT_WIFI_PASSWORD, sizeof(config->wifi_password));
     config->mqtt_port = 1883;
     config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
-    config->scd41_asc_enabled = true;
+    config->scd41_asc_enabled = false;
     config->scd41_altitude_m = 0;
-    config->scd41_temp_offset_c = 4.0f;
+    config->scd41_temp_offset_c = 0.0f;
     config->pms_control_pins_enabled = true;
     platform_config_sanitize(config, device_id);
 }

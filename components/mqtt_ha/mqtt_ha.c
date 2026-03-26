@@ -81,6 +81,22 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"voc_rating", "VOC Event Level (Sensirion)", "voc_rating", NULL, NULL, NULL, NULL, false},
     {"nox_index", "NOx Index (Sensirion)", "nox_index", NULL, NULL, "measurement", NULL, false},
     {"nox_rating", "NOx Event Level (Sensirion)", "nox_rating", NULL, NULL, NULL, NULL, false},
+    {"sgp41_voc_stabilization_remaining_s",
+     "SGP41 VOC Stabilization Remaining",
+     "sgp41_voc_stabilization_remaining_s",
+     "s",
+     "duration",
+     "measurement",
+     "diagnostic",
+     true},
+    {"sgp41_nox_stabilization_remaining_s",
+     "SGP41 NOx Stabilization Remaining",
+     "sgp41_nox_stabilization_remaining_s",
+     "s",
+     "duration",
+     "measurement",
+     "diagnostic",
+     true},
     {"pm1_0", "PM1.0", "pm1_0", "µg/m³", "pm1", "measurement", NULL, false},
     {"pm2_5", "PM2.5", "pm2_5", "µg/m³", "pm25", "measurement", NULL, false},
     {"pm4_0", "PM4.0", "pm4_0", "µg/m³", NULL, "measurement", NULL, false},
@@ -127,6 +143,8 @@ static const binary_sensor_entity_t BINARY_SENSOR_ENTITIES[] = {
     {"scd41_valid", "SCD41 Sample Valid", "scd41_valid", NULL, "diagnostic", false},
     {"sgp41_valid", "SGP41 Sample Valid", "sgp41_valid", NULL, "diagnostic", false},
     {"sgp41_conditioning", "SGP41 Conditioning", "sgp41_conditioning", "running", "diagnostic", false},
+    {"sgp41_voc_valid", "SGP41 VOC Index Valid", "sgp41_voc_valid", NULL, "diagnostic", false},
+    {"sgp41_nox_valid", "SGP41 NOx Index Valid", "sgp41_nox_valid", NULL, "diagnostic", false},
     {"bmp390_valid", "BMP390 Sample Valid", "bmp390_valid", NULL, "diagnostic", false},
     {"pm_valid", "Particle Sample Valid", "pm_valid", NULL, "diagnostic", false},
 };
@@ -573,10 +591,18 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(state, "scd41_valid", snapshot->scd41_valid);
     cJSON_AddBoolToObject(state, "sgp41_valid", snapshot->sgp41_valid);
     cJSON_AddBoolToObject(state, "sgp41_conditioning", snapshot->sgp41_conditioning);
+    cJSON_AddBoolToObject(state, "sgp41_voc_valid", snapshot->sgp41_voc_valid);
+    cJSON_AddBoolToObject(state, "sgp41_nox_valid", snapshot->sgp41_nox_valid);
     cJSON_AddBoolToObject(state, "bmp390_valid", snapshot->bmp390_valid);
     cJSON_AddBoolToObject(state, "pm_valid", snapshot->pm_valid);
     cJSON_AddStringToObject(state, "co2_compensation_source",
                             co2_compensation_source_key(snapshot->co2_compensation_source));
+    cJSON_AddNumberToObject(state,
+                            "sgp41_voc_stabilization_remaining_s",
+                            snapshot->sgp41_voc_stabilization_remaining_s);
+    cJSON_AddNumberToObject(state,
+                            "sgp41_nox_stabilization_remaining_s",
+                            snapshot->sgp41_nox_stabilization_remaining_s);
     if (snapshot->scd41_valid) {
         co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
         temperature_rating = air_quality_rate_temperature_label(snapshot->temperature_c);
@@ -595,16 +621,19 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "humidity");
         cJSON_AddNullToObject(state, "humidity_rating");
     }
-    if (snapshot->sgp41_valid && !snapshot->sgp41_conditioning) {
+    if (snapshot->sgp41_voc_valid) {
         voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
-        nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
         cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
         cJSON_AddStringToObject(state, "voc_rating", air_quality_voc_event_label(voc_rating));
-        cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
-        cJSON_AddStringToObject(state, "nox_rating", air_quality_nox_event_label(nox_rating));
     } else {
         cJSON_AddNullToObject(state, "voc_index");
         cJSON_AddNullToObject(state, "voc_rating");
+    }
+    if (snapshot->sgp41_nox_valid) {
+        nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
+        cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
+        cJSON_AddStringToObject(state, "nox_rating", air_quality_nox_event_label(nox_rating));
+    } else {
         cJSON_AddNullToObject(state, "nox_index");
         cJSON_AddNullToObject(state, "nox_rating");
     }
@@ -681,6 +710,12 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(diag_json, "bmp390_ready", diag->bmp390_ready);
     cJSON_AddStringToObject(diag_json, "co2_compensation_source",
                             co2_compensation_source_key(snapshot->co2_compensation_source));
+    cJSON_AddNumberToObject(diag_json,
+                            "sgp41_voc_stabilization_remaining_s",
+                            snapshot->sgp41_voc_stabilization_remaining_s);
+    cJSON_AddNumberToObject(diag_json,
+                            "sgp41_nox_stabilization_remaining_s",
+                            snapshot->sgp41_nox_stabilization_remaining_s);
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag->sps30_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_ready", diag->status_led_ready);
     if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {

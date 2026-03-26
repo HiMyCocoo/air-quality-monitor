@@ -1,6 +1,7 @@
 #include "sensors.h"
 
 #include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -20,6 +21,8 @@
 #define SCD41_FRC_STABILIZATION_MS (180000LL)
 #define SCD41_PRESSURE_COMPENSATION_FALLBACK_MS (15000LL)
 #define SGP41_CONDITIONING_SEC 10
+#define SGP41_VOC_STABILIZATION_MS ((int64_t)((GasIndexAlgorithm_INIT_DURATION_VARIANCE_VOC + GasIndexAlgorithm_INITIAL_BLACKOUT) * 1000.0f))
+#define SGP41_NOX_STABILIZATION_MS ((int64_t)((GasIndexAlgorithm_INIT_DURATION_VARIANCE_NOX + GasIndexAlgorithm_INITIAL_BLACKOUT) * 1000.0f))
 #define SGP41_DEFAULT_HUMIDITY_TICKS 0x8000
 #define SGP41_DEFAULT_TEMPERATURE_TICKS 0x6666
 #define SPS30_FAN_CLEANING_DURATION_MS (10000LL)
@@ -52,6 +55,7 @@ typedef struct {
     size_t pm_history_count;
     size_t pm_history_index;
     int64_t scd41_measurement_started_ms;
+    int64_t sgp41_measurement_started_ms;
     int64_t co2_compensation_updated_at_ms;
     int64_t sps30_warmup_until_ms;
     uint32_t co2_compensation_pressure_pa;
@@ -146,6 +150,10 @@ static void sensors_mark_sgp41_invalid_locked(void)
 {
     s_ctx.snapshot.sgp41_valid = false;
     s_ctx.snapshot.sgp41_conditioning = false;
+    s_ctx.snapshot.sgp41_voc_valid = false;
+    s_ctx.snapshot.sgp41_nox_valid = false;
+    s_ctx.snapshot.sgp41_voc_stabilization_remaining_s = 0;
+    s_ctx.snapshot.sgp41_nox_stabilization_remaining_s = 0;
     s_ctx.snapshot.voc_index = 0;
     s_ctx.snapshot.nox_index = 0;
 }
@@ -283,6 +291,7 @@ static void sensors_reset_sgp41(void)
     memset(&s_ctx.sgp41, 0, sizeof(s_ctx.sgp41));
     s_ctx.sgp41_initialized = false;
     s_ctx.sgp41_conditioning_remaining_s = 0;
+    s_ctx.sgp41_measurement_started_ms = 0;
     sensors_mark_sgp41_invalid_locked();
     xSemaphoreGive(s_ctx.lock);
 }
@@ -302,6 +311,47 @@ static void sensors_reset_sps30(void)
     sensors_mark_sps30_invalid_locked();
     s_ctx.snapshot.sps30_sleeping = false;
     xSemaphoreGive(s_ctx.lock);
+}
+
+static uint32_t sensors_remaining_seconds(int64_t started_ms, int64_t duration_ms, int64_t now_ms)
+{
+    if (duration_ms <= 0) {
+        return 0;
+    }
+
+    int64_t elapsed_ms = started_ms > 0 ? now_ms - started_ms : 0;
+    if (elapsed_ms < 0) {
+        elapsed_ms = 0;
+    }
+    if (elapsed_ms >= duration_ms) {
+        return 0;
+    }
+    return (uint32_t)((duration_ms - elapsed_ms + 999) / 1000);
+}
+
+static void sensors_update_sgp41_validity_locked(int64_t now_ms)
+{
+    if (!s_ctx.sgp41_initialized || s_ctx.sgp41_measurement_started_ms == 0) {
+        s_ctx.snapshot.sgp41_valid = false;
+        s_ctx.snapshot.sgp41_conditioning = false;
+        s_ctx.snapshot.sgp41_voc_valid = false;
+        s_ctx.snapshot.sgp41_nox_valid = false;
+        s_ctx.snapshot.sgp41_voc_stabilization_remaining_s = 0;
+        s_ctx.snapshot.sgp41_nox_stabilization_remaining_s = 0;
+        return;
+    }
+
+    s_ctx.snapshot.sgp41_voc_stabilization_remaining_s =
+        sensors_remaining_seconds(s_ctx.sgp41_measurement_started_ms, SGP41_VOC_STABILIZATION_MS, now_ms);
+    s_ctx.snapshot.sgp41_nox_stabilization_remaining_s =
+        sensors_remaining_seconds(s_ctx.sgp41_measurement_started_ms, SGP41_NOX_STABILIZATION_MS, now_ms);
+
+    s_ctx.snapshot.sgp41_conditioning = s_ctx.sgp41_conditioning_remaining_s > 0;
+    s_ctx.snapshot.sgp41_voc_valid =
+        !s_ctx.snapshot.sgp41_conditioning && s_ctx.snapshot.sgp41_voc_stabilization_remaining_s == 0;
+    s_ctx.snapshot.sgp41_nox_valid =
+        !s_ctx.snapshot.sgp41_conditioning && s_ctx.snapshot.sgp41_nox_stabilization_remaining_s == 0;
+    s_ctx.snapshot.sgp41_valid = s_ctx.snapshot.sgp41_voc_valid || s_ctx.snapshot.sgp41_nox_valid;
 }
 
 static void sensors_reset_bmp390(void)
@@ -456,8 +506,9 @@ static esp_err_t sensors_init_sgp41(void)
         GasIndexAlgorithm_init(&s_ctx.sgp41_voc_params, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
         GasIndexAlgorithm_init(&s_ctx.sgp41_nox_params, GasIndexAlgorithm_ALGORITHM_TYPE_NOX);
         s_ctx.sgp41_conditioning_remaining_s = SGP41_CONDITIONING_SEC;
+        s_ctx.sgp41_measurement_started_ms = esp_timer_get_time() / 1000;
         s_ctx.sgp41_initialized = true;
-        s_ctx.snapshot.sgp41_conditioning = true;
+        sensors_update_sgp41_validity_locked(s_ctx.sgp41_measurement_started_ms);
     } else if (s_ctx.sgp41.dev_handle != NULL || s_ctx.sgp41.bus_handle != NULL) {
         sgp41_deinit(&s_ctx.sgp41);
         memset(&s_ctx.sgp41, 0, sizeof(s_ctx.sgp41));
@@ -542,6 +593,13 @@ static esp_err_t sensors_init_sps30(void)
                      CONFIG_AIRMON_SPS30_UART_BAUD_RATE);
     if (err == ESP_OK) {
         err = sps30_start_measurement(&s_ctx.sps30);
+    }
+    if (err == ESP_OK) {
+        uint32_t auto_cleaning_interval_sec = 0;
+        err = sps30_read_auto_cleaning_interval(&s_ctx.sps30, &auto_cleaning_interval_sec);
+        if (err == ESP_OK && auto_cleaning_interval_sec != CONFIG_AIRMON_SPS30_AUTO_CLEANING_INTERVAL_SEC) {
+            err = sps30_set_auto_cleaning_interval(&s_ctx.sps30, CONFIG_AIRMON_SPS30_AUTO_CLEANING_INTERVAL_SEC);
+        }
     }
     if (err == ESP_OK) {
         s_ctx.sps30_initialized = true;
@@ -673,6 +731,8 @@ static void sensor_task(void *arg)
                     sensors_apply_pm_average(&measurement);
                     sensors_clear_sps30_error();
                 }
+            } else if (err == ESP_ERR_NOT_FINISHED) {
+                /* Read may legally return an empty response if the next sample is not ready yet. */
             } else if (err != ESP_OK) {
                 sensors_reset_sps30();
                 sensors_set_sps30_error(ready ? "read failed" : "ready check failed");
@@ -697,7 +757,7 @@ static void sensor_task(void *arg)
             }
             xSemaphoreGive(s_ctx.lock);
 
-        if (err == ESP_OK && ready && measurement_ok) {
+            if (err == ESP_OK && ready && measurement_ok) {
                 bool scd41_ready = false;
                 esp_err_t compensation_err = ESP_OK;
 
@@ -760,11 +820,10 @@ static void sensor_task(void *arg)
                     uint16_t sraw_voc = 0;
                     err = sgp41_execute_conditioning(&s_ctx.sgp41, humidity_ticks, temperature_ticks, &sraw_voc);
                     if (err == ESP_OK) {
-                        s_ctx.snapshot.sgp41_valid = false;
-                        s_ctx.snapshot.sgp41_conditioning = true;
                         if (s_ctx.sgp41_conditioning_remaining_s > 0) {
                             s_ctx.sgp41_conditioning_remaining_s--;
                         }
+                        sensors_update_sgp41_validity_locked(now_ms);
                         sample_ok = true;
                     }
                 } else {
@@ -778,10 +837,9 @@ static void sensor_task(void *arg)
                         GasIndexAlgorithm_process(&s_ctx.sgp41_voc_params, sraw_voc, &voc_index);
                         GasIndexAlgorithm_process(&s_ctx.sgp41_nox_params, sraw_nox, &nox_index);
 
-                        s_ctx.snapshot.sgp41_valid = true;
-                        s_ctx.snapshot.sgp41_conditioning = false;
                         s_ctx.snapshot.voc_index = voc_index;
                         s_ctx.snapshot.nox_index = nox_index;
+                        sensors_update_sgp41_validity_locked(now_ms);
                         s_ctx.snapshot.updated_at_ms = now_ms;
                         sample_ok = true;
                     }
