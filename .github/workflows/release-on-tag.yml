@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - master
+    paths-ignore:
+      - 'README.md'
+      - 'README.en.md'
+      - 'docs/**'
+      - '.github/release.yml'
   workflow_dispatch:
     inputs:
       tag:
