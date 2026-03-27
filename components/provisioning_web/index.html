@@ -1683,7 +1683,7 @@
         </div>
         <div class="settings-footer"
           style="background: rgba(229, 62, 62, 0.05); border-top: 1px solid rgba(229, 62, 62, 0.2);">
-          <p class="desc">设备 ID标识: <strong id="device_id_text" style="color: var(--color-unhealthy);">--</strong></p>
+          <p class="desc">恢复后将清除 Wi-Fi、MQTT 与传感器补偿配置，并回到 BLE 配网模式。</p>
           <div style="display:flex; gap: 12px; margin-left:auto;">
             <button onclick="restartDevice()" class="ghost"
               style="border-color: rgba(229, 62, 62, 0.6); color: var(--color-unhealthy);">仅重新启动</button>
@@ -1697,7 +1697,6 @@
   <script>
     const configFields = ['mqtt_url', 'scd41_altitude_m', 'scd41_temp_offset_c'];
     const configInputs = Object.fromEntries(configFields.map((id) => [id, document.getElementById(id)]));
-    const noticeEl = document.getElementById('notice');
     const overviewNetworkEl = document.getElementById('overviewNetwork');
     const overviewModulesEl = document.getElementById('overviewModules');
     const overviewSystemEl = document.getElementById('overviewSystem');
@@ -1710,7 +1709,6 @@
     const firmwareInput = document.getElementById('firmware');
     const firmwareNameEl = document.getElementById('firmware_name');
     const firmwareVersionTextEl = document.getElementById('firmware_version_text');
-    const deviceIdTextEl = document.getElementById('device_id_text');
     const mqttPrivacyHintEl = document.getElementById('mqtt_privacy_hint');
     const ascToggle = document.getElementById('asc_toggle');
     const ascStatusText = document.getElementById('asc_status_text');
@@ -1723,11 +1721,9 @@
     const republishBtn = document.getElementById('republish_btn');
     const tabButtons = [...document.querySelectorAll('.nav-btn')];
     const tabPanels = [...document.querySelectorAll('.tab-panel')];
-    const urlParams = new URLSearchParams(window.location.search);
 
     let configDirty = false;
     let mqttUrlDirty = false;
-    let noticeTimer = 0;
     const activeTabStorageKey = 'airmon-active-tab';
 
     const categoryLabels = { 'Good': '良好', 'Moderate': '一般', 'Unhealthy for Sensitive Groups': '敏感人群不健康', 'Unhealthy': '不健康', 'Very Unhealthy': '非常不健康', 'Hazardous': '危险', 'Unavailable': '暂不可用' };
@@ -1774,7 +1770,6 @@
     };
 
     function translate(map, value, fallback = '未提供') { return map[value] || value || fallback; }
-    function clone(data) { return JSON.parse(JSON.stringify(data)); }
     function num(value, digits = 0, unit = '') {
       if (value == null || value === '') return '--';
       const n = Number(value);
@@ -2051,16 +2046,13 @@
 
       overviewSystemEl.innerHTML = [
         kv('设备标识', d.diag.device_id),
-        kv('固件版本', d.diag.firmware_version),
         kv('CO2 补偿', co2CompensationLabel(d)),
-        kv('当前气压', num(d.snapshot.pressure_hpa, 1, ' hPa')),
         kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec)),
         kv('系统内存', `${(d.diag.heap_free / 1024).toFixed(1)} KB 空闲`),
         kv('最近错误', lastErrorStatus(d))
       ].join('');
 
       firmwareVersionTextEl.textContent = d.diag.firmware_version || '--';
-      deviceIdTextEl.textContent = d.diag.device_id || '--';
 
       airSummaryEl.innerHTML = shouldShowOverallSummary(d)
         ? summaryBanner(

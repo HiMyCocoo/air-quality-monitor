@@ -435,7 +435,6 @@ static esp_err_t status_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(diag_json, "uptime_sec", diag.uptime_sec);
     cJSON_AddNumberToObject(diag_json, "heap_free", diag.heap_free);
     cJSON_AddStringToObject(diag_json, "ip_addr", diag.ip_addr);
-    cJSON_AddStringToObject(diag_json, "ap_ssid", diag.ap_ssid);
     cJSON_AddStringToObject(diag_json, "device_id", diag.device_id);
     cJSON_AddStringToObject(diag_json, "firmware_version", diag.firmware_version);
     cJSON_AddStringToObject(diag_json, "last_error", diag.last_error[0] ? diag.last_error : "none");
@@ -564,14 +563,9 @@ static esp_err_t status_handler(httpd_req_t *req)
                             assessment.note[0] ? assessment.note : "Unavailable");
 
     cJSON *config_json = cJSON_AddObjectToObject(root, "config");
-    cJSON_AddStringToObject(config_json, "device_name", config.device_name);
     cJSON_AddStringToObject(config_json, "mqtt_url", mqtt_url);
-    cJSON_AddBoolToObject(config_json, "wifi_configured", config.wifi_ssid[0] != '\0');
     cJSON_AddBoolToObject(config_json, "mqtt_auth_configured",
                           config.mqtt_username[0] != '\0' || config.mqtt_password[0] != '\0');
-    cJSON_AddStringToObject(config_json, "discovery_prefix", config.discovery_prefix);
-    cJSON_AddStringToObject(config_json, "topic_root", config.topic_root);
-    cJSON_AddNumberToObject(config_json, "publish_interval_sec", config.publish_interval_sec);
     cJSON_AddNumberToObject(config_json, "scd41_altitude_m", config.scd41_altitude_m);
     cJSON_AddNumberToObject(config_json, "scd41_temp_offset_c", config.scd41_temp_offset_c);
     cJSON_AddBoolToObject(config_json, "scd41_asc_enabled", config.scd41_asc_enabled);

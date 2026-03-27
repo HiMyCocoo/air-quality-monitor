@@ -99,18 +99,18 @@ jobs:
           ref: ${{ needs.prepare.outputs.tag }}
           submodules: recursive
 
-      - name: Read version from tagged source
+      - name: Prepare build version
         id: meta
         run: |
           set -euo pipefail
           version="${{ needs.prepare.outputs.version }}"
-          bash scripts/set-project-version.sh "${version}"
           expected="v${version}"
           actual="${{ needs.prepare.outputs.tag }}"
           if [[ "${expected}" != "${actual}" ]]; then
             echo "Tag ${actual} does not match PROJECT_VER ${expected}" >&2
             exit 1
           fi
+          echo "AIRMON_RELEASE_VERSION=${version}" >> "${GITHUB_ENV}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Build firmware

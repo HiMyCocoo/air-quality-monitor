@@ -133,6 +133,8 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 仓库现在可以按 `PROJECT_VER` 自动发布：
 
 - `CMakeLists.txt` 里的 `PROJECT_VER` 现在作为版本基线使用
+- 固件内嵌版本号的解析优先级是：`AIRMON_RELEASE_VERSION` 环境变量 > 精确匹配的 git tag（如 `v0.1.4`）> `PROJECT_VER`
+- 这意味着从 release workflow 构建、或在本地直接构建某个 `vX.Y.Z` tag 时，管理后台显示的固件版本会和发布版本一致
 - workflow 会读取它的 `主版本.次版本`，并自动递增 `patch`
 - 例如基线是 `0.1.0`，已有最新 tag 是 `v0.1.3`，下一次发布会自动变成 `v0.1.4`
 - 如果你把基线改成 `0.2.0`，后续发布就会切到 `0.2.x`
