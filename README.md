@@ -1,5 +1,7 @@
 # air-quality-monitor
 
+[English README](README.en.md)
+
 基于 `YD-ESP32-S3` 的室内空气质量监测节点。
 
 当前项目按这套硬件方案维护：
