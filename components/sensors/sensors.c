@@ -8,6 +8,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -25,6 +26,10 @@
 #define SGP41_NOX_STABILIZATION_MS ((int64_t)((GasIndexAlgorithm_INIT_DURATION_VARIANCE_NOX + GasIndexAlgorithm_INITIAL_BLACKOUT) * 1000.0f))
 #define SGP41_DEFAULT_HUMIDITY_TICKS 0x8000
 #define SGP41_DEFAULT_TEMPERATURE_TICKS 0x6666
+#define SGP41_STATE_NAMESPACE "airmon_sgp41"
+#define SGP41_STATE_KEY "checkpoint"
+#define SGP41_STATE_VERSION 1
+#define SGP41_STATE_SAVE_INTERVAL_MS (300000LL)
 #define SPS30_FAN_CLEANING_DURATION_MS (10000LL)
 
 static const char *TAG = "sensors";
@@ -58,11 +63,120 @@ typedef struct {
     int64_t sgp41_measurement_started_ms;
     int64_t co2_compensation_updated_at_ms;
     int64_t sps30_warmup_until_ms;
+    int64_t sgp41_state_saved_at_ms;
     uint32_t co2_compensation_pressure_pa;
     uint8_t sgp41_conditioning_remaining_s;
+    bool sgp41_state_dirty;
 } sensors_ctx_t;
 
 static sensors_ctx_t s_ctx;
+
+typedef struct {
+    uint32_t version;
+    uint16_t serial_number[3];
+    uint32_t measurement_elapsed_s;
+    uint8_t conditioning_remaining_s;
+    int32_t voc_index;
+    int32_t nox_index;
+    GasIndexAlgorithmParams voc_params;
+    GasIndexAlgorithmParams nox_params;
+} sgp41_persisted_state_t;
+
+static bool sensors_sgp41_params_look_valid(const GasIndexAlgorithmParams *params, int expected_type)
+{
+    return params->mAlgorithm_Type == expected_type && params->mSamplingInterval > 0.0f;
+}
+
+static esp_err_t sensors_load_sgp41_state(sgp41_persisted_state_t *state)
+{
+    nvs_handle_t handle;
+    size_t required = sizeof(*state);
+    esp_err_t err = nvs_open(SGP41_STATE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_get_blob(handle, SGP41_STATE_KEY, state, &required);
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (required != sizeof(*state) ||
+        state->version != SGP41_STATE_VERSION ||
+        !sensors_sgp41_params_look_valid(&state->voc_params, GasIndexAlgorithm_ALGORITHM_TYPE_VOC) ||
+        !sensors_sgp41_params_look_valid(&state->nox_params, GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t sensors_store_sgp41_state(const sgp41_persisted_state_t *state)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(SGP41_STATE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_blob(handle, SGP41_STATE_KEY, state, sizeof(*state));
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+static bool sensors_prepare_sgp41_checkpoint_locked(sgp41_persisted_state_t *state, int64_t now_ms, bool force)
+{
+    if (!s_ctx.sgp41_initialized || s_ctx.sgp41_measurement_started_ms <= 0) {
+        return false;
+    }
+    if (!force && (!s_ctx.sgp41_state_dirty || (now_ms - s_ctx.sgp41_state_saved_at_ms) < SGP41_STATE_SAVE_INTERVAL_MS)) {
+        return false;
+    }
+
+    int64_t elapsed_ms = now_ms - s_ctx.sgp41_measurement_started_ms;
+    if (elapsed_ms < 0) {
+        elapsed_ms = 0;
+    }
+
+    memset(state, 0, sizeof(*state));
+    state->version = SGP41_STATE_VERSION;
+    state->measurement_elapsed_s = (uint32_t)(elapsed_ms / 1000);
+    state->conditioning_remaining_s = s_ctx.sgp41_conditioning_remaining_s;
+    state->voc_index = s_ctx.snapshot.voc_index;
+    state->nox_index = s_ctx.snapshot.nox_index;
+    state->voc_params = s_ctx.sgp41_voc_params;
+    state->nox_params = s_ctx.sgp41_nox_params;
+    return sgp41_get_serial_number(&s_ctx.sgp41, state->serial_number) == ESP_OK;
+}
+
+static esp_err_t sensors_checkpoint_sgp41_state_internal(bool force)
+{
+    if (s_ctx.lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    sgp41_persisted_state_t state = {0};
+    int64_t now_ms = esp_timer_get_time() / 1000;
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    bool should_save = sensors_prepare_sgp41_checkpoint_locked(&state, now_ms, force);
+    xSemaphoreGive(s_ctx.lock);
+
+    if (!should_save) {
+        return ESP_OK;
+    }
+
+    esp_err_t err = sensors_store_sgp41_state(&state);
+    if (err == ESP_OK) {
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+        s_ctx.sgp41_state_dirty = false;
+        s_ctx.sgp41_state_saved_at_ms = now_ms;
+        xSemaphoreGive(s_ctx.lock);
+    }
+    return err;
+}
 
 static void sensors_clear_co2_compensation_locked(void)
 {
@@ -537,8 +651,11 @@ static esp_err_t sensors_init_scd41(void)
 static esp_err_t sensors_init_sgp41(void)
 {
     uint16_t serial_number[3] = {0};
+    sgp41_persisted_state_t persisted = {0};
     esp_err_t err = ESP_OK;
     i2c_master_bus_handle_t shared_bus = NULL;
+    bool restored = false;
+    int64_t now_ms = 0;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     if (s_ctx.sgp41_initialized) {
@@ -567,9 +684,27 @@ static esp_err_t sensors_init_sgp41(void)
         GasIndexAlgorithm_init(&s_ctx.sgp41_voc_params, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
         GasIndexAlgorithm_init(&s_ctx.sgp41_nox_params, GasIndexAlgorithm_ALGORITHM_TYPE_NOX);
         s_ctx.sgp41_conditioning_remaining_s = SGP41_CONDITIONING_SEC;
-        s_ctx.sgp41_measurement_started_ms = esp_timer_get_time() / 1000;
+        now_ms = esp_timer_get_time() / 1000;
+        s_ctx.sgp41_measurement_started_ms = now_ms;
+        if (sensors_load_sgp41_state(&persisted) == ESP_OK &&
+            memcmp(persisted.serial_number, serial_number, sizeof(serial_number)) == 0) {
+            s_ctx.sgp41_voc_params = persisted.voc_params;
+            s_ctx.sgp41_nox_params = persisted.nox_params;
+            s_ctx.sgp41_conditioning_remaining_s =
+                persisted.conditioning_remaining_s > SGP41_CONDITIONING_SEC ? SGP41_CONDITIONING_SEC : persisted.conditioning_remaining_s;
+            s_ctx.sgp41_measurement_started_ms =
+                now_ms - ((int64_t)persisted.measurement_elapsed_s * 1000LL);
+            if (s_ctx.sgp41_measurement_started_ms <= 0 || s_ctx.sgp41_measurement_started_ms > now_ms) {
+                s_ctx.sgp41_measurement_started_ms = now_ms;
+            }
+            s_ctx.snapshot.voc_index = persisted.voc_index;
+            s_ctx.snapshot.nox_index = persisted.nox_index;
+            restored = true;
+        }
         s_ctx.sgp41_initialized = true;
-        sensors_update_sgp41_validity_locked(s_ctx.sgp41_measurement_started_ms);
+        s_ctx.sgp41_state_saved_at_ms = now_ms;
+        s_ctx.sgp41_state_dirty = !restored;
+        sensors_update_sgp41_validity_locked(now_ms);
     } else if (s_ctx.sgp41.dev_handle != NULL || s_ctx.sgp41.bus_handle != NULL) {
         sgp41_deinit(&s_ctx.sgp41);
         memset(&s_ctx.sgp41, 0, sizeof(s_ctx.sgp41));
@@ -892,6 +1027,7 @@ static void sensor_task(void *arg)
                         s_ctx.snapshot.nox_index = nox_index;
                         sensors_update_sgp41_validity_locked(now_ms);
                         s_ctx.snapshot.updated_at_ms = now_ms;
+                        s_ctx.sgp41_state_dirty = true;
                         sample_ok = true;
                     }
                 }
@@ -899,6 +1035,12 @@ static void sensor_task(void *arg)
             xSemaphoreGive(s_ctx.lock);
 
             if (sample_ok) {
+                if (!conditioning) {
+                    esp_err_t checkpoint_err = sensors_checkpoint_sgp41_state_internal(false);
+                    if (checkpoint_err != ESP_OK) {
+                        ESP_LOGW(TAG, "failed to checkpoint SGP41 state: %d", checkpoint_err);
+                    }
+                }
                 sensors_clear_sgp41_error();
             } else if (err != ESP_OK) {
                 sensors_reset_sgp41();
@@ -981,6 +1123,11 @@ esp_err_t sensors_start(const device_config_t *config)
     return ESP_OK;
 }
 
+esp_err_t sensors_checkpoint_sgp41_state(void)
+{
+    return sensors_checkpoint_sgp41_state_internal(true);
+}
+
 void sensors_stop(void)
 {
     if (s_ctx.running) {
@@ -993,6 +1140,10 @@ void sensors_stop(void)
         ESP_LOGW(TAG, "sensor task did not exit cleanly, forcing delete");
         vTaskDelete(s_ctx.task_handle);
         s_ctx.task_handle = NULL;
+    }
+    esp_err_t checkpoint_err = sensors_checkpoint_sgp41_state_internal(true);
+    if (checkpoint_err != ESP_OK && checkpoint_err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "failed to checkpoint SGP41 state during stop: %d", checkpoint_err);
     }
     if (s_ctx.bmp390_initialized) {
         bmp390_deinit(&s_ctx.bmp390);

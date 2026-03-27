@@ -9,6 +9,7 @@
 
 esp_err_t sensors_start(const device_config_t *config);
 void sensors_stop(void);
+esp_err_t sensors_checkpoint_sgp41_state(void);
 esp_err_t sensors_get_snapshot(sensor_snapshot_t *snapshot);
 bool sensors_any_ready(void);
 bool sensors_all_ready(void);

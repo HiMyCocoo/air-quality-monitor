@@ -958,6 +958,47 @@
       color: var(--text-muted);
     }
 
+    .ota-progress {
+      margin-top: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .ota-progress[hidden] {
+      display: none;
+    }
+
+    .ota-progress-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .ota-progress-head strong {
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ota-progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.08);
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .ota-progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--primary), #4fd1c5);
+      transition: width 0.2s ease;
+    }
+
     /* Subsections */
     .subsection {
       padding-top: 24px;
@@ -1667,12 +1708,21 @@
                   <span class="file-picker-hint">支持 .bin 格式，上传后系统将隐式校验完整性。</span>
                 </span>
               </label>
+              <div id="ota_progress" class="ota-progress" hidden>
+                <div class="ota-progress-head">
+                  <span id="ota_progress_label">等待上传</span>
+                  <strong id="ota_progress_percent">0%</strong>
+                </div>
+                <div class="ota-progress-track">
+                  <div id="ota_progress_fill" class="ota-progress-fill"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         <div class="settings-footer">
           <p class="desc">升级过程大约需要 30-60 秒，期间设备会停止响应且请勿断开电源。</p>
-          <button onclick="uploadFirmware()">开始上传并升级</button>
+          <button id="ota_upload_btn" onclick="uploadFirmware()">开始上传并升级</button>
         </div>
       </div>
 
@@ -1709,6 +1759,11 @@
     const firmwareInput = document.getElementById('firmware');
     const firmwareNameEl = document.getElementById('firmware_name');
     const firmwareVersionTextEl = document.getElementById('firmware_version_text');
+    const otaProgressEl = document.getElementById('ota_progress');
+    const otaProgressLabelEl = document.getElementById('ota_progress_label');
+    const otaProgressPercentEl = document.getElementById('ota_progress_percent');
+    const otaProgressFillEl = document.getElementById('ota_progress_fill');
+    const otaUploadBtn = document.getElementById('ota_upload_btn');
     const mqttPrivacyHintEl = document.getElementById('mqtt_privacy_hint');
     const ascToggle = document.getElementById('asc_toggle');
     const ascStatusText = document.getElementById('asc_status_text');
@@ -1724,6 +1779,7 @@
 
     let configDirty = false;
     let mqttUrlDirty = false;
+    let otaUploading = false;
     const activeTabStorageKey = 'airmon-active-tab';
 
     const categoryLabels = { 'Good': '良好', 'Moderate': '一般', 'Unhealthy for Sensitive Groups': '敏感人群不健康', 'Unhealthy': '不健康', 'Very Unhealthy': '非常不健康', 'Hazardous': '危险', 'Unavailable': '暂不可用' };
@@ -1770,6 +1826,15 @@
     };
 
     function translate(map, value, fallback = '未提供') { return map[value] || value || fallback; }
+    function formatTempOffsetValue(value) {
+      if (value == null || value === '') return '';
+      const n = Number(value);
+      return Number.isNaN(n) ? '' : n.toFixed(1);
+    }
+    function roundToSingleDecimal(value) {
+      const n = Number(value);
+      return Number.isNaN(n) ? 0 : Math.round(n * 10) / 10;
+    }
     function num(value, digits = 0, unit = '') {
       if (value == null || value === '') return '--';
       const n = Number(value);
@@ -1928,11 +1993,36 @@
       }
     }
 
+    function setOtaUploadState({ visible, uploading, label, progress }) {
+      otaUploading = !!uploading;
+      otaProgressEl.hidden = !visible;
+      otaProgressLabelEl.textContent = label;
+      const clamped = Math.max(0, Math.min(100, Number(progress) || 0));
+      otaProgressPercentEl.textContent = `${Math.round(clamped)}%`;
+      otaProgressFillEl.style.width = `${clamped}%`;
+      firmwareInput.disabled = otaUploading;
+      otaUploadBtn.disabled = otaUploading;
+      otaUploadBtn.textContent = otaUploading ? '上传中...' : '开始上传并升级';
+    }
+
+    function getXhrErrorMessage(xhr, fallback) {
+      try {
+        const payload = xhr.responseType === 'json' ? xhr.response : JSON.parse(xhr.responseText);
+        if (payload && payload.message) return payload.message;
+      } catch (_) { }
+      return xhr.responseText || fallback;
+    }
+
     function setConfigValues(d) {
       if (!configDirty) {
         for (const k of configFields) {
           const el = configInputs[k];
-          if (el) el.value = d.config[k] == null ? '' : d.config[k];
+          if (!el) continue;
+          if (k === 'scd41_temp_offset_c') {
+            el.value = formatTempOffsetValue(d.config[k]);
+            continue;
+          }
+          el.value = d.config[k] == null ? '' : d.config[k];
         }
       }
       mqttPrivacyHintEl.textContent = d.config.mqtt_auth_configured
@@ -2046,9 +2136,9 @@
 
       overviewSystemEl.innerHTML = [
         kv('设备标识', d.diag.device_id),
+        kv('固件版本', d.diag.firmware_version || '--'),
         kv('CO2 补偿', co2CompensationLabel(d)),
-        kv('样本发布时间', fmtAge(d.snapshot.sample_age_sec)),
-        kv('系统内存', `${(d.diag.heap_free / 1024).toFixed(1)} KB 空闲`),
+        kv('运行时长', fmtAge(d.diag.uptime_sec)),
         kv('最近错误', lastErrorStatus(d))
       ].join('');
 
@@ -2111,7 +2201,7 @@
     async function saveConfig() {
       const payload = {
         scd41_altitude_m: Number(configInputs.scd41_altitude_m.value),
-        scd41_temp_offset_c: Number(configInputs.scd41_temp_offset_c.value)
+        scd41_temp_offset_c: roundToSingleDecimal(configInputs.scd41_temp_offset_c.value)
       };
       if (mqttUrlDirty) {
         payload.mqtt_url = configInputs.mqtt_url.value;
@@ -2168,9 +2258,51 @@
     async function restartDevice() { await apiRequest('/api/action/restart', { method: 'POST' }, '请求失败', '已请求重启'); }
     async function factoryReset() { if (confirm('⚠️ 此操作将清除所有 Wi-Fi 和 MQTT 配置，是否继续？')) { await apiRequest('/api/action/factory-reset', { method: 'POST' }, '失败', '设备即将初始化完毕'); } }
     async function uploadFirmware() {
+      if (otaUploading) return;
       const file = firmwareInput.files[0];
       if (!file) { showNotice('info', '请选择固件'); return; }
-      if (await apiRequest('/api/ota', { method: 'POST', body: file }, 'OTA 升级失败')) { showNotice('success', '固件上传及校验成功，即将重启！'); }
+
+      setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: 0 });
+
+      await new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/ota');
+        xhr.responseType = 'json';
+
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) {
+            setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: 0 });
+            return;
+          }
+          const percent = event.total > 0 ? (event.loaded / event.total) * 100 : 0;
+          setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: percent });
+        };
+
+        xhr.upload.onload = () => {
+          setOtaUploadState({ visible: true, uploading: true, label: '上传完成，正在校验并切换固件...', progress: 100 });
+        };
+
+        xhr.onerror = () => {
+          setOtaUploadState({ visible: true, uploading: false, label: '上传失败', progress: 0 });
+          showNotice('error', 'OTA 升级失败: 网络连接已中断');
+          resolve();
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setOtaUploadState({ visible: true, uploading: false, label: '固件校验完成，设备即将重启', progress: 100 });
+            showNotice('success', '固件上传及校验成功，即将重启！');
+            resolve();
+            return;
+          }
+
+          setOtaUploadState({ visible: true, uploading: false, label: '升级失败，请重试', progress: 0 });
+          showNotice('error', getXhrErrorMessage(xhr, 'OTA 升级失败'));
+          resolve();
+        };
+
+        xhr.send(file);
+      });
     }
 
     for (const key of configFields) {
@@ -2183,6 +2315,10 @@
       }
     }
     firmwareInput.addEventListener('change', syncFirmwareLabel);
+    configInputs.scd41_temp_offset_c.addEventListener('blur', () => {
+      const value = formatTempOffsetValue(configInputs.scd41_temp_offset_c.value);
+      configInputs.scd41_temp_offset_c.value = value;
+    });
     ascToggle.addEventListener('change', async () => {
       const nextValue = ascToggle.checked;
       const previousValue = !nextValue;

@@ -1,5 +1,6 @@
 #include "platform_config.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -35,6 +36,8 @@ void platform_config_sanitize(device_config_t *config, const char *device_id)
     }
     if (config->scd41_temp_offset_c < 0.0f || config->scd41_temp_offset_c > 20.0f) {
         config->scd41_temp_offset_c = 0.0f;
+    } else {
+        config->scd41_temp_offset_c = roundf(config->scd41_temp_offset_c * 10.0f) / 10.0f;
     }
     if (config->scd41_altitude_m > 3000) {
         config->scd41_altitude_m = 0;
