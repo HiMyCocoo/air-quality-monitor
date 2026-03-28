@@ -1959,6 +1959,9 @@
     function particleCard(label, value, meta = '') {
       return `<article class='particle-card'><span class='particle-card-label'>${label}</span><strong class='particle-card-value'>${value || '--'}</strong>${meta ? `<small class='particle-card-meta'>${meta}</small>` : ''}</article>`;
     }
+    function normalizeMicronText(value) {
+      return String(value || '').replace(/\bum\b/g, 'µm');
+    }
     function metric(label, value, meta = '', variant = 'secondary', unitBadge = '', tone = '') { return `<div class='metric metric-${variant}${tone ? ` metric-tone-${tone}` : ''}'><span>${label}</span><div class='metric-value'><strong>${value || '--'}</strong>${unitBadge ? `<em class='metric-unit'>${unitBadge}</em>` : ''}</div>${meta ? `<small>${meta}</small>` : ''}</div>`; }
     function summaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-${tone || 'neutral'}'><strong>${value}</strong><span>${detail}</span></div>`; }
     function compactSummaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-banner-compact summary-${tone || 'neutral'}'><strong>${value}</strong>${detail ? `<span>${detail}</span>` : ''}</div>`; }
@@ -1973,8 +1976,8 @@
       return {
         fineShare: Number(match[1]),
         coarseShare: Number(match[2]),
-        dominantMassBand: match[3],
-        dominantCountBand: match[4],
+        dominantMassBand: normalizeMicronText(match[3]),
+        dominantCountBand: normalizeMicronText(match[4]),
         typicalSize: Number(match[5])
       };
     }
@@ -2005,14 +2008,15 @@
       const scientificPattern = /^PM2\.5 is ([0-9.]+)% of PM10, PM10-2\.5 is ([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\.$/;
       const scientificMatch = text.match(scientificPattern);
       if (scientificMatch) {
-        return `PM2.5 约占 PM10 的 ${scientificMatch[1]}%，粗颗粒（PM10-2.5）约占 ${scientificMatch[2]}%，质量峰值在 ${scientificMatch[3]}，数量峰值在 ${scientificMatch[4]}，典型粒径 ${scientificMatch[5]} µm`;
+        return `PM2.5 约占 PM10 的 ${scientificMatch[1]}%，粗颗粒（PM10-2.5）约占 ${scientificMatch[2]}%，质量峰值在 ${normalizeMicronText(scientificMatch[3])}，数量峰值在 ${normalizeMicronText(scientificMatch[4])}，典型粒径 ${scientificMatch[5]} µm`;
       }
       const englishPattern = /^Mass is led by (.+), counts are led by (.+), typical size ([0-9.]+) um\.$/;
       const match = text.match(englishPattern);
       if (match) {
-        return `质量主导区间 ${match[1]}，数量主导区间 ${match[2]}，典型粒径 ${match[3]} µm`;
+        return `质量主导区间 ${normalizeMicronText(match[1])}，数量主导区间 ${normalizeMicronText(match[2])}，典型粒径 ${match[3]} µm`;
       }
       return text
+        .replace(/\bum\b/g, 'µm')
         .replace(/。$/, '')
         .replace(/^以/, '')
         .replace(/为主，常见于/, '，常见于');
