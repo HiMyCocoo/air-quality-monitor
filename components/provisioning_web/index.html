@@ -329,10 +329,54 @@
       color: var(--text-main);
     }
 
+    .particle-section-grid {
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
+
     .particle-grid .kv {
       background: rgba(255, 255, 255, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.78);
       border-radius: 14px;
+    }
+
+    .particle-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 104px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      border-radius: 16px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .particle-card-label {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .particle-card-value {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.1;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .particle-card-value .kv-unit {
+      font-size: 0.58em;
+      margin-left: 6px;
+    }
+
+    .particle-card-meta {
+      margin-top: auto;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.35;
     }
 
     .metric {
@@ -1907,6 +1951,9 @@
 
     // Components
     function kv(label, value) { return `<div class='kv'><span>${label}</span><strong>${value || '--'}</strong></div>`; }
+    function particleCard(label, value, meta = '') {
+      return `<article class='particle-card'><span class='particle-card-label'>${label}</span><strong class='particle-card-value'>${value || '--'}</strong>${meta ? `<small class='particle-card-meta'>${meta}</small>` : ''}</article>`;
+    }
     function metric(label, value, meta = '', variant = 'secondary', unitBadge = '', tone = '') { return `<div class='metric metric-${variant}${tone ? ` metric-tone-${tone}` : ''}'><span>${label}</span><div class='metric-value'><strong>${value || '--'}</strong>${unitBadge ? `<em class='metric-unit'>${unitBadge}</em>` : ''}</div>${meta ? `<small>${meta}</small>` : ''}</div>`; }
     function summaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-${tone || 'neutral'}'><strong>${value}</strong><span>${detail}</span></div>`; }
     function compactSummaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-banner-compact summary-${tone || 'neutral'}'><strong>${value}</strong>${detail ? `<span>${detail}</span>` : ''}</div>`; }
@@ -2317,24 +2364,24 @@
       const particleInsight = parseParticleInsight(d.snapshot.particle_profile_note);
       particleMetricsEl.innerHTML = `<div class='particle-sections'>${[
         particleSection('PM 质量浓度', [
-          kv('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³')),
-          kv('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³')),
-          kv('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³')),
-          kv('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³'))
+          particleCard('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³'), '超细到细颗粒质量浓度'),
+          particleCard('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³'), '最常用的细颗粒指标'),
+          particleCard('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³'), '介于 PM2.5 和 PM10 之间'),
+          particleCard('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³'), '可吸入颗粒物总量')
         ]),
         particleSection('颗粒数', [
-          kv('>0.5 µm', num(d.snapshot.particles_0_5um, 1, ' #/cm³')),
-          kv('>1.0 µm', num(d.snapshot.particles_1_0um, 1, ' #/cm³')),
-          kv('>2.5 µm', num(d.snapshot.particles_2_5um, 1, ' #/cm³')),
-          kv('>4.0 µm', num(d.snapshot.particles_4_0um, 1, ' #/cm³')),
-          kv('>10.0 µm', num(d.snapshot.particles_10_0um, 1, ' #/cm³'))
+          particleCard('>0.5 µm', num(d.snapshot.particles_0_5um, 1, ' #/cm³'), '大于 0.5 微米的累计颗粒数'),
+          particleCard('>1.0 µm', num(d.snapshot.particles_1_0um, 1, ' #/cm³'), '大于 1.0 微米的累计颗粒数'),
+          particleCard('>2.5 µm', num(d.snapshot.particles_2_5um, 1, ' #/cm³'), '大于 2.5 微米的累计颗粒数'),
+          particleCard('>4.0 µm', num(d.snapshot.particles_4_0um, 1, ' #/cm³'), '大于 4.0 微米的累计颗粒数'),
+          particleCard('>10.0 µm', num(d.snapshot.particles_10_0um, 1, ' #/cm³'), '大于 10.0 微米的累计颗粒数')
         ]),
         particleSection('画像判读', [
-          kv('质量主导区间', particleInsight ? particleInsight.dominantMassBand : '--'),
-          kv('数量主导区间', particleInsight ? particleInsight.dominantCountBand : '--'),
-          kv('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm')),
-          kv('PM2.5 占比', particleInsight ? `${particleInsight.fineShare.toFixed(0)}%` : '--'),
-          kv('粗颗粒占比', particleInsight ? `${particleInsight.coarseShare.toFixed(0)}%` : '--')
+          particleCard('质量主导区间', particleInsight ? particleInsight.dominantMassBand : '--', '哪一段粒径对总质量贡献最大'),
+          particleCard('数量主导区间', particleInsight ? particleInsight.dominantCountBand : '--', '哪一段粒径的颗粒个数最多'),
+          particleCard('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'), '当前样本的代表性粒径'),
+          particleCard('PM2.5 占比', particleInsight ? `${particleInsight.fineShare.toFixed(0)}%` : '--', '细颗粒在 PM10 中的质量占比'),
+          particleCard('粗颗粒占比', particleInsight ? `${particleInsight.coarseShare.toFixed(0)}%` : '--', 'PM10-2.5 在 PM10 中的质量占比')
         ])
       ].join('')}</div>`;
 
