@@ -39,6 +39,11 @@
 #define SGP41_STATE_VERSION 2
 #define SGP41_STATE_SAVE_INTERVAL_MS (300000LL)
 #define SPS30_FAN_CLEANING_DURATION_MS (10000LL)
+#define TREND_STATE_NAMESPACE "airmon_trend"
+#define BMP390_HISTORY_KEY "bmp390_hist"
+#define SCD41_HUMIDITY_HISTORY_KEY "scd41_hum"
+#define TREND_STATE_VERSION 1
+#define TREND_STATE_SAVE_INTERVAL_MS (300000LL)
 
 static const char *TAG = "sensors";
 
@@ -84,9 +89,13 @@ typedef struct {
     int64_t co2_compensation_updated_at_ms;
     int64_t sps30_warmup_until_ms;
     int64_t sgp41_state_saved_at_ms;
+    int64_t bmp390_history_saved_at_ms;
+    int64_t scd41_humidity_history_saved_at_ms;
     uint32_t co2_compensation_pressure_pa;
     uint8_t sgp41_conditioning_remaining_s;
     bool sgp41_state_dirty;
+    bool bmp390_history_dirty;
+    bool scd41_humidity_history_dirty;
 } sensors_ctx_t;
 
 static sensors_ctx_t s_ctx;
@@ -290,7 +299,7 @@ static esp_err_t sensors_store_sgp41_state(const sgp41_persisted_state_t *state)
 
 static bool sensors_prepare_sgp41_checkpoint_locked(sgp41_persisted_state_t *state, int64_t now_ms, bool force)
 {
-    if (!s_ctx.sgp41_initialized || s_ctx.sgp41_measurement_started_ms <= 0) {
+    if (!s_ctx.sgp41_initialized || s_ctx.sgp41_measurement_started_ms == 0) {
         return false;
     }
     if (!force && (!s_ctx.sgp41_state_dirty || (now_ms - s_ctx.sgp41_state_saved_at_ms) < SGP41_STATE_SAVE_INTERVAL_MS)) {
@@ -344,6 +353,221 @@ static esp_err_t sensors_checkpoint_sgp41_state_internal(bool force)
                  state.nox_index);
     }
     return err;
+}
+
+/* ── BMP390 pressure history persistence ────────────────────────────── */
+
+typedef struct {
+    int64_t offset_ms;   /* milliseconds before save-time */
+    float   pressure_hpa;
+} bmp390_persisted_entry_t;
+
+typedef struct {
+    uint32_t version;
+    uint32_t count;
+    uint32_t write_index;
+    bmp390_persisted_entry_t entries[BMP390_PRESSURE_HISTORY_LEN];
+} bmp390_persisted_history_t;
+
+static esp_err_t sensors_store_bmp390_history(int64_t now_ms)
+{
+    bmp390_persisted_history_t persisted = {0};
+    persisted.version = TREND_STATE_VERSION;
+    persisted.count   = (uint32_t)s_ctx.bmp390_pressure_history_count;
+    persisted.write_index = (uint32_t)s_ctx.bmp390_pressure_history_index;
+
+    for (size_t i = 0; i < s_ctx.bmp390_pressure_history_count; ++i) {
+        persisted.entries[i].pressure_hpa = s_ctx.bmp390_pressure_history[i].pressure_hpa;
+        persisted.entries[i].offset_ms    = now_ms - s_ctx.bmp390_pressure_history[i].captured_at_ms;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_set_blob(handle, BMP390_HISTORY_KEY, &persisted, sizeof(persisted));
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+static esp_err_t sensors_load_bmp390_history(int64_t now_ms)
+{
+    bmp390_persisted_history_t persisted = {0};
+    size_t required = sizeof(persisted);
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_get_blob(handle, BMP390_HISTORY_KEY, &persisted, &required);
+    nvs_close(handle);
+    if (err != ESP_OK || required != sizeof(persisted)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (persisted.version != TREND_STATE_VERSION ||
+        persisted.count > BMP390_PRESSURE_HISTORY_LEN ||
+        persisted.write_index >= BMP390_PRESSURE_HISTORY_LEN) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    for (size_t i = 0; i < persisted.count; ++i) {
+        if (!isfinite(persisted.entries[i].pressure_hpa) ||
+            persisted.entries[i].pressure_hpa <= 0.0f ||
+            persisted.entries[i].offset_ms < 0) {
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+
+    s_ctx.bmp390_pressure_history_count = persisted.count;
+    s_ctx.bmp390_pressure_history_index = persisted.write_index;
+    for (size_t i = 0; i < persisted.count; ++i) {
+        s_ctx.bmp390_pressure_history[i].pressure_hpa = persisted.entries[i].pressure_hpa;
+        s_ctx.bmp390_pressure_history[i].captured_at_ms = now_ms - persisted.entries[i].offset_ms;
+    }
+
+    ESP_LOGI(TAG, "BMP390 pressure history restored: %u samples", (unsigned)persisted.count);
+    return ESP_OK;
+}
+
+static void sensors_checkpoint_bmp390_history(bool force)
+{
+    if (s_ctx.lock == NULL) {
+        return;
+    }
+
+    int64_t now_ms = esp_timer_get_time() / 1000;
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    bool should_save = s_ctx.bmp390_history_dirty &&
+                       (force || (now_ms - s_ctx.bmp390_history_saved_at_ms) >= TREND_STATE_SAVE_INTERVAL_MS);
+    if (!should_save || s_ctx.bmp390_pressure_history_count == 0) {
+        xSemaphoreGive(s_ctx.lock);
+        return;
+    }
+
+    esp_err_t err = sensors_store_bmp390_history(now_ms);
+    if (err == ESP_OK) {
+        s_ctx.bmp390_history_dirty = false;
+        s_ctx.bmp390_history_saved_at_ms = now_ms;
+    }
+    xSemaphoreGive(s_ctx.lock);
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "BMP390 pressure history checkpoint saved: %u samples",
+                 (unsigned)s_ctx.bmp390_pressure_history_count);
+    }
+}
+
+/* ── SCD41 humidity history persistence ─────────────────────────────── */
+
+typedef struct {
+    int64_t offset_ms;
+    float   humidity_rh;
+} scd41_persisted_humidity_entry_t;
+
+typedef struct {
+    uint32_t version;
+    uint32_t count;
+    uint32_t write_index;
+    scd41_persisted_humidity_entry_t entries[SCD41_HUMIDITY_HISTORY_LEN];
+} scd41_persisted_humidity_history_t;
+
+static esp_err_t sensors_store_scd41_humidity_history(int64_t now_ms)
+{
+    scd41_persisted_humidity_history_t persisted = {0};
+    persisted.version     = TREND_STATE_VERSION;
+    persisted.count       = (uint32_t)s_ctx.scd41_humidity_history_count;
+    persisted.write_index = (uint32_t)s_ctx.scd41_humidity_history_index;
+
+    for (size_t i = 0; i < s_ctx.scd41_humidity_history_count; ++i) {
+        persisted.entries[i].humidity_rh = s_ctx.scd41_humidity_history[i].humidity_rh;
+        persisted.entries[i].offset_ms   = now_ms - s_ctx.scd41_humidity_history[i].captured_at_ms;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_set_blob(handle, SCD41_HUMIDITY_HISTORY_KEY, &persisted, sizeof(persisted));
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+static esp_err_t sensors_load_scd41_humidity_history(int64_t now_ms)
+{
+    scd41_persisted_humidity_history_t persisted = {0};
+    size_t required = sizeof(persisted);
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_get_blob(handle, SCD41_HUMIDITY_HISTORY_KEY, &persisted, &required);
+    nvs_close(handle);
+    if (err != ESP_OK || required != sizeof(persisted)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (persisted.version != TREND_STATE_VERSION ||
+        persisted.count > SCD41_HUMIDITY_HISTORY_LEN ||
+        persisted.write_index >= SCD41_HUMIDITY_HISTORY_LEN) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    for (size_t i = 0; i < persisted.count; ++i) {
+        if (!isfinite(persisted.entries[i].humidity_rh) ||
+            persisted.entries[i].humidity_rh < 0.0f ||
+            persisted.entries[i].humidity_rh > 100.0f ||
+            persisted.entries[i].offset_ms < 0) {
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+
+    s_ctx.scd41_humidity_history_count = persisted.count;
+    s_ctx.scd41_humidity_history_index = persisted.write_index;
+    for (size_t i = 0; i < persisted.count; ++i) {
+        s_ctx.scd41_humidity_history[i].humidity_rh    = persisted.entries[i].humidity_rh;
+        s_ctx.scd41_humidity_history[i].captured_at_ms = now_ms - persisted.entries[i].offset_ms;
+    }
+
+    ESP_LOGI(TAG, "SCD41 humidity history restored: %u samples", (unsigned)persisted.count);
+    return ESP_OK;
+}
+
+static void sensors_checkpoint_scd41_humidity_history(bool force)
+{
+    if (s_ctx.lock == NULL) {
+        return;
+    }
+
+    int64_t now_ms = esp_timer_get_time() / 1000;
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    bool should_save = s_ctx.scd41_humidity_history_dirty &&
+                       (force || (now_ms - s_ctx.scd41_humidity_history_saved_at_ms) >= TREND_STATE_SAVE_INTERVAL_MS);
+    if (!should_save || s_ctx.scd41_humidity_history_count == 0) {
+        xSemaphoreGive(s_ctx.lock);
+        return;
+    }
+
+    esp_err_t err = sensors_store_scd41_humidity_history(now_ms);
+    if (err == ESP_OK) {
+        s_ctx.scd41_humidity_history_dirty = false;
+        s_ctx.scd41_humidity_history_saved_at_ms = now_ms;
+    }
+    xSemaphoreGive(s_ctx.lock);
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "SCD41 humidity history checkpoint saved: %u samples",
+                 (unsigned)s_ctx.scd41_humidity_history_count);
+    }
 }
 
 static void sensors_clear_co2_compensation_locked(void)
@@ -479,6 +703,7 @@ static void sensors_update_bmp390_pressure_trend_locked(float pressure_hpa, int6
         if (s_ctx.bmp390_pressure_history_count < BMP390_PRESSURE_HISTORY_LEN) {
             s_ctx.bmp390_pressure_history_count++;
         }
+        s_ctx.bmp390_history_dirty = true;
     }
 
     size_t oldest_index = s_ctx.bmp390_pressure_history_count == BMP390_PRESSURE_HISTORY_LEN
@@ -550,6 +775,7 @@ static void sensors_update_scd41_humidity_trend_locked(float humidity_rh, int64_
         if (s_ctx.scd41_humidity_history_count < SCD41_HUMIDITY_HISTORY_LEN) {
             s_ctx.scd41_humidity_history_count++;
         }
+        s_ctx.scd41_humidity_history_dirty = true;
     }
 
     size_t oldest_index = s_ctx.scd41_humidity_history_count == SCD41_HUMIDITY_HISTORY_LEN
@@ -771,7 +997,10 @@ static uint32_t sensors_remaining_seconds(int64_t started_ms, int64_t duration_m
         return 0;
     }
 
-    int64_t elapsed_ms = started_ms > 0 ? now_ms - started_ms : 0;
+    /* started_ms may be negative after restoring a checkpoint: it means
+     * the measurement logically started before the current boot.  A value
+     * of exactly 0 means "not started yet". */
+    int64_t elapsed_ms = (started_ms != 0) ? now_ms - started_ms : 0;
     if (elapsed_ms < 0) {
         elapsed_ms = 0;
     }
@@ -1013,9 +1242,14 @@ static esp_err_t sensors_init_sgp41(void)
             sensors_deserialize_sgp41_algorithm_state(&persisted.nox_state, &s_ctx.sgp41_nox_params);
             s_ctx.sgp41_conditioning_remaining_s =
                 persisted.conditioning_remaining_s > SGP41_CONDITIONING_SEC ? SGP41_CONDITIONING_SEC : persisted.conditioning_remaining_s;
+            /* Allow negative values: at early boot now_ms is tiny, so
+             * subtracting the elapsed seconds intentionally yields a
+             * negative timestamp that represents "started before boot".
+             * sensors_remaining_seconds() handles this correctly. */
             s_ctx.sgp41_measurement_started_ms =
                 now_ms - ((int64_t)persisted.measurement_elapsed_s * 1000LL);
-            if (s_ctx.sgp41_measurement_started_ms <= 0 || s_ctx.sgp41_measurement_started_ms > now_ms) {
+            if (s_ctx.sgp41_measurement_started_ms > now_ms) {
+                /* Overflow / corrupt data guard – fall back to fresh start */
                 s_ctx.sgp41_measurement_started_ms = now_ms;
             }
             s_ctx.snapshot.voc_index = persisted.voc_index;
@@ -1075,6 +1309,11 @@ static esp_err_t sensors_init_bmp390(void)
 
     if (err == ESP_OK) {
         s_ctx.bmp390_initialized = true;
+        /* Try to restore pressure ring buffer from NVS */
+        int64_t init_now_ms = esp_timer_get_time() / 1000;
+        if (sensors_load_bmp390_history(init_now_ms) != ESP_OK) {
+            ESP_LOGI(TAG, "BMP390 pressure history: starting fresh");
+        }
     } else if (s_ctx.bmp390.dev_handle != NULL || s_ctx.bmp390.bus_handle != NULL) {
         bmp390_deinit(&s_ctx.bmp390);
         memset(&s_ctx.bmp390, 0, sizeof(s_ctx.bmp390));
@@ -1415,6 +1654,10 @@ static void sensor_task(void *arg)
         }
 
         vTaskDelay(pdMS_TO_TICKS(200));
+
+        /* Periodic trend history checkpoints */
+        sensors_checkpoint_bmp390_history(false);
+        sensors_checkpoint_scd41_humidity_history(false);
     }
 
     s_ctx.task_handle = NULL;
@@ -1433,6 +1676,14 @@ esp_err_t sensors_start(const device_config_t *config)
     if (sensors_init_scd41() != ESP_OK) {
         sensors_mark_scd41_invalid();
         sensors_set_scd41_error("init failed");
+    } else {
+        /* Try to restore humidity history from NVS (SCD41 must be initialized first) */
+        int64_t hum_now_ms = esp_timer_get_time() / 1000;
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+        if (sensors_load_scd41_humidity_history(hum_now_ms) != ESP_OK) {
+            ESP_LOGI(TAG, "SCD41 humidity history: starting fresh");
+        }
+        xSemaphoreGive(s_ctx.lock);
     }
     if (sensors_init_sgp41() != ESP_OK) {
         sensors_mark_sgp41_invalid();
@@ -1477,6 +1728,8 @@ void sensors_stop(void)
     if (checkpoint_err != ESP_OK && checkpoint_err != ESP_ERR_INVALID_STATE) {
         ESP_LOGW(TAG, "failed to checkpoint SGP41 state during stop: %d", checkpoint_err);
     }
+    sensors_checkpoint_bmp390_history(true);
+    sensors_checkpoint_scd41_humidity_history(true);
     if (s_ctx.bmp390_initialized) {
         bmp390_deinit(&s_ctx.bmp390);
         s_ctx.bmp390_initialized = false;

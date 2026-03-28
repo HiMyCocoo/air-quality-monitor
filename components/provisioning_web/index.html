@@ -17,9 +17,9 @@
       --text-muted: #718096;
       --bg-gradient-1: #e0c3fc;
       --bg-gradient-2: #8ec5fc;
-      --glass-bg: rgba(255, 255, 255, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.5);
-      --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+      --glass-bg: rgba(255, 255, 255, 0.6);
+      --glass-border: rgba(255, 255, 255, 0.4);
+      --glass-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
       --card-radius: 24px;
       --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 
@@ -59,6 +59,7 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-variant-numeric: tabular-nums;
       color: var(--text-main);
       background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
       background-attachment: fixed;
@@ -373,8 +374,9 @@
     }
 
     .particle-card-value .kv-unit {
-      font-size: 0.58em;
-      margin-left: 6px;
+      font-size: 0.65em;
+      margin-left: 4px;
+      font-style: normal;
     }
 
     .particle-card-meta {
@@ -2096,7 +2098,7 @@
       return {
         value: num(d.snapshot.pressure_trend_hpa_3h, 1),
         meta: `${translate(pressureTrendLabels, d.snapshot.pressure_trend)}，基于过去 ${d.snapshot.pressure_trend_span_min} 分钟`,
-        unit: 'hPa / 3h',
+        unit: 'hPa/3h',
         tone: ''
       };
     }
@@ -2111,10 +2113,10 @@
       } else {
         parts.push('未校时，季节按中性处理');
       }
-      parts.push(`气压 ${formatSigned(d.snapshot.pressure_trend_hpa_3h)} hPa / 3h`);
+      parts.push(`气压 ${formatSigned(d.snapshot.pressure_trend_hpa_3h)} hPa/3h`);
 
       if (d.snapshot.humidity_trend_valid) {
-        parts.push(`湿度 ${formatSigned(d.snapshot.humidity_trend_rh_3h)} %RH / 3h`);
+        parts.push(`湿度 ${formatSigned(d.snapshot.humidity_trend_rh_3h)} %RH/3h`);
       } else if (d.snapshot.scd41_valid && d.snapshot.humidity_rh != null) {
         parts.push(`当前湿度 ${num(d.snapshot.humidity_rh, 0)} %RH`);
       } else {
@@ -2352,13 +2354,13 @@
         : '';
 
       airMetricsPrimaryEl.innerHTML = [
-        metric('PM AQI 估算', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level), 'featured', 'AQI', d.snapshot.us_aqi_level_key || 'unavailable'),
+        metric('PM AQI 估算', num(d.snapshot.us_aqi), translate(categoryLabels, d.snapshot.us_aqi_level), 'featured', '', d.snapshot.us_aqi_level_key || 'unavailable'),
         metric('CO2 浓度', num(d.snapshot.co2_ppm), translate(co2SignalLabels, d.snapshot.co2_rating), 'primary', 'ppm')
       ].join('');
 
       airMetricsSecondaryEl.innerHTML = [
         metric('室内温度', num(d.snapshot.temperature_c, 1), d.snapshot.scd41_valid ? `SCD41，${translate(comfortLabels, d.snapshot.temperature_rating, '--')}` : 'SCD41 暂不可用', 'secondary', '°C'),
-        metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
+        metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%'),
         metric('当前气压', num(d.snapshot.pressure_hpa, 1), d.snapshot.bmp390_valid ? 'BMP390' : (d.diag.bmp390_ready ? '已连接' : '离线'), 'secondary', 'hPa'),
         metric('3 小时气压趋势', pressureTrendMetric.value, pressureTrendMetric.meta, 'secondary', pressureTrendMetric.unit, pressureTrendMetric.tone),
         metric('短时降雨可能', rainOutlookMetric.value, rainOutlookMetric.meta, 'secondary', rainOutlookMetric.unit, rainOutlookMetric.tone),
@@ -2373,22 +2375,22 @@
       const particleInsight = parseParticleInsight(d.snapshot.particle_profile_note);
       particleMetricsEl.innerHTML = `<div class='particle-sections'>${[
         particleSection('PM 质量浓度', [
-          particleCard('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³'), '超细到细颗粒质量浓度'),
-          particleCard('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³'), '最常用的细颗粒指标'),
-          particleCard('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³'), '介于 PM2.5 和 PM10 之间'),
-          particleCard('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³'), '可吸入颗粒物总量')
+          particleCard('PM1.0', num(d.snapshot.pm1_0, 1, 'µg/m³'), '超细到细颗粒质量浓度'),
+          particleCard('PM2.5', num(d.snapshot.pm2_5, 1, 'µg/m³'), '最常用的细颗粒指标'),
+          particleCard('PM4.0', num(d.snapshot.pm4_0, 1, 'µg/m³'), '介于 PM2.5 和 PM10 之间'),
+          particleCard('PM10', num(d.snapshot.pm10_0, 1, 'µg/m³'), '可吸入颗粒物总量')
         ]),
         particleSection('颗粒数', [
-          particleCard('>0.5 µm', num(d.snapshot.particles_0_5um, 1, ' #/cm³'), '大于 0.5 微米的累计颗粒数'),
-          particleCard('>1.0 µm', num(d.snapshot.particles_1_0um, 1, ' #/cm³'), '大于 1.0 微米的累计颗粒数'),
-          particleCard('>2.5 µm', num(d.snapshot.particles_2_5um, 1, ' #/cm³'), '大于 2.5 微米的累计颗粒数'),
-          particleCard('>4.0 µm', num(d.snapshot.particles_4_0um, 1, ' #/cm³'), '大于 4.0 微米的累计颗粒数'),
-          particleCard('>10.0 µm', num(d.snapshot.particles_10_0um, 1, ' #/cm³'), '大于 10.0 微米的累计颗粒数')
+          particleCard('<0.5 µm', num(d.snapshot.particles_0_5um, 1, '#/cm³'), '0.5 微米以内的总体颗粒数'),
+          particleCard('<1.0 µm', num(d.snapshot.particles_1_0um, 1, '#/cm³'), '1.0 微米以内的总体颗粒数'),
+          particleCard('<2.5 µm', num(d.snapshot.particles_2_5um, 1, '#/cm³'), '2.5 微米以内的总体颗粒数'),
+          particleCard('<4.0 µm', num(d.snapshot.particles_4_0um, 1, '#/cm³'), '4.0 微米以内的总体颗粒数'),
+          particleCard('<10.0 µm', num(d.snapshot.particles_10_0um, 1, '#/cm³'), '10.0 微米以内的总体颗粒数')
         ]),
         particleSection('画像判读', [
-          particleCard('质量主导区间', particleInsight ? particleInsight.dominantMassBand : '--', '哪一段粒径对总质量贡献最大'),
-          particleCard('数量主导区间', particleInsight ? particleInsight.dominantCountBand : '--', '哪一段粒径的颗粒个数最多'),
-          particleCard('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'), '当前样本的代表性粒径'),
+          particleCard('质量主导区间', particleInsight ? particleInsight.dominantMassBand.replace(' µm', '<em class="kv-unit">µm</em>') : '--', '哪一段粒径对总质量贡献最大'),
+          particleCard('数量主导区间', particleInsight ? particleInsight.dominantCountBand.replace(' µm', '<em class="kv-unit">µm</em>') : '--', '哪一段粒径的颗粒个数最多'),
+          particleCard('典型粒径', num(d.snapshot.typical_particle_size_um, 2, 'µm'), '当前样本的代表性粒径'),
           particleCard('PM2.5 占比', particleInsight ? `${particleInsight.fineShare.toFixed(0)}%` : '--', '细颗粒在 PM10 中的质量占比'),
           particleCard('粗颗粒占比', particleInsight ? `${particleInsight.coarseShare.toFixed(0)}%` : '--', 'PM10-2.5 在 PM10 中的质量占比')
         ])
