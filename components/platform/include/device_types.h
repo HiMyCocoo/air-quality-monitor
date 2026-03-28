@@ -60,6 +60,12 @@ typedef struct {
   float humidity_rh;
   float bmp390_temperature_c;
   float pressure_hpa;
+  bool pressure_trend_valid;
+  float pressure_trend_hpa_3h;
+  uint16_t pressure_trend_span_min;
+  bool humidity_trend_valid;
+  float humidity_trend_rh_3h;
+  uint16_t humidity_trend_span_min;
   int32_t voc_index;
   int32_t nox_index;
   float pm1_0;

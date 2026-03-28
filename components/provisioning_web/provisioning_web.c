@@ -416,6 +416,8 @@ static esp_err_t status_handler(httpd_req_t *req)
     air_quality_compute_overall_assessment(&snapshot, &assessment);
     air_quality_particle_insight_t particle = {0};
     air_quality_compute_particle_insight(&snapshot, &particle);
+    air_quality_rain_analysis_t rain = {0};
+    air_quality_analyze_rain(&snapshot, &rain);
     int64_t now_ms = esp_timer_get_time() / 1000;
     build_public_mqtt_url_string(&config, mqtt_url, sizeof(mqtt_url));
 
@@ -496,6 +498,32 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNullToObject(snapshot_json, "bmp390_temperature_c");
         cJSON_AddNullToObject(snapshot_json, "pressure_hpa");
     }
+    if (snapshot.pressure_trend_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "pressure_trend_hpa_3h", snapshot.pressure_trend_hpa_3h);
+        cJSON_AddNumberToObject(snapshot_json, "pressure_trend_span_min", snapshot.pressure_trend_span_min);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "pressure_trend_hpa_3h");
+        cJSON_AddNullToObject(snapshot_json, "pressure_trend_span_min");
+    }
+    if (snapshot.humidity_trend_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "humidity_trend_rh_3h", snapshot.humidity_trend_rh_3h);
+        cJSON_AddNumberToObject(snapshot_json, "humidity_trend_span_min", snapshot.humidity_trend_span_min);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "humidity_trend_rh_3h");
+        cJSON_AddNullToObject(snapshot_json, "humidity_trend_span_min");
+    }
+    if (rain.dew_point_spread_valid) {
+        cJSON_AddNumberToObject(snapshot_json, "dew_point_spread_c", rain.dew_point_spread_c);
+    } else {
+        cJSON_AddNullToObject(snapshot_json, "dew_point_spread_c");
+    }
+    cJSON_AddStringToObject(snapshot_json, "pressure_trend", air_quality_pressure_trend_label(rain.pressure_trend));
+    cJSON_AddStringToObject(snapshot_json, "pressure_trend_key", air_quality_pressure_trend_key(rain.pressure_trend));
+    cJSON_AddStringToObject(snapshot_json, "rain_outlook", air_quality_rain_outlook_label(rain.outlook));
+    cJSON_AddStringToObject(snapshot_json, "rain_outlook_key", air_quality_rain_outlook_key(rain.outlook));
+    cJSON_AddStringToObject(snapshot_json, "rain_season", air_quality_rain_season_label(rain.season));
+    cJSON_AddStringToObject(snapshot_json, "rain_season_key", air_quality_rain_season_key(rain.season));
+    cJSON_AddStringToObject(snapshot_json, "rain_basis", rain.basis[0] ? rain.basis : "Unavailable");
     if (snapshot.pm_valid) {
         cJSON_AddNumberToObject(snapshot_json, "pm1_0", snapshot.pm1_0);
         cJSON_AddNumberToObject(snapshot_json, "pm2_5", snapshot.pm2_5);

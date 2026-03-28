@@ -310,6 +310,25 @@
       gap: 12px;
     }
 
+    .particle-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .particle-section {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.74);
+    }
+
+    .particle-section h4 {
+      margin: 0 0 12px;
+      font-size: 0.92rem;
+      color: var(--text-main);
+    }
+
     .particle-grid .kv {
       background: rgba(255, 255, 255, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.78);
@@ -1814,6 +1833,29 @@
       'Coarse-Mode Dominant': '粗颗粒模态主导',
       'Unavailable': '暂不可用'
     };
+    const pressureTrendLabels = {
+      'Rising Fast': '快速回升',
+      'Rising': '缓慢回升',
+      'Stable': '基本稳定',
+      'Falling': '持续下降',
+      'Falling Fast': '快速下降',
+      'Unavailable': '暂不可用'
+    };
+    const rainOutlookLabels = {
+      'Unlikely': '暂不明显',
+      'Slight Chance': '略有升高',
+      'Possible': '可能有雨',
+      'Likely Soon': '较可能短时降雨',
+      'Unavailable': '暂不可用'
+    };
+    const rainSeasonLabels = {
+      'Spring': '春季',
+      'Meiyu Season': '梅雨季',
+      'Summer': '夏季',
+      'Autumn': '秋季',
+      'Winter': '冬季',
+      'Unavailable': '未校时'
+    };
     const basisLabels = {
       'EPA AQI (PM2.5 / PM10)': 'EPA AQI（PM2.5 / PM10）',
       'EPA AQI unavailable': 'EPA AQI 暂不可用',
@@ -1834,6 +1876,14 @@
     function roundToSingleDecimal(value) {
       const n = Number(value);
       return Number.isNaN(n) ? 0 : Math.round(n * 10) / 10;
+    }
+    function formatSigned(value, digits = 1) {
+      const n = Number(value);
+      if (Number.isNaN(n)) return '--';
+      const abs = Math.abs(n).toFixed(digits);
+      if (n > 0) return `+${abs}`;
+      if (n < 0) return `-${abs}`;
+      return Number(abs).toFixed(digits);
     }
     function num(value, digits = 0, unit = '') {
       if (value == null || value === '') return '--';
@@ -1862,6 +1912,41 @@
     function compactSummaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-banner-compact summary-${tone || 'neutral'}'><strong>${value}</strong>${detail ? `<span>${detail}</span>` : ''}</div>`; }
 
     function localizedOverall(value) { return translate(categoryLabels, value, '评估不可用'); }
+    function parseParticleInsight(note) {
+      if (!note) return null;
+      const text = String(note).trim();
+      const scientificPattern = /^PM2\.5 is ([0-9.]+)% of PM10, PM10-2\.5 is ([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\.$/;
+      const match = text.match(scientificPattern);
+      if (!match) return null;
+      return {
+        fineShare: Number(match[1]),
+        coarseShare: Number(match[2]),
+        dominantMassBand: match[3],
+        dominantCountBand: match[4],
+        typicalSize: Number(match[5])
+      };
+    }
+    function particleProfileMeaning(key) {
+      switch (key) {
+        case 'fine':
+          return '说明空气里以更容易长时间悬浮、也更容易深入呼吸道的细颗粒为主，常见于烹饪烟雾、燃烧源或室外污染输入。';
+        case 'coarse':
+          return '说明空气里以较大颗粒为主，通常更容易沉降，常见于扬尘、扫地、纤维、花粉或机械扰动。';
+        case 'mixed':
+          return '说明细颗粒和粗颗粒都比较明显，通常是室内活动与外部输入共同作用。';
+        default:
+          return '等待足够的颗粒物样本后再判读模态主导。';
+      }
+    }
+    function particleProfileExplanation(d) {
+      const parsed = parseParticleInsight(d.snapshot.particle_profile_note);
+      const leading = particleProfileMeaning(d.snapshot.particle_profile_key);
+      if (!parsed) return leading;
+      return `${leading} 当前质量主导区间在 ${parsed.dominantMassBand}，数量主导区间在 ${parsed.dominantCountBand}，典型粒径 ${parsed.typicalSize.toFixed(2)} µm。`;
+    }
+    function particleSection(title, items) {
+      return `<section class='particle-section'><h4>${title}</h4><div class='particle-grid particle-section-grid'>${items.join('')}</div></section>`;
+    }
     function compactParticleNote(note) {
       if (!note) return '';
       const text = String(note).trim();
@@ -1936,6 +2021,62 @@
         };
       }
       return { value: '--', meta: '等待稳定样本', unit: '', tone: 'unavailable' };
+    }
+    function pressureTrendMeta(d) {
+      if (!d.diag.bmp390_ready) return 'BMP390 离线';
+      if (!d.snapshot.bmp390_valid) return '等待有效气压样本';
+      if (!d.snapshot.pressure_trend_valid) return '需要约 1 小时连续气压历史';
+      return `过去 ${d.snapshot.pressure_trend_span_min} 分钟折算为 3 小时变化 ${formatSigned(d.snapshot.pressure_trend_hpa_3h)} hPa`;
+    }
+    function pressureTrendMetricState(d) {
+      if (!d.snapshot.pressure_trend_valid) {
+        return {
+          value: translate(pressureTrendLabels, d.snapshot.pressure_trend, '暂不可用'),
+          meta: pressureTrendMeta(d),
+          unit: '',
+          tone: 'unavailable'
+        };
+      }
+      return {
+        value: num(d.snapshot.pressure_trend_hpa_3h, 1),
+        meta: `${translate(pressureTrendLabels, d.snapshot.pressure_trend)}，基于过去 ${d.snapshot.pressure_trend_span_min} 分钟`,
+        unit: 'hPa / 3h',
+        tone: ''
+      };
+    }
+    function rainOutlookMeta(d) {
+      if (!d.diag.bmp390_ready) return 'BMP390 离线';
+      if (!d.snapshot.bmp390_valid) return '等待有效气压样本';
+      if (!d.snapshot.pressure_trend_valid) return '需要约 1 小时连续气压历史';
+
+      const parts = [];
+      if (d.snapshot.rain_season && d.snapshot.rain_season !== 'Unavailable') {
+        parts.push(`杭州${translate(rainSeasonLabels, d.snapshot.rain_season)}`);
+      } else {
+        parts.push('未校时，季节按中性处理');
+      }
+      parts.push(`气压 ${formatSigned(d.snapshot.pressure_trend_hpa_3h)} hPa / 3h`);
+
+      if (d.snapshot.humidity_trend_valid) {
+        parts.push(`湿度 ${formatSigned(d.snapshot.humidity_trend_rh_3h)} %RH / 3h`);
+      } else if (d.snapshot.scd41_valid && d.snapshot.humidity_rh != null) {
+        parts.push(`当前湿度 ${num(d.snapshot.humidity_rh, 0)} %RH`);
+      } else {
+        parts.push('湿度趋势暂不可用');
+      }
+
+      if (d.snapshot.dew_point_spread_c != null && Number.isFinite(Number(d.snapshot.dew_point_spread_c))) {
+        parts.push(`露点差 ${num(d.snapshot.dew_point_spread_c, 1)} °C`);
+      }
+      return parts.join('，');
+    }
+    function rainOutlookMetricState(d) {
+      return {
+        value: translate(rainOutlookLabels, d.snapshot.rain_outlook, '暂不可用'),
+        meta: rainOutlookMeta(d),
+        unit: '',
+        tone: d.snapshot.pressure_trend_valid ? '' : 'unavailable'
+      };
     }
 
     function syncActionAvailability(d) {
@@ -2118,6 +2259,8 @@
         'nox_rating',
         noxSignalLabels
       );
+      const pressureTrendMetric = pressureTrendMetricState(d);
+      const rainOutlookMetric = rainOutlookMetricState(d);
 
       overviewNetworkEl.innerHTML = [
         kv('运行模式', d.diag.provisioning_mode ? 'BLE 配网' : '局域网运行'),
@@ -2158,10 +2301,11 @@
       ].join('');
 
       airMetricsSecondaryEl.innerHTML = [
-        metric('室内温度', num(d.snapshot.temperature_c, 1), translate(comfortLabels, d.snapshot.temperature_rating, '--'), 'secondary', '°C'),
+        metric('室内温度', num(d.snapshot.temperature_c, 1), d.snapshot.scd41_valid ? `SCD41，${translate(comfortLabels, d.snapshot.temperature_rating, '--')}` : 'SCD41 暂不可用', 'secondary', '°C'),
         metric('相对湿度', num(d.snapshot.humidity_rh, 1), translate(comfortLabels, d.snapshot.humidity_rating, '--'), 'secondary', '%RH'),
         metric('当前气压', num(d.snapshot.pressure_hpa, 1), d.snapshot.bmp390_valid ? 'BMP390' : (d.diag.bmp390_ready ? '已连接' : '离线'), 'secondary', 'hPa'),
-        metric('BMP390 温度', num(d.snapshot.bmp390_temperature_c, 1), d.snapshot.bmp390_valid ? '气压传感器' : '暂不可用', 'secondary', '°C'),
+        metric('3 小时气压趋势', pressureTrendMetric.value, pressureTrendMetric.meta, 'secondary', pressureTrendMetric.unit, pressureTrendMetric.tone),
+        metric('短时降雨可能', rainOutlookMetric.value, rainOutlookMetric.meta, 'secondary', rainOutlookMetric.unit, rainOutlookMetric.tone),
         metric('VOC 指数 (Sensirion)', vocMetric.value, vocMetric.meta, 'secondary', vocMetric.unit, vocMetric.tone),
         metric('NOx 指数 (Sensirion)', noxMetric.value, noxMetric.meta, 'secondary', noxMetric.unit, noxMetric.tone)
       ].join('');
@@ -2170,19 +2314,33 @@
       syncSps30State(d.snapshot.sps30_sleeping, d.diag.sps30_ready);
       syncStatusLedState(d.diag.status_led_enabled, d.diag.status_led_ready);
 
-      particleMetricsEl.innerHTML = [
-        kv('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³')),
-        kv('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³')),
-        kv('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³')),
-        kv('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³')),
-        kv('颗粒数 PM0.5', num(d.snapshot.particles_0_5um, 1, ' #/cm³')),
-        kv('颗粒数 PM10', num(d.snapshot.particles_10_0um, 1, ' #/cm³')),
-        kv('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm'))
-      ].join('');
+      const particleInsight = parseParticleInsight(d.snapshot.particle_profile_note);
+      particleMetricsEl.innerHTML = `<div class='particle-sections'>${[
+        particleSection('PM 质量浓度', [
+          kv('PM1.0', num(d.snapshot.pm1_0, 1, ' µg/m³')),
+          kv('PM2.5', num(d.snapshot.pm2_5, 1, ' µg/m³')),
+          kv('PM4.0', num(d.snapshot.pm4_0, 1, ' µg/m³')),
+          kv('PM10', num(d.snapshot.pm10_0, 1, ' µg/m³'))
+        ]),
+        particleSection('颗粒数', [
+          kv('>0.5 µm', num(d.snapshot.particles_0_5um, 1, ' #/cm³')),
+          kv('>1.0 µm', num(d.snapshot.particles_1_0um, 1, ' #/cm³')),
+          kv('>2.5 µm', num(d.snapshot.particles_2_5um, 1, ' #/cm³')),
+          kv('>4.0 µm', num(d.snapshot.particles_4_0um, 1, ' #/cm³')),
+          kv('>10.0 µm', num(d.snapshot.particles_10_0um, 1, ' #/cm³'))
+        ]),
+        particleSection('画像判读', [
+          kv('质量主导区间', particleInsight ? particleInsight.dominantMassBand : '--'),
+          kv('数量主导区间', particleInsight ? particleInsight.dominantCountBand : '--'),
+          kv('典型粒径', num(d.snapshot.typical_particle_size_um, 2, ' µm')),
+          kv('PM2.5 占比', particleInsight ? `${particleInsight.fineShare.toFixed(0)}%` : '--'),
+          kv('粗颗粒占比', particleInsight ? `${particleInsight.coarseShare.toFixed(0)}%` : '--')
+        ])
+      ].join('')}</div>`;
 
       particleSummaryEl.innerHTML = compactSummaryBanner(
         translate(profileLabels, d.snapshot.particle_profile),
-        compactParticleNote(d.snapshot.particle_profile_note),
+        particleProfileExplanation(d),
         d.snapshot.particle_profile_key || 'neutral'
       );
     }

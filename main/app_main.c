@@ -1,7 +1,9 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "air_quality.h"
 #include "driver/rmt_tx.h"
@@ -11,6 +13,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_netif_sntp.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -57,6 +60,7 @@ typedef struct {
     bool mqtt_started;
     bool web_started;
     bool status_led_enabled;
+    bool time_sync_started;
     bool publish_now;
     bool pending_restart;
     bool pending_factory_reset;
@@ -217,6 +221,51 @@ static void status_led_task(void *arg)
         app_status_led_update();
         vTaskDelay(pdMS_TO_TICKS(STATUS_LED_UPDATE_MS));
     }
+}
+
+static void app_time_sync_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_data;
+    if (event_base != NETIF_SNTP_EVENT || event_id != NETIF_SNTP_TIME_SYNC) {
+        return;
+    }
+
+    time_t now = 0;
+    time(&now);
+    struct tm local_time = {0};
+    char buffer[32] = {0};
+    if (localtime_r(&now, &local_time) != NULL &&
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &local_time) > 0) {
+        ESP_LOGI(TAG, "system time synchronized: %s", buffer);
+    } else {
+        ESP_LOGI(TAG, "system time synchronized");
+    }
+}
+
+static esp_err_t app_start_time_sync(void)
+{
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    if (s_app.time_sync_started) {
+        xSemaphoreGive(s_app.lock);
+        return ESP_OK;
+    }
+    s_app.time_sync_started = true;
+    xSemaphoreGive(s_app.lock);
+
+    setenv("TZ", "CST-8", 1);
+    tzset();
+
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("ntp.aliyun.com");
+    config.wait_for_sync = false;
+
+    esp_err_t err = esp_netif_sntp_init(&config);
+    if (err != ESP_OK) {
+        xSemaphoreTake(s_app.lock, portMAX_DELAY);
+        s_app.time_sync_started = false;
+        xSemaphoreGive(s_app.lock);
+    }
+    return err;
 }
 
 static void app_fill_diag(device_diag_t *diag)
@@ -739,6 +788,10 @@ static void app_wifi_event(bool connected, void *user_ctx)
     xSemaphoreGive(s_app.lock);
 
     if (connected) {
+        esp_err_t time_err = app_start_time_sync();
+        if (time_err != ESP_OK) {
+            ESP_LOGW(TAG, "time sync init failed: %d", time_err);
+        }
         if (start_web) {
             app_start_web();
         }
@@ -870,6 +923,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &app_prov_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, &app_time_sync_event_handler, NULL));
 
     ESP_ERROR_CHECK(sensors_start(&s_app.config));
     esp_err_t led_err = app_status_led_init();

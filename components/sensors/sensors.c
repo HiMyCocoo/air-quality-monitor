@@ -19,6 +19,14 @@
 #include "sps30.h"
 
 #define PM_HISTORY_LEN 6
+#define BMP390_PRESSURE_HISTORY_LEN 37
+#define BMP390_PRESSURE_SAMPLE_INTERVAL_MS (300000LL)
+#define BMP390_PRESSURE_TREND_WINDOW_MS (3LL * 60LL * 60LL * 1000LL)
+#define BMP390_PRESSURE_TREND_MIN_SPAN_MS (60LL * 60LL * 1000LL)
+#define SCD41_HUMIDITY_HISTORY_LEN 37
+#define SCD41_HUMIDITY_SAMPLE_INTERVAL_MS (300000LL)
+#define SCD41_HUMIDITY_TREND_WINDOW_MS (3LL * 60LL * 60LL * 1000LL)
+#define SCD41_HUMIDITY_TREND_MIN_SPAN_MS (60LL * 60LL * 1000LL)
 #define SCD41_FRC_STABILIZATION_MS (180000LL)
 #define SCD41_PRESSURE_COMPENSATION_FALLBACK_MS (15000LL)
 #define SGP41_CONDITIONING_SEC 10
@@ -28,7 +36,7 @@
 #define SGP41_DEFAULT_TEMPERATURE_TICKS 0x6666
 #define SGP41_STATE_NAMESPACE "airmon_sgp41"
 #define SGP41_STATE_KEY "checkpoint"
-#define SGP41_STATE_VERSION 1
+#define SGP41_STATE_VERSION 2
 #define SGP41_STATE_SAVE_INTERVAL_MS (300000LL)
 #define SPS30_FAN_CLEANING_DURATION_MS (10000LL)
 
@@ -57,8 +65,20 @@ typedef struct {
     GasIndexAlgorithmParams sgp41_voc_params;
     GasIndexAlgorithmParams sgp41_nox_params;
     sps30_measurement_t pm_history[PM_HISTORY_LEN];
+    struct {
+        float pressure_hpa;
+        int64_t captured_at_ms;
+    } bmp390_pressure_history[BMP390_PRESSURE_HISTORY_LEN];
+    struct {
+        float humidity_rh;
+        int64_t captured_at_ms;
+    } scd41_humidity_history[SCD41_HUMIDITY_HISTORY_LEN];
     size_t pm_history_count;
     size_t pm_history_index;
+    size_t bmp390_pressure_history_count;
+    size_t bmp390_pressure_history_index;
+    size_t scd41_humidity_history_count;
+    size_t scd41_humidity_history_index;
     int64_t scd41_measurement_started_ms;
     int64_t sgp41_measurement_started_ms;
     int64_t co2_compensation_updated_at_ms;
@@ -72,19 +92,161 @@ typedef struct {
 static sensors_ctx_t s_ctx;
 
 typedef struct {
+    int32_t algorithm_type;
+    float sampling_interval;
+    float index_offset;
+    int32_t sraw_minimum;
+    float gating_max_duration_minutes;
+    float init_duration_mean;
+    float init_duration_variance;
+    float gating_threshold;
+    float index_gain;
+    float tau_mean_hours;
+    float tau_variance_hours;
+    float sraw_std_initial;
+    float uptime;
+    float sraw;
+    float gas_index;
+    uint8_t mean_variance_estimator_initialized;
+    float mean_variance_estimator_mean;
+    float mean_variance_estimator_sraw_offset;
+    float mean_variance_estimator_std;
+    float mean_variance_estimator_gamma_mean_internal;
+    float mean_variance_estimator_gamma_variance_internal;
+    float mean_variance_estimator_gamma_initial_mean;
+    float mean_variance_estimator_gamma_initial_variance;
+    float mean_variance_estimator_gamma_mean;
+    float mean_variance_estimator_gamma_variance;
+    float mean_variance_estimator_uptime_gamma;
+    float mean_variance_estimator_uptime_gating;
+    float mean_variance_estimator_gating_duration_minutes;
+    float mean_variance_estimator_sigmoid_k;
+    float mean_variance_estimator_sigmoid_x0;
+    float mox_model_sraw_std;
+    float mox_model_sraw_mean;
+    float sigmoid_scaled_k;
+    float sigmoid_scaled_x0;
+    float sigmoid_scaled_offset_default;
+    float adaptive_lowpass_a1;
+    float adaptive_lowpass_a2;
+    uint8_t adaptive_lowpass_initialized;
+    float adaptive_lowpass_x1;
+    float adaptive_lowpass_x2;
+    float adaptive_lowpass_x3;
+} sgp41_persisted_algorithm_state_t;
+
+typedef struct {
     uint32_t version;
     uint16_t serial_number[3];
     uint32_t measurement_elapsed_s;
     uint8_t conditioning_remaining_s;
     int32_t voc_index;
     int32_t nox_index;
-    GasIndexAlgorithmParams voc_params;
-    GasIndexAlgorithmParams nox_params;
+    sgp41_persisted_algorithm_state_t voc_state;
+    sgp41_persisted_algorithm_state_t nox_state;
 } sgp41_persisted_state_t;
 
-static bool sensors_sgp41_params_look_valid(const GasIndexAlgorithmParams *params, int expected_type)
+static void sensors_serialize_sgp41_algorithm_state(const GasIndexAlgorithmParams *params,
+                                                    sgp41_persisted_algorithm_state_t *state)
 {
-    return params->mAlgorithm_Type == expected_type && params->mSamplingInterval > 0.0f;
+    memset(state, 0, sizeof(*state));
+    state->algorithm_type = params->mAlgorithm_Type;
+    state->sampling_interval = params->mSamplingInterval;
+    state->index_offset = params->mIndex_Offset;
+    state->sraw_minimum = params->mSraw_Minimum;
+    state->gating_max_duration_minutes = params->mGating_Max_Duration_Minutes;
+    state->init_duration_mean = params->mInit_Duration_Mean;
+    state->init_duration_variance = params->mInit_Duration_Variance;
+    state->gating_threshold = params->mGating_Threshold;
+    state->index_gain = params->mIndex_Gain;
+    state->tau_mean_hours = params->mTau_Mean_Hours;
+    state->tau_variance_hours = params->mTau_Variance_Hours;
+    state->sraw_std_initial = params->mSraw_Std_Initial;
+    state->uptime = params->mUptime;
+    state->sraw = params->mSraw;
+    state->gas_index = params->mGas_Index;
+    state->mean_variance_estimator_initialized = params->m_Mean_Variance_Estimator___Initialized ? 1U : 0U;
+    state->mean_variance_estimator_mean = params->m_Mean_Variance_Estimator___Mean;
+    state->mean_variance_estimator_sraw_offset = params->m_Mean_Variance_Estimator___Sraw_Offset;
+    state->mean_variance_estimator_std = params->m_Mean_Variance_Estimator___Std;
+    state->mean_variance_estimator_gamma_mean_internal = params->m_Mean_Variance_Estimator___Gamma_Mean;
+    state->mean_variance_estimator_gamma_variance_internal = params->m_Mean_Variance_Estimator___Gamma_Variance;
+    state->mean_variance_estimator_gamma_initial_mean = params->m_Mean_Variance_Estimator___Gamma_Initial_Mean;
+    state->mean_variance_estimator_gamma_initial_variance = params->m_Mean_Variance_Estimator___Gamma_Initial_Variance;
+    state->mean_variance_estimator_gamma_mean = params->m_Mean_Variance_Estimator__Gamma_Mean;
+    state->mean_variance_estimator_gamma_variance = params->m_Mean_Variance_Estimator__Gamma_Variance;
+    state->mean_variance_estimator_uptime_gamma = params->m_Mean_Variance_Estimator___Uptime_Gamma;
+    state->mean_variance_estimator_uptime_gating = params->m_Mean_Variance_Estimator___Uptime_Gating;
+    state->mean_variance_estimator_gating_duration_minutes = params->m_Mean_Variance_Estimator___Gating_Duration_Minutes;
+    state->mean_variance_estimator_sigmoid_k = params->m_Mean_Variance_Estimator___Sigmoid__K;
+    state->mean_variance_estimator_sigmoid_x0 = params->m_Mean_Variance_Estimator___Sigmoid__X0;
+    state->mox_model_sraw_std = params->m_Mox_Model__Sraw_Std;
+    state->mox_model_sraw_mean = params->m_Mox_Model__Sraw_Mean;
+    state->sigmoid_scaled_k = params->m_Sigmoid_Scaled__K;
+    state->sigmoid_scaled_x0 = params->m_Sigmoid_Scaled__X0;
+    state->sigmoid_scaled_offset_default = params->m_Sigmoid_Scaled__Offset_Default;
+    state->adaptive_lowpass_a1 = params->m_Adaptive_Lowpass__A1;
+    state->adaptive_lowpass_a2 = params->m_Adaptive_Lowpass__A2;
+    state->adaptive_lowpass_initialized = params->m_Adaptive_Lowpass___Initialized ? 1U : 0U;
+    state->adaptive_lowpass_x1 = params->m_Adaptive_Lowpass___X1;
+    state->adaptive_lowpass_x2 = params->m_Adaptive_Lowpass___X2;
+    state->adaptive_lowpass_x3 = params->m_Adaptive_Lowpass___X3;
+}
+
+static void sensors_deserialize_sgp41_algorithm_state(const sgp41_persisted_algorithm_state_t *state,
+                                                      GasIndexAlgorithmParams *params)
+{
+    memset(params, 0, sizeof(*params));
+    params->mAlgorithm_Type = state->algorithm_type;
+    params->mSamplingInterval = state->sampling_interval;
+    params->mIndex_Offset = state->index_offset;
+    params->mSraw_Minimum = state->sraw_minimum;
+    params->mGating_Max_Duration_Minutes = state->gating_max_duration_minutes;
+    params->mInit_Duration_Mean = state->init_duration_mean;
+    params->mInit_Duration_Variance = state->init_duration_variance;
+    params->mGating_Threshold = state->gating_threshold;
+    params->mIndex_Gain = state->index_gain;
+    params->mTau_Mean_Hours = state->tau_mean_hours;
+    params->mTau_Variance_Hours = state->tau_variance_hours;
+    params->mSraw_Std_Initial = state->sraw_std_initial;
+    params->mUptime = state->uptime;
+    params->mSraw = state->sraw;
+    params->mGas_Index = state->gas_index;
+    params->m_Mean_Variance_Estimator___Initialized = state->mean_variance_estimator_initialized != 0U;
+    params->m_Mean_Variance_Estimator___Mean = state->mean_variance_estimator_mean;
+    params->m_Mean_Variance_Estimator___Sraw_Offset = state->mean_variance_estimator_sraw_offset;
+    params->m_Mean_Variance_Estimator___Std = state->mean_variance_estimator_std;
+    params->m_Mean_Variance_Estimator___Gamma_Mean = state->mean_variance_estimator_gamma_mean_internal;
+    params->m_Mean_Variance_Estimator___Gamma_Variance = state->mean_variance_estimator_gamma_variance_internal;
+    params->m_Mean_Variance_Estimator___Gamma_Initial_Mean = state->mean_variance_estimator_gamma_initial_mean;
+    params->m_Mean_Variance_Estimator___Gamma_Initial_Variance = state->mean_variance_estimator_gamma_initial_variance;
+    params->m_Mean_Variance_Estimator__Gamma_Mean = state->mean_variance_estimator_gamma_mean;
+    params->m_Mean_Variance_Estimator__Gamma_Variance = state->mean_variance_estimator_gamma_variance;
+    params->m_Mean_Variance_Estimator___Uptime_Gamma = state->mean_variance_estimator_uptime_gamma;
+    params->m_Mean_Variance_Estimator___Uptime_Gating = state->mean_variance_estimator_uptime_gating;
+    params->m_Mean_Variance_Estimator___Gating_Duration_Minutes = state->mean_variance_estimator_gating_duration_minutes;
+    params->m_Mean_Variance_Estimator___Sigmoid__K = state->mean_variance_estimator_sigmoid_k;
+    params->m_Mean_Variance_Estimator___Sigmoid__X0 = state->mean_variance_estimator_sigmoid_x0;
+    params->m_Mox_Model__Sraw_Std = state->mox_model_sraw_std;
+    params->m_Mox_Model__Sraw_Mean = state->mox_model_sraw_mean;
+    params->m_Sigmoid_Scaled__K = state->sigmoid_scaled_k;
+    params->m_Sigmoid_Scaled__X0 = state->sigmoid_scaled_x0;
+    params->m_Sigmoid_Scaled__Offset_Default = state->sigmoid_scaled_offset_default;
+    params->m_Adaptive_Lowpass__A1 = state->adaptive_lowpass_a1;
+    params->m_Adaptive_Lowpass__A2 = state->adaptive_lowpass_a2;
+    params->m_Adaptive_Lowpass___Initialized = state->adaptive_lowpass_initialized != 0U;
+    params->m_Adaptive_Lowpass___X1 = state->adaptive_lowpass_x1;
+    params->m_Adaptive_Lowpass___X2 = state->adaptive_lowpass_x2;
+    params->m_Adaptive_Lowpass___X3 = state->adaptive_lowpass_x3;
+}
+
+static bool sensors_sgp41_state_look_valid(const sgp41_persisted_algorithm_state_t *state, int expected_type)
+{
+    return state->algorithm_type == expected_type &&
+           isfinite(state->sampling_interval) &&
+           state->sampling_interval > 0.0f &&
+           isfinite(state->uptime) &&
+           state->uptime >= 0.0f;
 }
 
 static esp_err_t sensors_load_sgp41_state(sgp41_persisted_state_t *state)
@@ -103,8 +265,8 @@ static esp_err_t sensors_load_sgp41_state(sgp41_persisted_state_t *state)
     }
     if (required != sizeof(*state) ||
         state->version != SGP41_STATE_VERSION ||
-        !sensors_sgp41_params_look_valid(&state->voc_params, GasIndexAlgorithm_ALGORITHM_TYPE_VOC) ||
-        !sensors_sgp41_params_look_valid(&state->nox_params, GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
+        !sensors_sgp41_state_look_valid(&state->voc_state, GasIndexAlgorithm_ALGORITHM_TYPE_VOC) ||
+        !sensors_sgp41_state_look_valid(&state->nox_state, GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
         return ESP_ERR_INVALID_STATE;
     }
     return ESP_OK;
@@ -146,8 +308,8 @@ static bool sensors_prepare_sgp41_checkpoint_locked(sgp41_persisted_state_t *sta
     state->conditioning_remaining_s = s_ctx.sgp41_conditioning_remaining_s;
     state->voc_index = s_ctx.snapshot.voc_index;
     state->nox_index = s_ctx.snapshot.nox_index;
-    state->voc_params = s_ctx.sgp41_voc_params;
-    state->nox_params = s_ctx.sgp41_nox_params;
+    sensors_serialize_sgp41_algorithm_state(&s_ctx.sgp41_voc_params, &state->voc_state);
+    sensors_serialize_sgp41_algorithm_state(&s_ctx.sgp41_nox_params, &state->nox_state);
     return sgp41_get_serial_number(&s_ctx.sgp41, state->serial_number) == ESP_OK;
 }
 
@@ -174,6 +336,12 @@ static esp_err_t sensors_checkpoint_sgp41_state_internal(bool force)
         s_ctx.sgp41_state_dirty = false;
         s_ctx.sgp41_state_saved_at_ms = now_ms;
         xSemaphoreGive(s_ctx.lock);
+        ESP_LOGI(TAG,
+                 "SGP41 checkpoint saved: elapsed=%" PRIu32 "s conditioning=%u voc=%" PRId32 " nox=%" PRId32,
+                 state.measurement_elapsed_s,
+                 state.conditioning_remaining_s,
+                 state.voc_index,
+                 state.nox_index);
     }
     return err;
 }
@@ -236,6 +404,11 @@ static void sensors_mark_scd41_invalid_locked(void)
     s_ctx.snapshot.co2_ppm = 0;
     s_ctx.snapshot.temperature_c = 0.0f;
     s_ctx.snapshot.humidity_rh = 0.0f;
+    s_ctx.snapshot.humidity_trend_valid = false;
+    s_ctx.snapshot.humidity_trend_rh_3h = 0.0f;
+    s_ctx.snapshot.humidity_trend_span_min = 0;
+    s_ctx.scd41_humidity_history_count = 0;
+    s_ctx.scd41_humidity_history_index = 0;
 }
 
 static void sensors_mark_sps30_invalid_locked(void)
@@ -258,6 +431,11 @@ static void sensors_mark_bmp390_invalid_locked(void)
     s_ctx.snapshot.bmp390_valid = false;
     s_ctx.snapshot.bmp390_temperature_c = 0.0f;
     s_ctx.snapshot.pressure_hpa = 0.0f;
+    s_ctx.snapshot.pressure_trend_valid = false;
+    s_ctx.snapshot.pressure_trend_hpa_3h = 0.0f;
+    s_ctx.snapshot.pressure_trend_span_min = 0;
+    s_ctx.bmp390_pressure_history_count = 0;
+    s_ctx.bmp390_pressure_history_index = 0;
 }
 
 static void sensors_mark_sgp41_invalid_locked(void)
@@ -270,6 +448,149 @@ static void sensors_mark_sgp41_invalid_locked(void)
     s_ctx.snapshot.sgp41_nox_stabilization_remaining_s = 0;
     s_ctx.snapshot.voc_index = 0;
     s_ctx.snapshot.nox_index = 0;
+}
+
+static void sensors_update_bmp390_pressure_trend_locked(float pressure_hpa, int64_t now_ms)
+{
+    s_ctx.snapshot.pressure_trend_valid = false;
+    s_ctx.snapshot.pressure_trend_hpa_3h = 0.0f;
+    s_ctx.snapshot.pressure_trend_span_min = 0;
+
+    if (!isfinite(pressure_hpa) || pressure_hpa <= 0.0f) {
+        return;
+    }
+
+    if (s_ctx.bmp390_pressure_history_count == 0) {
+        s_ctx.bmp390_pressure_history[0].pressure_hpa = pressure_hpa;
+        s_ctx.bmp390_pressure_history[0].captured_at_ms = now_ms;
+        s_ctx.bmp390_pressure_history_count = 1;
+        s_ctx.bmp390_pressure_history_index = 1 % BMP390_PRESSURE_HISTORY_LEN;
+        return;
+    }
+
+    size_t newest_index =
+        (s_ctx.bmp390_pressure_history_index + BMP390_PRESSURE_HISTORY_LEN - 1) % BMP390_PRESSURE_HISTORY_LEN;
+    int64_t newest_at_ms = s_ctx.bmp390_pressure_history[newest_index].captured_at_ms;
+    if ((now_ms - newest_at_ms) >= BMP390_PRESSURE_SAMPLE_INTERVAL_MS) {
+        size_t write_index = s_ctx.bmp390_pressure_history_index;
+        s_ctx.bmp390_pressure_history[write_index].pressure_hpa = pressure_hpa;
+        s_ctx.bmp390_pressure_history[write_index].captured_at_ms = now_ms;
+        s_ctx.bmp390_pressure_history_index = (write_index + 1) % BMP390_PRESSURE_HISTORY_LEN;
+        if (s_ctx.bmp390_pressure_history_count < BMP390_PRESSURE_HISTORY_LEN) {
+            s_ctx.bmp390_pressure_history_count++;
+        }
+    }
+
+    size_t oldest_index = s_ctx.bmp390_pressure_history_count == BMP390_PRESSURE_HISTORY_LEN
+                              ? s_ctx.bmp390_pressure_history_index
+                              : 0;
+    int64_t window_start_ms = now_ms - BMP390_PRESSURE_TREND_WINDOW_MS;
+    float baseline_pressure_hpa = 0.0f;
+    int64_t baseline_at_ms = 0;
+    bool baseline_found = false;
+
+    for (size_t i = 0; i < s_ctx.bmp390_pressure_history_count; ++i) {
+        size_t index = (oldest_index + i) % BMP390_PRESSURE_HISTORY_LEN;
+        float candidate_pressure_hpa = s_ctx.bmp390_pressure_history[index].pressure_hpa;
+        int64_t candidate_at_ms = s_ctx.bmp390_pressure_history[index].captured_at_ms;
+        if (!isfinite(candidate_pressure_hpa) || candidate_pressure_hpa <= 0.0f || candidate_at_ms <= 0) {
+            continue;
+        }
+        if (candidate_at_ms < window_start_ms) {
+            continue;
+        }
+        baseline_pressure_hpa = candidate_pressure_hpa;
+        baseline_at_ms = candidate_at_ms;
+        baseline_found = true;
+        break;
+    }
+
+    if (!baseline_found) {
+        return;
+    }
+
+    int64_t span_ms = now_ms - baseline_at_ms;
+    if (span_ms < BMP390_PRESSURE_TREND_MIN_SPAN_MS) {
+        return;
+    }
+
+    s_ctx.snapshot.pressure_trend_valid = true;
+    s_ctx.snapshot.pressure_trend_hpa_3h =
+        (float)((pressure_hpa - baseline_pressure_hpa) *
+                ((double)BMP390_PRESSURE_TREND_WINDOW_MS / (double)span_ms));
+    s_ctx.snapshot.pressure_trend_span_min = (uint16_t)((span_ms + 30000LL) / 60000LL);
+}
+
+static void sensors_update_scd41_humidity_trend_locked(float humidity_rh, int64_t now_ms)
+{
+    s_ctx.snapshot.humidity_trend_valid = false;
+    s_ctx.snapshot.humidity_trend_rh_3h = 0.0f;
+    s_ctx.snapshot.humidity_trend_span_min = 0;
+
+    if (!isfinite(humidity_rh) || humidity_rh < 0.0f || humidity_rh > 100.0f) {
+        return;
+    }
+
+    if (s_ctx.scd41_humidity_history_count == 0) {
+        s_ctx.scd41_humidity_history[0].humidity_rh = humidity_rh;
+        s_ctx.scd41_humidity_history[0].captured_at_ms = now_ms;
+        s_ctx.scd41_humidity_history_count = 1;
+        s_ctx.scd41_humidity_history_index = 1 % SCD41_HUMIDITY_HISTORY_LEN;
+        return;
+    }
+
+    size_t newest_index =
+        (s_ctx.scd41_humidity_history_index + SCD41_HUMIDITY_HISTORY_LEN - 1) % SCD41_HUMIDITY_HISTORY_LEN;
+    int64_t newest_at_ms = s_ctx.scd41_humidity_history[newest_index].captured_at_ms;
+    if ((now_ms - newest_at_ms) >= SCD41_HUMIDITY_SAMPLE_INTERVAL_MS) {
+        size_t write_index = s_ctx.scd41_humidity_history_index;
+        s_ctx.scd41_humidity_history[write_index].humidity_rh = humidity_rh;
+        s_ctx.scd41_humidity_history[write_index].captured_at_ms = now_ms;
+        s_ctx.scd41_humidity_history_index = (write_index + 1) % SCD41_HUMIDITY_HISTORY_LEN;
+        if (s_ctx.scd41_humidity_history_count < SCD41_HUMIDITY_HISTORY_LEN) {
+            s_ctx.scd41_humidity_history_count++;
+        }
+    }
+
+    size_t oldest_index = s_ctx.scd41_humidity_history_count == SCD41_HUMIDITY_HISTORY_LEN
+                              ? s_ctx.scd41_humidity_history_index
+                              : 0;
+    int64_t window_start_ms = now_ms - SCD41_HUMIDITY_TREND_WINDOW_MS;
+    float baseline_humidity_rh = 0.0f;
+    int64_t baseline_at_ms = 0;
+    bool baseline_found = false;
+
+    for (size_t i = 0; i < s_ctx.scd41_humidity_history_count; ++i) {
+        size_t index = (oldest_index + i) % SCD41_HUMIDITY_HISTORY_LEN;
+        float candidate_humidity_rh = s_ctx.scd41_humidity_history[index].humidity_rh;
+        int64_t candidate_at_ms = s_ctx.scd41_humidity_history[index].captured_at_ms;
+        if (!isfinite(candidate_humidity_rh) || candidate_humidity_rh < 0.0f || candidate_humidity_rh > 100.0f ||
+            candidate_at_ms <= 0) {
+            continue;
+        }
+        if (candidate_at_ms < window_start_ms) {
+            continue;
+        }
+        baseline_humidity_rh = candidate_humidity_rh;
+        baseline_at_ms = candidate_at_ms;
+        baseline_found = true;
+        break;
+    }
+
+    if (!baseline_found) {
+        return;
+    }
+
+    int64_t span_ms = now_ms - baseline_at_ms;
+    if (span_ms < SCD41_HUMIDITY_TREND_MIN_SPAN_MS) {
+        return;
+    }
+
+    s_ctx.snapshot.humidity_trend_valid = true;
+    s_ctx.snapshot.humidity_trend_rh_3h =
+        (float)((humidity_rh - baseline_humidity_rh) *
+                ((double)SCD41_HUMIDITY_TREND_WINDOW_MS / (double)span_ms));
+    s_ctx.snapshot.humidity_trend_span_min = (uint16_t)((span_ms + 30000LL) / 60000LL);
 }
 
 static void sensors_set_scd41_error(const char *message)
@@ -688,8 +1009,8 @@ static esp_err_t sensors_init_sgp41(void)
         s_ctx.sgp41_measurement_started_ms = now_ms;
         if (sensors_load_sgp41_state(&persisted) == ESP_OK &&
             memcmp(persisted.serial_number, serial_number, sizeof(serial_number)) == 0) {
-            s_ctx.sgp41_voc_params = persisted.voc_params;
-            s_ctx.sgp41_nox_params = persisted.nox_params;
+            sensors_deserialize_sgp41_algorithm_state(&persisted.voc_state, &s_ctx.sgp41_voc_params);
+            sensors_deserialize_sgp41_algorithm_state(&persisted.nox_state, &s_ctx.sgp41_nox_params);
             s_ctx.sgp41_conditioning_remaining_s =
                 persisted.conditioning_remaining_s > SGP41_CONDITIONING_SEC ? SGP41_CONDITIONING_SEC : persisted.conditioning_remaining_s;
             s_ctx.sgp41_measurement_started_ms =
@@ -700,6 +1021,14 @@ static esp_err_t sensors_init_sgp41(void)
             s_ctx.snapshot.voc_index = persisted.voc_index;
             s_ctx.snapshot.nox_index = persisted.nox_index;
             restored = true;
+            ESP_LOGI(TAG,
+                     "SGP41 checkpoint restored: elapsed=%" PRIu32 "s conditioning=%u voc=%" PRId32 " nox=%" PRId32,
+                     persisted.measurement_elapsed_s,
+                     persisted.conditioning_remaining_s,
+                     persisted.voc_index,
+                     persisted.nox_index);
+        } else {
+            ESP_LOGI(TAG, "SGP41 checkpoint unavailable or serial mismatch; starting fresh learning");
         }
         s_ctx.sgp41_initialized = true;
         s_ctx.sgp41_state_saved_at_ms = now_ms;
@@ -857,6 +1186,7 @@ static void sensors_apply_bmp390_measurement(float temperature_c, float pressure
     s_ctx.snapshot.bmp390_valid = true;
     s_ctx.snapshot.bmp390_temperature_c = temperature_c;
     s_ctx.snapshot.pressure_hpa = pressure_hpa;
+    sensors_update_bmp390_pressure_trend_locked(pressure_hpa, now_ms);
     s_ctx.snapshot.updated_at_ms = now_ms;
     xSemaphoreGive(s_ctx.lock);
 }
@@ -1010,6 +1340,7 @@ static void sensor_task(void *arg)
                             s_ctx.sgp41_conditioning_remaining_s--;
                         }
                         sensors_update_sgp41_validity_locked(now_ms);
+                        s_ctx.sgp41_state_dirty = true;
                         sample_ok = true;
                     }
                 } else {
@@ -1067,6 +1398,7 @@ static void sensor_task(void *arg)
                         s_ctx.snapshot.co2_ppm = co2;
                         s_ctx.snapshot.temperature_c = temperature;
                         s_ctx.snapshot.humidity_rh = humidity;
+                        sensors_update_scd41_humidity_trend_locked(humidity, now_ms);
                         s_ctx.snapshot.updated_at_ms = now_ms;
                         measurement_ok = true;
                     }

@@ -109,8 +109,14 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"temperature_rating", "Temperature Rating", "temperature_rating", NULL, NULL, NULL, NULL, false},
     {"humidity", "Humidity", "humidity", "%", "humidity", "measurement", NULL, false},
     {"humidity_rating", "Humidity Rating", "humidity_rating", NULL, NULL, NULL, NULL, false},
+    {"humidity_trend_3h", "Humidity Trend (3h Equivalent)", "humidity_trend_rh_3h", "%", "humidity", "measurement", NULL, false},
     {"bmp390_temperature", "BMP390 Temperature", "bmp390_temperature", "°C", "temperature", "measurement", NULL, false},
     {"pressure", "Pressure", "pressure", "hPa", "atmospheric_pressure", "measurement", NULL, false},
+    {"pressure_trend_3h", "Pressure Trend (3h Equivalent)", "pressure_trend_hpa_3h", "hPa", NULL, "measurement", NULL, false},
+    {"pressure_trend", "Pressure Trend", "pressure_trend", NULL, NULL, NULL, NULL, false},
+    {"dew_point_spread", "Dew Point Spread", "dew_point_spread_c", "°C", "temperature", "measurement", NULL, false},
+    {"rain_outlook", "Rain Outlook", "rain_outlook", NULL, NULL, NULL, NULL, false},
+    {"rain_season", "Rain Season Context", "rain_season", NULL, NULL, NULL, NULL, false},
     {"voc_index", "VOC Index (Sensirion)", "voc_index", NULL, NULL, "measurement", NULL, false},
     {"voc_rating", "VOC Event Level (Sensirion)", "voc_rating", NULL, NULL, NULL, NULL, false},
     {"nox_index", "NOx Index (Sensirion)", "nox_index", NULL, NULL, "measurement", NULL, false},
@@ -151,6 +157,8 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"particles_10_0um", "Particles >10µm", "particles_10_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"typical_particle_size_um", "Typical Particle Size", "typical_particle_size_um", "µm", NULL, "measurement", NULL, false},
     {"sample_age_sec", "Sample Age", "sample_age_sec", "s", "duration", "measurement", "diagnostic", true},
+    {"pressure_trend_span_min", "Pressure Trend History", "pressure_trend_span_min", "min", NULL, "measurement", NULL, false},
+    {"humidity_trend_span_min", "Humidity Trend History", "humidity_trend_span_min", "min", NULL, "measurement", NULL, false},
     {"wifi_rssi", "Wi-Fi RSSI", "wifi_rssi", "dBm", "signal_strength", "measurement", "diagnostic", true},
     {"uptime_sec", "Uptime", "uptime_sec", "s", "duration", "measurement", "diagnostic", true},
     {"heap_free", "Heap Free", "heap_free", "B", "data_size", "measurement", "diagnostic", true},
@@ -658,6 +666,8 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     air_quality_compute_overall_assessment(snapshot, &assessment);
     air_quality_particle_insight_t particle = {0};
     air_quality_compute_particle_insight(snapshot, &particle);
+    air_quality_rain_analysis_t rain = {0};
+    air_quality_analyze_rain(snapshot, &rain);
     air_quality_signal_level_t co2_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
     air_quality_signal_level_t voc_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
     air_quality_signal_level_t nox_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
@@ -698,6 +708,13 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "humidity");
         cJSON_AddNullToObject(state, "humidity_rating");
     }
+    if (snapshot->humidity_trend_valid) {
+        cJSON_AddNumberToObject(state, "humidity_trend_rh_3h", snapshot->humidity_trend_rh_3h);
+        cJSON_AddNumberToObject(state, "humidity_trend_span_min", snapshot->humidity_trend_span_min);
+    } else {
+        cJSON_AddNullToObject(state, "humidity_trend_rh_3h");
+        cJSON_AddNullToObject(state, "humidity_trend_span_min");
+    }
     if (snapshot->sgp41_voc_valid) {
         voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
         cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
@@ -721,6 +738,25 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "bmp390_temperature");
         cJSON_AddNullToObject(state, "pressure");
     }
+    if (snapshot->pressure_trend_valid) {
+        cJSON_AddNumberToObject(state, "pressure_trend_hpa_3h", snapshot->pressure_trend_hpa_3h);
+        cJSON_AddNumberToObject(state, "pressure_trend_span_min", snapshot->pressure_trend_span_min);
+    } else {
+        cJSON_AddNullToObject(state, "pressure_trend_hpa_3h");
+        cJSON_AddNullToObject(state, "pressure_trend_span_min");
+    }
+    if (rain.dew_point_spread_valid) {
+        cJSON_AddNumberToObject(state, "dew_point_spread_c", rain.dew_point_spread_c);
+    } else {
+        cJSON_AddNullToObject(state, "dew_point_spread_c");
+    }
+    cJSON_AddStringToObject(state, "pressure_trend", air_quality_pressure_trend_label(rain.pressure_trend));
+    cJSON_AddStringToObject(state, "pressure_trend_key", air_quality_pressure_trend_key(rain.pressure_trend));
+    cJSON_AddStringToObject(state, "rain_outlook", air_quality_rain_outlook_label(rain.outlook));
+    cJSON_AddStringToObject(state, "rain_outlook_key", air_quality_rain_outlook_key(rain.outlook));
+    cJSON_AddStringToObject(state, "rain_season", air_quality_rain_season_label(rain.season));
+    cJSON_AddStringToObject(state, "rain_season_key", air_quality_rain_season_key(rain.season));
+    cJSON_AddStringToObject(state, "rain_basis", rain.basis[0] ? rain.basis : "Unavailable");
     if (snapshot->pm_valid) {
         cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
         cJSON_AddNumberToObject(state, "pm2_5", snapshot->pm2_5);

@@ -70,6 +70,32 @@ typedef enum {
     AIR_QUALITY_PARTICLE_PROFILE_COARSE,
 } air_quality_particle_profile_t;
 
+typedef enum {
+    AIR_QUALITY_PRESSURE_TREND_UNAVAILABLE = 0,
+    AIR_QUALITY_PRESSURE_TREND_RISING_FAST,
+    AIR_QUALITY_PRESSURE_TREND_RISING,
+    AIR_QUALITY_PRESSURE_TREND_STABLE,
+    AIR_QUALITY_PRESSURE_TREND_FALLING,
+    AIR_QUALITY_PRESSURE_TREND_FALLING_FAST,
+} air_quality_pressure_trend_t;
+
+typedef enum {
+    AIR_QUALITY_RAIN_OUTLOOK_UNAVAILABLE = 0,
+    AIR_QUALITY_RAIN_OUTLOOK_UNLIKELY,
+    AIR_QUALITY_RAIN_OUTLOOK_SLIGHT_CHANCE,
+    AIR_QUALITY_RAIN_OUTLOOK_POSSIBLE,
+    AIR_QUALITY_RAIN_OUTLOOK_LIKELY,
+} air_quality_rain_outlook_t;
+
+typedef enum {
+    AIR_QUALITY_RAIN_SEASON_UNAVAILABLE = 0,
+    AIR_QUALITY_RAIN_SEASON_SPRING,
+    AIR_QUALITY_RAIN_SEASON_MEIYU,
+    AIR_QUALITY_RAIN_SEASON_SUMMER,
+    AIR_QUALITY_RAIN_SEASON_AUTUMN,
+    AIR_QUALITY_RAIN_SEASON_WINTER,
+} air_quality_rain_season_t;
+
 typedef struct {
     bool valid;
     air_quality_particle_profile_t profile;
@@ -78,17 +104,38 @@ typedef struct {
     char note[AIR_QUALITY_NOTE_LEN];
 } air_quality_particle_insight_t;
 
+typedef struct {
+    bool valid;
+    air_quality_pressure_trend_t pressure_trend;
+    air_quality_rain_outlook_t outlook;
+    air_quality_rain_season_t season;
+    bool dew_point_spread_valid;
+    float dew_point_spread_c;
+    char basis[AIR_QUALITY_NOTE_LEN];
+} air_quality_rain_analysis_t;
+
 void air_quality_compute_us_aqi(const sensor_snapshot_t *snapshot, air_quality_us_aqi_t *result);
 void air_quality_compute_overall_assessment(const sensor_snapshot_t *snapshot, air_quality_assessment_t *result);
 void air_quality_compute_particle_insight(const sensor_snapshot_t *snapshot, air_quality_particle_insight_t *result);
+void air_quality_analyze_rain(const sensor_snapshot_t *snapshot, air_quality_rain_analysis_t *result);
 air_quality_signal_level_t air_quality_rate_co2(uint16_t co2_ppm);
 air_quality_signal_level_t air_quality_rate_voc_index(int32_t voc_index);
 air_quality_signal_level_t air_quality_rate_nox_index(int32_t nox_index);
+air_quality_pressure_trend_t air_quality_rate_pressure_trend(float pressure_trend_hpa_3h, bool valid);
+air_quality_rain_outlook_t air_quality_estimate_rain_outlook(float pressure_hpa,
+                                                             float pressure_trend_hpa_3h,
+                                                             bool valid);
 const char *air_quality_co2_ventilation_label(air_quality_signal_level_t level);
 const char *air_quality_voc_event_label(air_quality_signal_level_t level);
 const char *air_quality_nox_event_label(air_quality_signal_level_t level);
 const char *air_quality_rate_temperature_label(float temperature_c);
 const char *air_quality_rate_humidity_label(float humidity_rh);
+const char *air_quality_pressure_trend_label(air_quality_pressure_trend_t trend);
+const char *air_quality_pressure_trend_key(air_quality_pressure_trend_t trend);
+const char *air_quality_rain_outlook_label(air_quality_rain_outlook_t outlook);
+const char *air_quality_rain_outlook_key(air_quality_rain_outlook_t outlook);
+const char *air_quality_rain_season_label(air_quality_rain_season_t season);
+const char *air_quality_rain_season_key(air_quality_rain_season_t season);
 const char *air_quality_category_label(air_quality_category_t category);
 const char *air_quality_category_key(air_quality_category_t category);
 const char *air_quality_pollutant_label(air_quality_pollutant_t pollutant);
