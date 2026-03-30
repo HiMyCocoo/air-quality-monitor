@@ -170,18 +170,13 @@ If a tag already exists but assets were not uploaded because a workflow run fail
 
 ## First Boot and Provisioning
 
-### 1. Default Network Attempt
+### 1. BLE Provisioning on First Boot
 
-If the device does not yet have saved configuration, the firmware first tries the built-in default `Wi-Fi` credentials:
-
-- SSID: `<your-wifi-ssid>`
-- Password: `<your-wifi-password>`
-
-Only if that default `Wi-Fi` is unavailable or connection fails will the device fall back to `BLE` provisioning.
+If the device does not yet have saved `Wi-Fi` configuration, the firmware goes straight into `BLE` provisioning. No default `Wi-Fi` credentials are built into the public codebase.
 
 ### 2. BLE Provisioning Fallback
 
-If no working `Wi-Fi` is available, the default `Wi-Fi` connection fails, or the device stays offline long enough, it enters `ESP BLE Prov`.
+If no working `Wi-Fi` is available or the device stays offline long enough, it enters `ESP BLE Prov`.
 
 - BLE Service Name: `airmon-<device_id>`
 - PoP: `<device_id>`

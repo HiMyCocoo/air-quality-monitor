@@ -871,18 +871,12 @@ static void supervisor_task(void *arg)
         xSemaphoreGive(s_app.lock);
 
         if (do_factory_reset) {
-            esp_err_t checkpoint_err = sensors_checkpoint_sgp41_state();
-            if (checkpoint_err != ESP_OK) {
-                ESP_LOGW(TAG, "failed to checkpoint SGP41 state before factory reset: %d", checkpoint_err);
-            }
+            sensors_stop();
             platform_config_reset();
             esp_restart();
         }
         if (do_restart) {
-            esp_err_t checkpoint_err = sensors_checkpoint_sgp41_state();
-            if (checkpoint_err != ESP_OK) {
-                ESP_LOGW(TAG, "failed to checkpoint SGP41 state before restart: %d", checkpoint_err);
-            }
+            sensors_stop();
             esp_restart();
         }
         if (do_start_mqtt) {

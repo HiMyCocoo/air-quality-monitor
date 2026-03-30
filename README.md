@@ -170,17 +170,13 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 
 ## 首次上电与配网
 
-### 1. 默认联网尝试
+### 1. BLE 配网启动
 
-如果设备里还没有已保存的配置，固件会先尝试使用内置默认 `Wi-Fi` 凭据联网：
+如果设备里还没有已保存的 `Wi-Fi` 配置，固件会直接进入 `BLE` 配网流程，不内置任何默认 `Wi-Fi` 凭据。
 
-- SSID：`<your-wifi-ssid>`
-- 密码：`<your-wifi-password>`
-
-如果默认 `Wi-Fi` 不可用或连接失败，设备才会回退到 `BLE` 配网流程。
 ### 2. BLE 配网回退
 
-没有可用 `Wi-Fi`、默认 `Wi-Fi` 连接失败、或离线超时后，设备会进入 `ESP BLE Prov`。
+没有可用 `Wi-Fi`、或离线超时后，设备会进入 `ESP BLE Prov`。
 
 - BLE Service Name：`airmon-<device_id>`
 - PoP：`<device_id>`
