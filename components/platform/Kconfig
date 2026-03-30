@@ -95,4 +95,24 @@ config AIRMON_AP_SSID_PREFIX
     string "SoftAP SSID prefix"
     default "airmon"
 
+config AIRMON_GITHUB_OTA_ENABLED
+    bool "Enable GitHub OTA auto update"
+    default y
+
+if AIRMON_GITHUB_OTA_ENABLED
+
+config AIRMON_GITHUB_RELEASE_OWNER
+    string "GitHub release owner"
+    default "HiMyCocoo"
+
+config AIRMON_GITHUB_RELEASE_REPO
+    string "GitHub release repository"
+    default "air-quality-monitor"
+
+config AIRMON_GITHUB_OTA_ASSET_PREFIX
+    string "GitHub OTA asset filename prefix"
+    default "air_quality_monitor-ota-"
+
+endif
+
 endmenu

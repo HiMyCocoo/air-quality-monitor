@@ -1761,7 +1761,7 @@
       <div class="settings-card">
         <div class="settings-header">
           <h2>固件升级 (OTA)</h2>
-          <p>上传最新的二进制固件进行无缝系统升级。</p>
+          <p>支持手动上传固件，也支持直接从 GitHub Releases 检查并升级。</p>
         </div>
         <div class="settings-body">
           <div class="maintenance-system-card">
@@ -1769,29 +1769,56 @@
               <span>当前固件版本</span>
               <strong id="firmware_version_text">--</strong>
             </div>
-            <div class="upload-box" style="margin-bottom:0;">
-              <input id="firmware" class="file-input" type="file" accept=".bin" />
-              <label for="firmware" class="file-picker">
-                <span class="file-picker-btn">选择固件包</span>
-                <span class="file-picker-copy">
-                  <span id="firmware_name" class="file-picker-name">尚未选择文件</span>
-                  <span class="file-picker-hint">支持 .bin 格式，上传后系统将隐式校验完整性。</span>
-                </span>
-              </label>
-              <div id="ota_progress" class="ota-progress" hidden>
-                <div class="ota-progress-head">
-                  <span id="ota_progress_label">等待上传</span>
-                  <strong id="ota_progress_percent">0%</strong>
+            <div id="github_ota_section" class="maintenance-tool-block">
+              <h3>GitHub 自动更新</h3>
+              <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
+                <div style="display:grid; gap:12px;">
+                  <div class="mini-kv" style="margin-bottom:0;">
+                    <span>GitHub 最新版本</span>
+                    <strong id="github_latest_version_text">--</strong>
+                  </div>
+                  <div class="mini-kv" style="margin-bottom:0;">
+                    <span>发布仓库</span>
+                    <strong id="github_repo_text">--</strong>
+                  </div>
+                  <div class="mini-kv" style="margin-bottom:0;">
+                    <span>自动更新状态</span>
+                    <strong id="github_ota_status_text">等待检查</strong>
+                  </div>
+                  <p id="github_ota_meta" class="hint" style="margin:0;">页面加载后会自动检查一次 GitHub 最新 Release。</p>
                 </div>
-                <div class="ota-progress-track">
-                  <div id="ota_progress_fill" class="ota-progress-fill"></div>
+                <div style="display:flex; flex-direction:column; gap:12px; justify-content:flex-end;">
+                  <button id="github_ota_check_btn" class="ghost no-wrap" onclick="checkGithubRelease()">检查 GitHub 最新版本</button>
+                  <button id="github_ota_update_btn" class="no-wrap" onclick="updateFirmwareFromGithub()">从 GitHub 直接升级</button>
+                </div>
+              </div>
+            </div>
+            <div class="maintenance-subsection">
+              <h3>手动上传 OTA 固件</h3>
+              <div class="upload-box" style="margin-bottom:0;">
+                <input id="firmware" class="file-input" type="file" accept=".bin" />
+                <label for="firmware" class="file-picker">
+                  <span class="file-picker-btn">选择固件包</span>
+                  <span class="file-picker-copy">
+                    <span id="firmware_name" class="file-picker-name">尚未选择文件</span>
+                    <span class="file-picker-hint">支持 .bin 格式，上传后系统将隐式校验完整性。</span>
+                  </span>
+                </label>
+                <div id="ota_progress" class="ota-progress" hidden>
+                  <div class="ota-progress-head">
+                    <span id="ota_progress_label">等待上传</span>
+                    <strong id="ota_progress_percent">0%</strong>
+                  </div>
+                  <div class="ota-progress-track">
+                    <div id="ota_progress_fill" class="ota-progress-fill"></div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
         <div class="settings-footer">
-          <p class="desc">升级过程大约需要 30-60 秒，期间设备会停止响应且请勿断开电源。</p>
+          <p class="desc">GitHub 直连升级和手动上传都会在校验通过后自动重启，整个过程大约需要 30-60 秒，请勿断电。</p>
           <button id="ota_upload_btn" onclick="uploadFirmware()">开始上传并升级</button>
         </div>
       </div>
@@ -1829,6 +1856,13 @@
     const firmwareInput = document.getElementById('firmware');
     const firmwareNameEl = document.getElementById('firmware_name');
     const firmwareVersionTextEl = document.getElementById('firmware_version_text');
+    const githubOtaSectionEl = document.getElementById('github_ota_section');
+    const githubLatestVersionTextEl = document.getElementById('github_latest_version_text');
+    const githubRepoTextEl = document.getElementById('github_repo_text');
+    const githubOtaStatusTextEl = document.getElementById('github_ota_status_text');
+    const githubOtaMetaEl = document.getElementById('github_ota_meta');
+    const githubOtaCheckBtn = document.getElementById('github_ota_check_btn');
+    const githubOtaUpdateBtn = document.getElementById('github_ota_update_btn');
     const otaProgressEl = document.getElementById('ota_progress');
     const otaProgressLabelEl = document.getElementById('ota_progress_label');
     const otaProgressPercentEl = document.getElementById('ota_progress_percent');
@@ -1849,7 +1883,8 @@
 
     let configDirty = false;
     let mqttUrlDirty = false;
-    let otaUploading = false;
+    let otaBusy = false;
+    let otaAutoCheckRequested = false;
     const activeTabStorageKey = 'airmon-active-tab';
 
     const categoryLabels = { 'Good': '良好', 'Moderate': '一般', 'Unhealthy for Sensitive Groups': '敏感人群不健康', 'Unhealthy': '不健康', 'Very Unhealthy': '非常不健康', 'Hazardous': '危险', 'Unavailable': '暂不可用' };
@@ -1898,6 +1933,15 @@
       'Possible': '可能有雨',
       'Likely Soon': '较可能短时降雨',
       'Unavailable': '暂不可用'
+    };
+    const otaStateLabels = {
+      idle: '等待检查',
+      checking: '正在查询',
+      uploading: '正在上传',
+      downloading: '正在下载',
+      ready: '可直接升级',
+      success: '升级完成',
+      error: '升级失败'
     };
     const rainSeasonLabels = {
       'Spring': '春季',
@@ -2192,16 +2236,16 @@
       }
     }
 
-    function setOtaUploadState({ visible, uploading, label, progress }) {
-      otaUploading = !!uploading;
+    function setOtaUploadState({ visible, uploading, busy, label, progress, uploadButtonText }) {
+      otaBusy = busy != null ? !!busy : !!uploading;
       otaProgressEl.hidden = !visible;
       otaProgressLabelEl.textContent = label;
       const clamped = Math.max(0, Math.min(100, Number(progress) || 0));
       otaProgressPercentEl.textContent = `${Math.round(clamped)}%`;
       otaProgressFillEl.style.width = `${clamped}%`;
-      firmwareInput.disabled = otaUploading;
-      otaUploadBtn.disabled = otaUploading;
-      otaUploadBtn.textContent = otaUploading ? '上传中...' : '开始上传并升级';
+      firmwareInput.disabled = otaBusy;
+      otaUploadBtn.disabled = otaBusy;
+      otaUploadBtn.textContent = uploadButtonText || (otaBusy && uploading ? '上传中...' : otaBusy ? '处理中...' : '开始上传并升级');
     }
 
     function getXhrErrorMessage(xhr, fallback) {
@@ -2235,6 +2279,78 @@
     function syncFirmwareLabel() {
       const file = firmwareInput.files && firmwareInput.files[0];
       firmwareNameEl.textContent = file ? file.name : '尚未选择任何文件';
+    }
+
+    function otaProgressVisible(ota) {
+      return ['uploading', 'downloading', 'success', 'error'].includes(ota?.state);
+    }
+
+    function buildOtaMetaText(ota) {
+      if (!ota || !ota.enabled) {
+        return '当前固件未启用 GitHub 自动更新，仍可继续使用手动上传 OTA。';
+      }
+      if (ota.last_error) {
+        return ota.last_error;
+      }
+
+      const parts = [];
+      if (ota.update_available && ota.current_version && ota.latest_version) {
+        parts.push(`当前 ${ota.current_version}，最新 ${ota.latest_version}`);
+      } else if (ota.latest_version) {
+        parts.push(`GitHub 最新版本 ${ota.latest_version}`);
+      }
+      if (ota.asset_name) {
+        parts.push(`升级文件 ${ota.asset_name}`);
+      }
+      if (!parts.length) {
+        parts.push('页面加载后会自动检查一次 GitHub 最新 Release。');
+      } else if (!ota.update_available && ota.last_checked_at_ms != null) {
+        parts.push('当前已经是 GitHub 最新版本');
+      }
+      return parts.join('，');
+    }
+
+    function renderOtaStatus(ota) {
+      const hasOta = !!ota;
+      const enabled = !!ota?.enabled;
+      githubOtaSectionEl.hidden = !enabled;
+      githubLatestVersionTextEl.textContent = ota?.latest_version || '--';
+      githubRepoTextEl.textContent = ota?.github_repo || '--';
+      githubOtaStatusTextEl.textContent = ota?.status_text || translate(otaStateLabels, ota?.state, '等待检查');
+      githubOtaMetaEl.textContent = buildOtaMetaText(ota);
+
+      const busy = !!ota?.busy;
+      const restartPending = !!ota?.restart_pending;
+      const allowCheck = enabled && !busy && !restartPending;
+      const allowUpdate = enabled && !busy && !restartPending && !!ota?.update_available;
+      githubOtaCheckBtn.disabled = !allowCheck;
+      githubOtaUpdateBtn.disabled = !allowUpdate;
+      githubOtaCheckBtn.textContent = busy && ota?.state === 'checking' ? '查询中...' : '检查 GitHub 最新版本';
+      githubOtaUpdateBtn.textContent = busy && ota?.state === 'downloading' ? '下载中...' : '从 GitHub 直接升级';
+
+      if (!hasOta) {
+        setOtaUploadState({ visible: false, busy: false, label: '等待上传', progress: 0 });
+        return;
+      }
+
+      const progressLabel = ota.status_text || translate(otaStateLabels, ota.state, '等待上传');
+      setOtaUploadState({
+        visible: otaProgressVisible(ota),
+        busy: busy || restartPending,
+        uploading: ota.state === 'uploading',
+        label: progressLabel,
+        progress: ota.progress_percent,
+        uploadButtonText: ota.state === 'uploading' && (busy || restartPending)
+          ? '上传中...'
+          : (busy || restartPending) ? '处理中...' : '开始上传并升级'
+      });
+    }
+
+    function maybeAutoCheckGithubRelease(ota) {
+      if (!ota?.enabled || ota?.busy || otaAutoCheckRequested) return;
+      if (ota.last_checked_at_ms != null && Number(ota.last_checked_at_ms) > 0) return;
+      otaAutoCheckRequested = true;
+      checkGithubRelease({ silent: true });
     }
 
     function syncAscState(enabled, ready) {
@@ -2344,6 +2460,8 @@
       ].join('');
 
       firmwareVersionTextEl.textContent = d.diag.firmware_version || '--';
+      renderOtaStatus(d.ota);
+      maybeAutoCheckGithubRelease(d.ota);
 
       airSummaryEl.innerHTML = shouldShowOverallSummary(d)
         ? summaryBanner(
@@ -2473,12 +2591,59 @@
     async function republishDiscovery() { await apiRequest('/api/action/republish-discovery', { method: 'POST' }, '请求失败', '已重新发送 Discovery 报文'); }
     async function restartDevice() { await apiRequest('/api/action/restart', { method: 'POST' }, '请求失败', '已请求重启'); }
     async function factoryReset() { if (confirm('⚠️ 此操作将清除所有 Wi-Fi 和 MQTT 配置，是否继续？')) { await apiRequest('/api/action/factory-reset', { method: 'POST' }, '失败', '设备即将初始化完毕'); } }
+    async function checkGithubRelease({ silent = false } = {}) {
+      if (otaBusy) return false;
+      try {
+        const r = await fetch('/api/ota/github/check', { method: 'POST' });
+        if (!r.ok) {
+          if (!silent) {
+            showNotice('error', await getErrorMessage(r, '检查 GitHub 最新版本失败'));
+          }
+          return false;
+        }
+
+        const payload = await r.json();
+        if (payload?.ota) {
+          renderOtaStatus(payload.ota);
+        }
+
+        if (!silent) {
+          if (payload?.ota?.update_available) {
+            showNotice('success', `检测到新版本 ${payload.ota.latest_version}，可直接升级`);
+          } else {
+            showNotice('info', '当前已经是 GitHub 最新版本');
+          }
+        }
+        return true;
+      } catch (e) {
+        if (!silent) {
+          showNotice('error', '检查 GitHub 最新版本失败: ' + e.message);
+        }
+        return false;
+      }
+    }
+    async function updateFirmwareFromGithub() {
+      if (otaBusy) return;
+      const latestVersion = githubLatestVersionTextEl.textContent && githubLatestVersionTextEl.textContent !== '--'
+        ? ` v${githubLatestVersionTextEl.textContent}`
+        : ' 最新版本';
+      if (!confirm(`设备将从 GitHub 下载${latestVersion} OTA 固件并自动重启，是否继续？`)) {
+        return;
+      }
+
+      const result = await apiRequestJson('/api/ota/github/update', { method: 'POST' }, 'GitHub OTA 启动失败');
+      if (!result) return;
+      if (result.ota) {
+        renderOtaStatus(result.ota);
+      }
+      showNotice('success', '已开始从 GitHub 下载 OTA 固件，请勿断电。');
+    }
     async function uploadFirmware() {
-      if (otaUploading) return;
+      if (otaBusy) return;
       const file = firmwareInput.files[0];
       if (!file) { showNotice('info', '请选择固件'); return; }
 
-      setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: 0 });
+      setOtaUploadState({ visible: true, uploading: true, busy: true, label: '正在上传固件...', progress: 0, uploadButtonText: '上传中...' });
 
       await new Promise((resolve) => {
         const xhr = new XMLHttpRequest();
@@ -2487,32 +2652,32 @@
 
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) {
-            setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: 0 });
+            setOtaUploadState({ visible: true, uploading: true, busy: true, label: '正在上传固件...', progress: 0, uploadButtonText: '上传中...' });
             return;
           }
           const percent = event.total > 0 ? (event.loaded / event.total) * 100 : 0;
-          setOtaUploadState({ visible: true, uploading: true, label: '正在上传固件...', progress: percent });
+          setOtaUploadState({ visible: true, uploading: true, busy: true, label: '正在上传固件...', progress: percent, uploadButtonText: '上传中...' });
         };
 
         xhr.upload.onload = () => {
-          setOtaUploadState({ visible: true, uploading: true, label: '上传完成，正在校验并切换固件...', progress: 100 });
+          setOtaUploadState({ visible: true, uploading: true, busy: true, label: '上传完成，正在校验并切换固件...', progress: 100, uploadButtonText: '上传中...' });
         };
 
         xhr.onerror = () => {
-          setOtaUploadState({ visible: true, uploading: false, label: '上传失败', progress: 0 });
+          setOtaUploadState({ visible: true, uploading: false, busy: false, label: '上传失败', progress: 0, uploadButtonText: '开始上传并升级' });
           showNotice('error', 'OTA 升级失败: 网络连接已中断');
           resolve();
         };
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            setOtaUploadState({ visible: true, uploading: false, label: '固件校验完成，设备即将重启', progress: 100 });
+            setOtaUploadState({ visible: true, uploading: false, busy: true, label: '固件校验完成，设备即将重启', progress: 100, uploadButtonText: '处理中...' });
             showNotice('success', '固件上传及校验成功，即将重启！');
             resolve();
             return;
           }
 
-          setOtaUploadState({ visible: true, uploading: false, label: '升级失败，请重试', progress: 0 });
+          setOtaUploadState({ visible: true, uploading: false, busy: false, label: '升级失败，请重试', progress: 0, uploadButtonText: '开始上传并升级' });
           showNotice('error', getXhrErrorMessage(xhr, 'OTA 升级失败'));
           resolve();
         };
