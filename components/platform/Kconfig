@@ -109,6 +109,13 @@ config AIRMON_GITHUB_RELEASE_REPO
     string "GitHub release repository"
     default "air-quality-monitor"
 
+config AIRMON_GITHUB_AUTH_TOKEN
+    string "GitHub access token for private repositories"
+    default ""
+    help
+        Optional GitHub token used to access private repositories and
+        private release assets. Leave empty for public repositories.
+
 config AIRMON_GITHUB_OTA_ASSET_PREFIX
     string "GitHub OTA asset filename prefix"
     default "air_quality_monitor-ota-"

@@ -22,6 +22,10 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#ifndef CONFIG_AIRMON_GITHUB_AUTH_TOKEN
+#define CONFIG_AIRMON_GITHUB_AUTH_TOKEN ""
+#endif
+
 static const char *TAG = "provisioning_web";
 
 #define MQTT_PORT_MIN 1
@@ -35,6 +39,7 @@ static const char *TAG = "provisioning_web";
 #define OTA_GITHUB_TAG_LEN 32
 #define OTA_GITHUB_ASSET_NAME_LEN 96
 #define OTA_GITHUB_URL_LEN 512
+#define OTA_GITHUB_AUTH_HEADER_LEN 512
 #define OTA_STATUS_TEXT_LEN 128
 #define OTA_ERROR_TEXT_LEN 192
 #define OTA_DOWNLOAD_TASK_STACK_SIZE 12288
@@ -66,6 +71,7 @@ typedef struct {
     char tag[OTA_GITHUB_TAG_LEN];
     char asset_name[OTA_GITHUB_ASSET_NAME_LEN];
     char asset_url[OTA_GITHUB_URL_LEN];
+    char asset_api_url[OTA_GITHUB_URL_LEN];
     char release_url[OTA_GITHUB_URL_LEN];
 } ota_release_info_t;
 
@@ -172,6 +178,34 @@ static const char *github_repo_name(void)
     return CONFIG_AIRMON_GITHUB_RELEASE_OWNER "/" CONFIG_AIRMON_GITHUB_RELEASE_REPO;
 #else
     return "";
+#endif
+}
+
+static bool github_auth_token_configured(void)
+{
+#if CONFIG_AIRMON_GITHUB_OTA_ENABLED
+    return CONFIG_AIRMON_GITHUB_AUTH_TOKEN[0] != '\0';
+#else
+    return false;
+#endif
+}
+
+static void github_apply_auth_header(esp_http_client_handle_t client)
+{
+#if CONFIG_AIRMON_GITHUB_OTA_ENABLED
+    if (client == NULL || !github_auth_token_configured()) {
+        return;
+    }
+
+    char auth_header[OTA_GITHUB_AUTH_HEADER_LEN];
+    int written = snprintf(auth_header, sizeof(auth_header), "Bearer %s", CONFIG_AIRMON_GITHUB_AUTH_TOKEN);
+    if (written <= 0 || written >= (int)sizeof(auth_header)) {
+        ESP_LOGW(TAG, "github auth token is too long, Authorization header skipped");
+        return;
+    }
+    esp_http_client_set_header(client, "Authorization", auth_header);
+#else
+    (void)client;
 #endif
 }
 
@@ -484,6 +518,136 @@ static bool github_json_message(const char *payload, char *buffer, size_t buffer
     return ok;
 }
 
+static esp_err_t github_http_get(const char *url,
+                                 const char *accept,
+                                 bool api_request,
+                                 http_buffer_t *response,
+                                 int *status_code,
+                                 char *error,
+                                 size_t error_len)
+{
+    if (url == NULL || response == NULL) {
+        snprintf(error, error_len, "GitHub HTTP 请求参数无效");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = OTA_HTTP_TIMEOUT_MS,
+        .buffer_size = 2048,
+        .buffer_size_tx = 1024,
+        .user_agent = OTA_HTTP_USER_AGENT,
+        .event_handler = http_collect_event_handler,
+        .user_data = response,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL) {
+        snprintf(error, error_len, "GitHub HTTP 客户端初始化失败");
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (accept != NULL && accept[0] != '\0') {
+        esp_http_client_set_header(client, "Accept", accept);
+    }
+    if (api_request) {
+        esp_http_client_set_header(client, "X-GitHub-Api-Version", "2022-11-28");
+    }
+    github_apply_auth_header(client);
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (status_code != NULL) {
+        *status_code = esp_http_client_get_status_code(client);
+    }
+    if (err != ESP_OK) {
+        snprintf(error, error_len, "GitHub 请求失败: %s", esp_err_to_name(err));
+    }
+
+    esp_http_client_cleanup(client);
+    return err;
+}
+
+static void github_describe_repo_access_error(char *error, size_t error_len)
+{
+    if (github_auth_token_configured()) {
+        snprintf(error,
+                 error_len,
+                 "GitHub 仓库 %s 不存在，或当前 Token 无权访问该仓库",
+                 github_repo_name());
+    } else {
+        snprintf(error,
+                 error_len,
+                 "GitHub 仓库 %s 不存在或不可匿名访问。若这是私有仓库，请在固件配置中提供 GitHub Token",
+                 github_repo_name());
+    }
+}
+
+static esp_err_t github_probe_repo_visibility(bool *visible, char *error, size_t error_len)
+{
+    if (visible == NULL) {
+        snprintf(error, error_len, "GitHub 仓库探测参数无效");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char api_url[OTA_GITHUB_URL_LEN];
+    snprintf(api_url,
+             sizeof(api_url),
+             "https://api.github.com/repos/%s/%s",
+             CONFIG_AIRMON_GITHUB_RELEASE_OWNER,
+             CONFIG_AIRMON_GITHUB_RELEASE_REPO);
+
+    http_buffer_t response = {0};
+    int status_code = 0;
+    esp_err_t err = github_http_get(api_url,
+                                    "application/vnd.github+json",
+                                    true,
+                                    &response,
+                                    &status_code,
+                                    error,
+                                    error_len);
+    if (err != ESP_OK) {
+        http_buffer_free(&response);
+        return err;
+    }
+
+    *visible = status_code >= 200 && status_code < 300;
+    if (!*visible && status_code != 404) {
+        if (!github_json_message(response.data, error, error_len)) {
+            snprintf(error, error_len, "GitHub 仓库探测返回 HTTP %d", status_code);
+        }
+        http_buffer_free(&response);
+        return ESP_FAIL;
+    }
+
+    http_buffer_free(&response);
+    return ESP_OK;
+}
+
+static void github_describe_latest_release_not_found(char *error, size_t error_len)
+{
+    bool repo_visible = false;
+    char probe_error[OTA_ERROR_TEXT_LEN] = {0};
+    esp_err_t probe_err = github_probe_repo_visibility(&repo_visible, probe_error, sizeof(probe_error));
+    if (probe_err == ESP_OK && repo_visible) {
+        snprintf(error,
+                 error_len,
+                 "GitHub 仓库 %s 可访问，但还没有已发布的正式 Release（草稿或预发布不算 latest）",
+                 github_repo_name());
+        return;
+    }
+    if (probe_err == ESP_OK) {
+        github_describe_repo_access_error(error, error_len);
+        return;
+    }
+    if (probe_error[0] != '\0') {
+        strlcpy(error, probe_error, error_len);
+        return;
+    }
+    snprintf(error, error_len, "GitHub 最新 Release 不存在");
+}
+
 static bool github_parse_release_info(const char *payload, ota_release_info_t *info, char *error, size_t error_len)
 {
     if (payload == NULL || info == NULL) {
@@ -546,8 +710,12 @@ static bool github_parse_release_info(const char *payload, ota_release_info_t *i
     }
 
     cJSON *asset_name = cJSON_GetObjectItemCaseSensitive(selected, "name");
+    cJSON *asset_api_url = cJSON_GetObjectItemCaseSensitive(selected, "url");
     cJSON *asset_url = cJSON_GetObjectItemCaseSensitive(selected, "browser_download_url");
     strlcpy(info->asset_name, asset_name->valuestring, sizeof(info->asset_name));
+    if (cJSON_IsString(asset_api_url)) {
+        strlcpy(info->asset_api_url, asset_api_url->valuestring, sizeof(info->asset_api_url));
+    }
     strlcpy(info->asset_url, asset_url->valuestring, sizeof(info->asset_url));
 
     cJSON_Delete(root);
@@ -573,46 +741,30 @@ static esp_err_t github_fetch_latest_release(ota_release_info_t *info, char *err
              CONFIG_AIRMON_GITHUB_RELEASE_REPO);
 
     http_buffer_t response = {0};
-    esp_http_client_config_t config = {
-        .url = api_url,
-        .method = HTTP_METHOD_GET,
-        .timeout_ms = OTA_HTTP_TIMEOUT_MS,
-        .buffer_size = 2048,
-        .buffer_size_tx = 1024,
-        .user_agent = OTA_HTTP_USER_AGENT,
-        .event_handler = http_collect_event_handler,
-        .user_data = &response,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL) {
-        snprintf(error, error_len, "GitHub HTTP 客户端初始化失败");
-        return ESP_ERR_NO_MEM;
-    }
-    esp_http_client_set_header(client, "Accept", "application/vnd.github+json");
-    esp_http_client_set_header(client, "X-GitHub-Api-Version", "2022-11-28");
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status_code = esp_http_client_get_status_code(client);
+    int status_code = 0;
+    esp_err_t err = github_http_get(api_url,
+                                    "application/vnd.github+json",
+                                    true,
+                                    &response,
+                                    &status_code,
+                                    error,
+                                    error_len);
     if (err != ESP_OK) {
-        snprintf(error, error_len, "GitHub Release 查询失败: %s", esp_err_to_name(err));
-        esp_http_client_cleanup(client);
         http_buffer_free(&response);
         return err;
     }
     if (status_code < 200 || status_code >= 300) {
-        if (!github_json_message(response.data, error, error_len)) {
+        if (status_code == 404) {
+            github_describe_latest_release_not_found(error, error_len);
+        } else if (!github_json_message(response.data, error, error_len)) {
             snprintf(error, error_len, "GitHub Release 查询返回 HTTP %d", status_code);
         }
-        esp_http_client_cleanup(client);
         http_buffer_free(&response);
         return ESP_FAIL;
     }
 
     memset(info, 0, sizeof(*info));
     bool parsed = github_parse_release_info(response.data, info, error, error_len);
-    esp_http_client_cleanup(client);
     http_buffer_free(&response);
     return parsed ? ESP_OK : ESP_FAIL;
 }
@@ -621,18 +773,32 @@ static esp_err_t github_ota_http_client_init(esp_http_client_handle_t client)
 {
     ESP_RETURN_ON_FALSE(client != NULL, ESP_ERR_INVALID_ARG, TAG, "ota http client null");
     esp_http_client_set_header(client, "Accept", "application/octet-stream");
+    if (github_auth_token_configured()) {
+        esp_http_client_set_header(client, "X-GitHub-Api-Version", "2022-11-28");
+        github_apply_auth_header(client);
+    }
     return ESP_OK;
 }
 
 static esp_err_t github_download_and_apply_ota(const ota_release_info_t *info, char *error, size_t error_len)
 {
-    if (info == NULL || info->asset_url[0] == '\0') {
+    const char *download_url = NULL;
+    if (info != NULL) {
+        if (github_auth_token_configured() && info->asset_api_url[0] != '\0') {
+            download_url = info->asset_api_url;
+        } else if (info->asset_url[0] != '\0') {
+            download_url = info->asset_url;
+        } else if (info->asset_api_url[0] != '\0') {
+            download_url = info->asset_api_url;
+        }
+    }
+    if (download_url == NULL || download_url[0] == '\0') {
         snprintf(error, error_len, "GitHub OTA 下载地址为空");
         return ESP_ERR_INVALID_ARG;
     }
 
     esp_http_client_config_t http_config = {
-        .url = info->asset_url,
+        .url = download_url,
         .timeout_ms = OTA_HTTP_TIMEOUT_MS,
         .buffer_size = 4096,
         .buffer_size_tx = 1024,

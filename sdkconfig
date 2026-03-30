@@ -4189,6 +4189,8 @@ CONFIG_AIRMON_GITHUB_RELEASE_OWNER="HiMyCocoo"
 # default:
 CONFIG_AIRMON_GITHUB_RELEASE_REPO="air-quality-monitor"
 # default:
+CONFIG_AIRMON_GITHUB_AUTH_TOKEN=""
+# default:
 CONFIG_AIRMON_GITHUB_OTA_ASSET_PREFIX="air_quality_monitor-ota-"
 # end of Air Quality Monitor
 
