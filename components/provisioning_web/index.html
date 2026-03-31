@@ -5,6 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>空气监测节点后台</title>
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23526af2'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 53A19 19 0 0 1 26.7 15.1C42.2 12 46.3 10.6 52 4c2.7 4.7 4 9.8 4 17 0 15.2-11.8 32-26 32Z'/%3E%3Cpath d='M9 56c0-8 4.8-14.5 13.8-16.3C29 38.7 35 34.7 38 32'/%3E%3C/g%3E%3C/svg%3E" />
   <style>
     /* Modern Reset & Base */
     :root {
@@ -1129,6 +1131,7 @@
 
     .nav-tabs {
       display: flex;
+      align-items: center;
       gap: 4px;
       flex: 1;
       min-width: 0;
@@ -1136,6 +1139,7 @@
     }
 
     .nav-btn {
+      width: auto;
       padding: 8px 16px;
       border-radius: 8px;
       border: none;
@@ -1146,11 +1150,18 @@
       cursor: pointer;
       transition: var(--transition);
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.2;
+      box-shadow: none;
     }
 
     .nav-btn:hover:not(:disabled) {
       color: var(--text-main);
       background: rgba(0, 0, 0, 0.04);
+      transform: none;
     }
 
     .nav-btn[aria-selected='true'] {
@@ -1527,10 +1538,15 @@
 
       .nav-tabs {
         width: 100%;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        display: flex;
         gap: 8px;
-        justify-content: stretch;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
       }
 
       .nav-tabs::-webkit-scrollbar {
@@ -1538,10 +1554,13 @@
       }
 
       .nav-btn {
+        flex: 0 0 auto;
+        min-width: 92px;
         font-size: 0.9rem;
-        padding: 10px 8px;
+        padding: 10px 14px;
         min-height: 44px;
-        white-space: normal;
+        white-space: nowrap;
+        scroll-snap-align: start;
       }
 
       h2 {
@@ -1870,7 +1889,8 @@
       }
 
       .nav-btn {
-        padding: 9px 6px;
+        min-width: 84px;
+        padding: 9px 12px;
         font-size: 0.84rem;
       }
 
