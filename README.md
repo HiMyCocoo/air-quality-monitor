@@ -1,83 +1,72 @@
-# air-quality-monitor
+# Air Quality Monitor
 
-[English README](README.en.md)
+[English](README.en.md)
 
-基于 `YD-ESP32-S3` 的室内空气质量监测节点。
+![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.0-E7352C)
+![Target](https://img.shields.io/badge/Target-ESP32--S3-00979D)
+![Home%20Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5)
+![OTA](https://img.shields.io/badge/OTA-GitHub%20Release%20%2B%20Local-2EA44F)
 
-当前项目按这套硬件方案维护：
+基于 `YD-ESP32-S3` 的室内空气质量监测节点，面向局域网部署和 `Home Assistant` 集成。固件集成 `BLE` 配网、本地响应式 Web 管理后台、`MQTT Discovery`、手动 OTA，以及基于 `GitHub Releases` 的在线升级。
 
-- `SPS30` 保留 `UART`
-- `SCD41`、`SGP41`、`BMP390` 通过 `I2C` 分线器共用一条 `I2C` 总线接入 `ESP32-S3`
-- `BMP390` 提供温度和气压，并在运行时给 `SCD41` 提供动态气压补偿
-- 设备连网后提供本地管理后台，并通过 `MQTT Discovery` 接入 `Home Assistant`
-- `SGP41` 按官方气体指数算法执行预热与学习期，`VOC/NOx` 会在各自稳定后才对外标记为有效
+## 项目特性
 
-旧版“双 I2C 总线”接法不再作为当前项目方案。
+- 当前硬件方案使用一条共享 `I2C` 总线接 `SCD41 / SGP41 / BMP390`，`SPS30` 保持 `UART`
+- 同时输出原始传感器数据、`PM AQI` 估算、综合空气质量结论、粒径画像、气压趋势和短时降雨可能
+- `BMP390` 在运行时为 `SCD41` 提供动态气压补偿，`BMP390` 不可用时自动回退到 `SCD41` 海拔补偿
+- `SGP41` 按 Sensirion 官方 conditioning 和学习流程运行，`VOC / NOx` 只有在稳定后才标记为有效
+- 缺少单个传感器时不会阻断整机启动，其余在线传感器继续工作
+- 本地 Web 后台同时适配桌面和手机访问
+- 自动接入 `Home Assistant`，同时暴露状态类实体和控制类实体
+- 支持本地固件上传 OTA，也支持直接从 `GitHub Releases` 检查和下载升级
 
-## 当前项目内容
+## 传感器与导出能力
 
-- `SCD41`：`CO2 / 温度 / 相对湿度`
-- `SGP41`：`VOC Index / NOx Index`
-- `BMP390`：`气压 / 温度`
-- `SPS30`：`PM1.0 / PM2.5 / PM4.0 / PM10.0`
-- `SPS30`：`0.5 / 1.0 / 2.5 / 4.0 / 10 μm` 粒子数浓度
-- `SPS30`：`典型粒径`
-- 总体空气质量评估：优先使用 `PM AQI` 估算，并补充 `CO2 / 湿度 / VOC / NOx` 的解释性状态
-- 管理后台和 `Home Assistant` 同时展示 `BMP390` 温度、气压、传感器状态与 `CO2` 补偿来源
-- 允许缺少部分传感器继续运行；单个传感器异常时，其余在线传感器继续上报
-- 板载 `WS2812 RGB`（`GPIO48`）用于实时空气质量状态指示
+| 模块 | 接口 | 主要输出 | 备注 |
+| --- | --- | --- | --- |
+| `SCD41` | `I2C` | `CO2 / 温度 / 相对湿度` | 支持海拔补偿、温度偏移、`ASC`、`FRC` |
+| `SGP41` | `I2C` | `VOC Index / NOx Index` | 带 conditioning、学习剩余时间和有效性状态 |
+| `BMP390` | `I2C` | `气压 / 温度` | 给 `SCD41` 提供动态气压补偿 |
+| `SPS30` | `UART` | `PM1.0 / PM2.5 / PM4.0 / PM10.0 / 粒子数浓度 / 典型粒径` | 支持连续采样、休眠、唤醒、风扇清洁 |
+| 固件衍生指标 | 软件计算 | `PM AQI` 估算、综合空气质量、粒径画像、湿度趋势、气压趋势、露点差、短时降雨可能 | 降雨启发式带杭州季节上下文 |
 
-## 硬件与默认 GPIO
+> 说明：项目当前以本 README 中的共享 `I2C` 布局为准，旧版“双 I2C 总线”接法不再是当前方案。
 
-- 开发板：`YD-ESP32-S3`
-- 共享 `I2C` 总线：`GPIO8 / GPIO9`
-- `SPS30`：`UART1`，`GPIO17 / GPIO18`
-- 板载 `WS2812 RGB`：`GPIO48`
-- `BMP390` 默认地址：`0x77`
+## 默认硬件配置
 
-默认拓扑：
+| 项目 | 默认值 |
+| --- | --- |
+| 开发板 | `YD-ESP32-S3` |
+| 共享 `I2C` 总线 | `GPIO8 / GPIO9` |
+| `SPS30` 串口 | `UART1` on `GPIO17 / GPIO18` |
+| 板载状态灯 | `WS2812 RGB` on `GPIO48` |
+| `BMP390` 默认地址 | `0x77` |
+| 默认发布周期 | `10` 秒 |
+| `SPS30` 自动风扇清洁周期 | `604800` 秒（7 天） |
+| 运行离线回退到 BLE 配网超时 | `180` 秒 |
 
-- `SCD41 / SGP41 / BMP390` 都接到同一个 `I2C` 分线器
+当前默认拓扑：
+
+- `SCD41 / SGP41 / BMP390` 接到同一个 `I2C` 分线器
 - 分线器上游只占用开发板一组 `SDA / SCL`
-- `SPS30` 单独走 `UART`
-
-如果你要改引脚，入口仍然在 `idf.py menuconfig` 对应的项目配置项里调整。
-
-默认传感器策略：
-
-- `SCD41` 温度偏移默认 `0.0°C`
-- `SCD41 ASC` 默认关闭，避免在未知通风场景下误学习
-- `SPS30` 自动风扇清洁周期默认显式设置为 `604800 秒`（7 天）
-- `SGP41` 默认共享 `GPIO8 / GPIO9` 这条 `I2C` 总线
+- `SPS30` 独立走 `UART`
+- 板载 `RGB` 为开发板自带，无需额外接线
 
 ## 默认接线
 
-### 共享 I2C 总线
+共享 `I2C` 总线：
 
-- 开发板 `GPIO8 -> I2C SDA`
-- 开发板 `GPIO9 -> I2C SCL`
+- 开发板 `GPIO8 -> SDA`
+- 开发板 `GPIO9 -> SCL`
 - 开发板 `3V3 -> I2C 分线器 VCC`
 - 开发板 `GND -> I2C 分线器 GND`
+- `SCD41 / SGP41 / BMP390` 都按标准 `I2C` 四线连接到分线器
 
-把以下三个模块都接到分线器的任一支路上：
+`SPS30`：
 
-- `SCD41`
-- `SGP41`
-- `BMP390`
-
-三者都按标准 `I2C` 四线连接：
-
-- `SDA -> SDA`
-- `SCL -> SCL`
-- `VDD/VCC -> 3V3`
-- `GND -> GND`
-
-### SPS30
-
-- 原厂 5Pin：`VDD / RX / TX / SEL / GND`
 - `VDD -> 5V0`
-- `RX -> GPIO17`（开发板发出，接传感器 `RX`）
-- `TX -> GPIO18`（开发板接收，接传感器 `TX`）
+- `RX -> GPIO17`，即开发板发出、接传感器 `RX`
+- `TX -> GPIO18`，即开发板接收、接传感器 `TX`
 - `SEL -> 悬空，不接`
 - `GND -> GND`
 
@@ -85,40 +74,17 @@
 
 - `SCD41 / SGP41 / BMP390` 都是 `3.3V I2C`
 - `SPS30` 继续走 `UART`，不要把 `SEL` 拉到 `GND`
-- 所有 `GND` 必须共地
-- 板载 `RGB` 是开发板自带的，不需要外接
+- 所有模块必须共地
 
-## SCD41 补偿说明
+## 快速开始
 
-当前固件对 `SCD41` 已接入的补偿项有两项：
+前提：
 
-1. `SCD41` 海拔补偿
-2. `SCD41` 温度偏移
+- `ESP-IDF v6.0`
+- 可正常供电和刷写的 `ESP32-S3` 开发板
+- 至少一颗已接好的传感器
 
-它们会在启动时加载，并在你通过管理后台保存配置后立即下发到传感器。
-
-此外，运行过程中如果 `BMP390` 提供有效气压，固件会通过 `SCD41 set_ambient_pressure` 持续下发动态气压补偿。
-
-补偿优先级如下：
-
-1. 启动或配置更新时先应用 `SCD41` 海拔补偿和温度偏移
-2. 运行过程中只要 `BMP390` 持续提供有效气压，`SCD41` 就切换到 `BMP390` 动态气压补偿
-3. 如果 `BMP390` 气压更新中断一段时间，系统会恢复到配置里的 `SCD41` 海拔补偿
-
-## SGP41 学习期说明
-
-`SGP41` 启动后并不会立刻产出可信的 `VOC Index / NOx Index`。
-
-- 前 `10` 秒先执行传感器 conditioning
-- `VOC Index` 会在算法稳定后才标记为有效，当前配置下大约需要 `1.5` 小时
-- `NOx Index` 学习更久，当前配置下大约需要 `5.8` 小时
-- 管理后台和 `Home Assistant` 会分别展示 `VOC` 与 `NOx` 的有效状态和剩余学习时间
-
-这意味着设备刚上电后的 `SGP41` 在线状态不等于指数已经可用。
-
-## 烧录
-
-先加载你的 `ESP-IDF` 环境。当前机器上的示例路径是：
+构建和烧录示例：
 
 ```bash
 source ~/.espressif/v6.0/esp-idf/export.sh
@@ -126,163 +92,139 @@ idf.py build
 idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 ```
 
-如果你的 `ESP-IDF` 安装路径不同，把 `export.sh` 换成你自己的路径即可。
+常用开发命令：
 
-建议优先使用板子右侧 `USB to UART` 口烧录和看日志。
+```bash
+idf.py menuconfig
+idf.py build
+idf.py -p /dev/cu.wchusbserialXXXX flash monitor
+```
 
-## 自动发布到 GitHub Release
-
-仓库现在可以按 `PROJECT_VER` 自动发布：
-
-- `CMakeLists.txt` 里的 `PROJECT_VER` 现在作为版本基线使用
-- 固件内嵌版本号的解析优先级是：`AIRMON_RELEASE_VERSION` 环境变量 > 精确匹配的 git tag（如 `v0.1.4`）> `PROJECT_VER`
-- 这意味着从 release workflow 构建、或在本地直接构建某个 `vX.Y.Z` tag 时，管理后台显示的固件版本会和发布版本一致
-- workflow 会读取它的 `主版本.次版本`，并自动递增 `patch`
-- 例如基线是 `0.1.0`，已有最新 tag 是 `v0.1.3`，下一次发布会自动变成 `v0.1.4`
-- 如果你把基线改成 `0.2.0`，后续发布就会切到 `0.2.x`
-- 然后在同一个 workflow 里继续构建固件，并自动发布到 GitHub Release
-- Release 会附带自动生成的更新日志和编译后的 `bin` 文件
-
-当前上传到 Release 的产物包括：
-
-- OTA 应用固件 `air_quality_monitor-ota-<version>.bin`
-- 完整刷机镜像 `air_quality_monitor-full-<version>.bin`
-- `bootloader.bin`
-- `partition-table.bin`
-- `ota_data_initial.bin`
-- `flasher_args.json`
-- `SHA256SUMS.txt`
-
-对应配置文件：
-
-- 自动打 tag、构建并发布：`.github/workflows/release-on-tag.yml`
-- Release notes 分类配置：`.github/release.yml`
-
-使用方式：
-
-1. 平时正常提交并推送到 `main` 或 `master`
-2. workflow 会自动计算下一个 patch 版本、创建 tag、构建并发布
-3. 只有当你想切换大版本或小版本时，才需要手动修改 `CMakeLists.txt` 里的 `PROJECT_VER`
-
-如果某个提交已经有对应的 `v*` tag，workflow 会复用这个 tag，不会在同一个提交上继续递增出新的 patch 版本。
-
-如果某个 tag 已经存在，但之前因为工作流失败没有成功上传资产，也可以手动运行 `Build And Release Firmware`，并在可选输入里填上对应 tag（例如 `v0.1.0`）来补发 Release 资产。
+建议优先使用开发板的 `USB to UART` 口烧录和查看日志。
 
 ## 首次上电与配网
 
-### 1. BLE 配网启动
-
-如果设备里还没有已保存的 `Wi-Fi` 配置，固件会直接进入 `BLE` 配网流程，不内置任何默认 `Wi-Fi` 凭据。
-
-### 2. BLE 配网回退
-
-没有可用 `Wi-Fi`、或离线超时后，设备会进入 `ESP BLE Prov`。
-
-- BLE Service Name：`airmon-<device_id>`
-- PoP：`<device_id>`
-
-其中 `device_id` 是设备 `MAC` 后 3 字节的小写十六进制字符串，例如 `a1b2c3`。
-
-### 3. 接入局域网
-
-用 Espressif 官方 `ESP BLE Prov` App 或兼容客户端下发 `Wi-Fi` 后，设备会自动连入局域网。
-
-### 4. 打开本地后台补 MQTT
-
-设备拿到 IP 后，用浏览器访问设备 IP，在管理后台里填写一行 `MQTT URL`：
-
-- 例如：`mqtt://user:password@192.168.1.20:1883`
-
-保存后设备会自动重启。
+1. 如果设备里还没有已保存的 `Wi-Fi` 配置，固件会直接进入 `BLE` 配网流程。
+2. 默认 `BLE Service Name` 为 `airmon-<device_id>`。
+3. 默认 `PoP` 为 `<device_id>`。
+4. `device_id` 来自设备 `MAC` 后 3 字节，例如 `a1b2c3`。
+5. 用 Espressif 官方 `ESP BLE Prov` App 或兼容客户端下发 `Wi-Fi` 后，设备自动加入局域网。
+6. 设备拿到 IP 后，用浏览器打开设备 IP，即可访问本地管理后台。
+7. 如果设备长时间离线，固件会自动回退到 `BLE` 配网模式。
 
 说明：
 
-- 只配 `Wi-Fi` 也能进入局域网
-- 只有 `MQTT URL` 配好后，设备才会启动 `MQTT` 并发布 Discovery
-- `MQTT URL` 格式为 `mqtt://[user:password@]host[:port]`
-- 用户名或密码里如果有 `@ / :` 等保留字符，需要做 `URL 编码`
+- 公开代码库不内置任何默认 `Wi-Fi` 凭据
+- 只配置 `Wi-Fi` 时设备可以进局域网，但不会启动 `MQTT`
+- 只有 `MQTT URL` 保存成功后，设备才会启动 `MQTT` 并发布 `Home Assistant Discovery`
+- 更新 `MQTT URL` 会触发设备重启；只修改 `SCD41` 补偿参数时会即时下发到传感器
 
-## 本地管理后台
+## 本地 Web 管理后台
 
-管理后台提供以下内容：
+后台源码位于 `components/provisioning_web/index.html`，构建时会嵌入固件。
 
-- 设备状态、联网状态、最近错误
-- `CO2 / 温度 / 相对湿度 / VOC / NOx / PM / 粒子数 / 典型粒径`
-- `BMP390` 温度、当前气压、`BMP390 Ready`、`BMP390 Valid`
-- `SGP41 VOC/NOx` 各自的学习状态与稳定剩余时间
-- `CO2` 补偿来源
-- `Wi-Fi / MQTT URL` 配置
-- `SCD41` 温度偏移
-- `SCD41` 海拔补偿
-- `SCD41 ASC`
-- `SCD41 FRC`
-- `SPS30` 休眠 / 唤醒
-- `SPS30` 手动触发自动风扇清洁
-- 板载 `RGB` 状态灯开关
-- `Home Assistant Discovery` 重发
-- `OTA` 升级
-- 重启、恢复出厂
+后台主要包含三个区域：
 
-配置语义说明：
+- 实时监测：综合空气质量、`PM AQI` 估算、`CO2 / 温湿度 / VOC / NOx / PM / 粒子数 / 粒径画像 / 气压趋势 / 短时降雨可能`
+- 项目配置：`MQTT URL`、`SCD41` 海拔补偿、温度偏移、`ASC`
+- 维护操作：`SPS30` 连续采样开关、风扇清洁、`RGB` 状态灯、重发 Discovery、`FRC`、手动 OTA、GitHub OTA、重启、恢复出厂
 
-- `SCD41 温度偏移`：始终生效
-- `SCD41 海拔补偿`：启动时先应用；若 `BMP390` 动态气压补偿暂时不可用，也会作为回退补偿使用
-- `SGP41 VOC / NOx`：只有在各自学习完成后才会显示正式指数值，学习期间页面会显示剩余时间
+当前后台特性：
 
-当前网页管理端口不带登录认证，只适合你信任的局域网。
-
-网页前端文件在 `components/provisioning_web/index.html`，构建时会嵌入固件。
-
-## OTA 说明
-
-- `OTA` 升级的是整包应用镜像，不只是后端逻辑
-- 因为管理后台前端已经嵌入固件，所以 `OTA` 会连前端页面一起升级
-- 如果 `OTA` 后浏览器里样式还是旧的，通常是缓存问题，强制刷新一次即可
+- 支持桌面和手机访问
+- 保存 `MQTT URL` 时不会回显已保存的用户名和密码
+- 支持从页面查看 `SGP41` 学习状态、`BMP390` 补偿来源和设备运行诊断
+- 当前无登录认证，只适合信任的局域网
 
 ## MQTT / Home Assistant
 
-默认值：
+默认配置：
 
-- `device_name = aq-monitor-<device_id>`
-- `discovery_prefix = homeassistant`
-- `topic_root = air_quality_monitor/<device_id>`
-- `mqtt_port = 1883`
-- `publish_interval_sec = 10`
+| 项目 | 默认值 |
+| --- | --- |
+| `device_name` | `aq-monitor-<device_id>` |
+| `discovery_prefix` | `homeassistant` |
+| `topic_root` | `air_quality_monitor/<device_id>` |
+| `mqtt_port` | `1883` |
+| `publish_interval_sec` | `10` |
 
-网页后台里，`MQTT` 现在只需要填写一行 `MQTT URL`，例如：
+页面里只需要填写一行 `MQTT URL`，例如：
 
-- `mqtt://user:password@192.168.1.20:1883`
+```text
+mqtt://user:password@192.168.1.20:1883
+```
 
-主要上报内容包括：
+`MQTT URL` 规则：
 
-- `CO2 / 温度 / 相对湿度`
-- `VOC Index / NOx Index`
-- `BMP390 温度 / 气压`
-- `PM1.0 / PM2.5 / PM4.0 / PM10.0`
-- `粒子数浓度`
-- `典型粒径`
-- `Composite Air Quality / Basis / Driver / Note`
-- `PM AQI Estimate / AQI 等级 / 主要污染物`
-- `Wi-Fi RSSI / Uptime / Heap / Firmware Version / Last Error / IP / AP SSID / Device ID`
-- `Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
-- `SCD41 / SGP41 / BMP390 / SPS30 / RGB 状态灯` 在线状态
-- `SCD41 / SGP41 / BMP390 / PM` 数据有效状态
-- `BMP390 Ready / BMP390 Valid`
-- `CO2 Compensation Source`
-- `SCD41 ASC`
-- `SPS30 Sleep`
-- `SPS30 Fan Cleaning`
-- `RGB Status LED`
-- `Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+- 格式为 `mqtt://[user:password@]host[:port]`
+- 只支持主机、端口、用户名和密码
+- 用户名或密码里如果有 `@ / :` 等保留字符，需要先做 URL 编码
 
-## 运行说明
+默认会向 `Home Assistant` 暴露以下几类实体：
 
-- 缺少某一颗传感器时，系统仍会启动，其他在线传感器继续工作
-- `BMP390` 正常时，`SCD41` 会使用动态气压补偿；本地后台系统区会显示当前 `CO2` 补偿来源
-- `BMP390` 不可用不会阻断其他传感器上报；本地后台和 `MQTT` 中的气压 / `BMP390` 温度字段会显示为空，补偿来源会回退为 `SCD41` 海拔补偿
-- `SGP41` 上电后会先经历一小段 `NOx` 调理期，随后进入算法学习阶段
-- `All Sensors Ready` 的语义应理解为四个物理传感器都 ready：`SCD41 / SGP41 / BMP390 / SPS30`
-- `CO2 Ventilation Status` 是通风状态分级；`VOC / NOx Event Level` 基于 `Sensirion` 指数的相对事件强度，不代表绝对浓度
-- `VOC / NOx Index`、粒子数、典型粒径会继续上报，但不参与 `EPA AQI`
-- 板载 `RGB` 跟随统一的总体空气质量评估结果
-- 传感器都还没准备好时，板载灯进入等待态闪烁
+- 环境数据：`CO2 / 温度 / 湿度 / VOC / NOx / PM / 粒子数 / 典型粒径`
+- 派生数据：`PM AQI` 估算、综合空气质量、粒径画像、气压趋势、湿度趋势、露点差、短时降雨可能
+- 诊断数据：`Wi-Fi RSSI / Uptime / Heap / IP / Device ID / Firmware Version / Last Error`
+- 状态实体：`Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
+- 控制实体：`SCD41 ASC / SPS30 Sleep / SPS30 Fan Cleaning / RGB Status LED / Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+
+## OTA 与 GitHub Release
+
+固件支持两种升级方式：
+
+- 本地手动上传 OTA
+- 直接从 `GitHub Releases` 检查并升级
+
+本地 OTA 说明：
+
+- 页面上传的是 OTA 应用镜像，不是整包串口刷机镜像
+- 推荐上传发布产物中的 `air_quality_monitor-ota-<version>.bin`
+- `OTA` 会升级整个应用，包括嵌入式 Web 前端
+
+GitHub OTA 默认编译配置：
+
+| 配置项 | 默认值 |
+| --- | --- |
+| `AIRMON_GITHUB_RELEASE_OWNER` | `HiMyCocoo` |
+| `AIRMON_GITHUB_RELEASE_REPO` | `air-quality-monitor` |
+| `AIRMON_GITHUB_OTA_ASSET_PREFIX` | `air_quality_monitor-ota-` |
+
+如果你 fork 这个仓库并想保留在线升级能力，记得同步修改这些配置。
+
+仓库已包含自动发布工作流：
+
+- 推送到 `main` 或 `master` 时，工作流会按 `PROJECT_VER` 的 `主版本.次版本` 基线自动递增 `patch`
+- 工作流会构建固件、创建或复用 `vX.Y.Z` tag，并发布到 `GitHub Releases`
+- 也可以手动运行 `Build And Release Firmware`，为已有 tag 补发资产
+
+当前 Release 产物：
+
+- `air_quality_monitor-ota-<version>.bin`
+- `air_quality_monitor-full-<version>.bin`
+- `bootloader-<version>.bin`
+- `partition-table-<version>.bin`
+- `ota_data_initial-<version>.bin`
+- `flasher_args-<version>.json`
+- `SHA256SUMS.txt`
+
+## 项目结构
+
+| 路径 | 作用 |
+| --- | --- |
+| `main/` | 应用入口、状态灯逻辑、配网与主循环 |
+| `components/sensors/` | `SCD41 / SGP41 / BMP390 / SPS30` 驱动与采样 |
+| `components/air_quality/` | `AQI`、综合空气质量、粒径画像、降雨启发式等计算 |
+| `components/mqtt_ha/` | `MQTT` 发布、`Home Assistant Discovery`、远程控制实体 |
+| `components/provisioning_web/` | 本地 Web 管理后台和 HTTP API |
+| `components/platform/` | 配置持久化、`Wi-Fi` 启动与平台配置 |
+| `.github/workflows/` | GitHub Release 构建与发布流程 |
+| `scripts/` | 版本号和发布辅助脚本 |
+
+## 运行说明与限制
+
+- 缺少单个传感器不会阻断整机运行，但对应字段会显示为空或无效
+- `SCD41` 补偿优先级为：配置中的海拔补偿与温度偏移先应用，`BMP390` 有效时切到动态气压补偿，`BMP390` 中断后再回退
+- `SGP41 VOC` 在当前配置下约需 `1.5` 小时稳定，`NOx` 约需 `5.8` 小时稳定
+- 板载 `RGB` 状态灯跟随综合空气质量结论；如果传感器还未准备好，会进入等待态闪烁
+- `OTA` 后如果浏览器仍显示旧样式，通常是缓存问题，强制刷新一次即可
+- 降雨启发式当前使用 `CST-8` 和杭州季节上下文，如果你部署在其他地区，建议按实际场景调整

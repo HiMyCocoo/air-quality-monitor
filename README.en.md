@@ -1,83 +1,72 @@
-# air-quality-monitor
+# Air Quality Monitor
 
 [中文说明](README.md)
 
-An indoor air-quality monitoring node based on `YD-ESP32-S3`.
+![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.0-E7352C)
+![Target](https://img.shields.io/badge/Target-ESP32--S3-00979D)
+![Home%20Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5)
+![OTA](https://img.shields.io/badge/OTA-GitHub%20Release%20%2B%20Local-2EA44F)
 
-The project is currently maintained around this hardware layout:
+An indoor air-quality monitoring node built around `YD-ESP32-S3` for local-network deployment and `Home Assistant` integration. The firmware includes `BLE` provisioning, a responsive local web console, `MQTT Discovery`, manual OTA, and direct upgrades from `GitHub Releases`.
 
-- `SPS30` stays on `UART`
-- `SCD41`, `SGP41`, and `BMP390` share one `I2C` bus through an `I2C` splitter and connect to the `ESP32-S3`
-- `BMP390` provides temperature and pressure, and also supplies runtime ambient-pressure compensation for `SCD41`
-- Once connected to the network, the device exposes a local web console and integrates with `Home Assistant` through `MQTT Discovery`
-- `SGP41` follows Sensirion's official gas-index conditioning and learning flow; `VOC/NOx` are only marked valid after each index has stabilized
+## Highlights
 
-The old "dual I2C bus" wiring is no longer the current project layout.
+- Current hardware layout uses one shared `I2C` bus for `SCD41 / SGP41 / BMP390`, while `SPS30` stays on `UART`
+- Exposes both raw sensor data and derived signals such as `PM AQI`, composite air-quality status, particle profile, pressure trend, and short-term rain outlook
+- `BMP390` provides runtime ambient-pressure compensation for `SCD41`, with automatic fallback to configured `SCD41` altitude compensation
+- `SGP41` follows Sensirion conditioning and learning behavior, and `VOC / NOx` are only marked valid after stabilization
+- The firmware keeps working when one sensor is missing; other online sensors continue reporting
+- The local web console is usable on both desktop and mobile browsers
+- Integrates with `Home Assistant` through `MQTT Discovery`, including both telemetry and control entities
+- Supports both local file OTA and direct upgrade from `GitHub Releases`
 
-## Current Scope
+## Sensors and Derived Outputs
 
-- `SCD41`: `CO2 / temperature / relative humidity`
-- `SGP41`: `VOC Index / NOx Index`
-- `BMP390`: `pressure / temperature`
-- `SPS30`: `PM1.0 / PM2.5 / PM4.0 / PM10.0`
-- `SPS30`: particle number concentrations for `0.5 / 1.0 / 2.5 / 4.0 / 10 um`
-- `SPS30`: typical particle size
-- Overall air-quality assessment: primarily based on estimated `PM AQI`, with explanatory states from `CO2 / humidity / VOC / NOx`
-- The web console and `Home Assistant` both show `BMP390` temperature, pressure, sensor readiness, and the current `CO2` compensation source
-- The system keeps running with missing sensors; if one sensor fails, the remaining online sensors continue to report
-- The on-board `WS2812 RGB` on `GPIO48` is used as a real-time air-quality status indicator
+| Module | Interface | Main Outputs | Notes |
+| --- | --- | --- | --- |
+| `SCD41` | `I2C` | `CO2 / temperature / relative humidity` | Supports altitude compensation, temperature offset, `ASC`, and `FRC` |
+| `SGP41` | `I2C` | `VOC Index / NOx Index` | Includes conditioning, stabilization countdown, and validity state |
+| `BMP390` | `I2C` | `pressure / temperature` | Supplies dynamic pressure compensation to `SCD41` |
+| `SPS30` | `UART` | `PM1.0 / PM2.5 / PM4.0 / PM10.0 / particle counts / typical particle size` | Supports continuous sampling, sleep, wake, and fan cleaning |
+| Derived firmware signals | Software | `PM AQI`, composite air quality, particle profile, humidity trend, pressure trend, dew-point spread, short-term rain outlook | Rain heuristic uses Hangzhou seasonal context |
 
-## Hardware and Default GPIO
+> Note: the current project uses the shared `I2C` layout described in this README. The older dual-`I2C` wiring is no longer the active hardware design.
 
-- Development board: `YD-ESP32-S3`
-- Shared `I2C` bus: `GPIO8 / GPIO9`
-- `SPS30`: `UART1`, `GPIO17 / GPIO18`
-- On-board `WS2812 RGB`: `GPIO48`
-- `BMP390` default address: `0x77`
+## Default Hardware Layout
+
+| Item | Default |
+| --- | --- |
+| Development board | `YD-ESP32-S3` |
+| Shared `I2C` bus | `GPIO8 / GPIO9` |
+| `SPS30` serial interface | `UART1` on `GPIO17 / GPIO18` |
+| On-board status LED | `WS2812 RGB` on `GPIO48` |
+| `BMP390` default address | `0x77` |
+| Default publish interval | `10` seconds |
+| `SPS30` auto fan-cleaning interval | `604800` seconds (7 days) |
+| Runtime offline timeout before BLE fallback | `180` seconds |
 
 Default topology:
 
-- `SCD41 / SGP41 / BMP390` are all connected to the same `I2C` splitter
-- The splitter occupies only one `SDA / SCL` pair on the development board
-- `SPS30` remains on a separate `UART`
-
-If you want to change pins, use the project configuration items exposed through `idf.py menuconfig`.
-
-Default sensor policy:
-
-- `SCD41` temperature offset defaults to `0.0°C`
-- `SCD41 ASC` is disabled by default to avoid accidental self-learning in unknown ventilation conditions
-- `SPS30` auto fan-cleaning interval is explicitly set to `604800 seconds` (7 days)
-- `SGP41` uses the shared `GPIO8 / GPIO9` `I2C` bus by default
+- `SCD41 / SGP41 / BMP390` share the same `I2C` splitter
+- The splitter uses only one `SDA / SCL` pair on the board
+- `SPS30` stays on a separate `UART`
+- The `RGB` status LED is already built into the board
 
 ## Default Wiring
 
-### Shared I2C Bus
+Shared `I2C` bus:
 
-- Board `GPIO8 -> I2C SDA`
-- Board `GPIO9 -> I2C SCL`
+- Board `GPIO8 -> SDA`
+- Board `GPIO9 -> SCL`
 - Board `3V3 -> I2C splitter VCC`
 - Board `GND -> I2C splitter GND`
+- Connect `SCD41 / SGP41 / BMP390` to the splitter using normal 4-wire `I2C`
 
-Connect the following three modules to any branches on the splitter:
+`SPS30`:
 
-- `SCD41`
-- `SGP41`
-- `BMP390`
-
-All three use standard 4-wire `I2C` wiring:
-
-- `SDA -> SDA`
-- `SCL -> SCL`
-- `VDD/VCC -> 3V3`
-- `GND -> GND`
-
-### SPS30
-
-- Factory 5-pin header: `VDD / RX / TX / SEL / GND`
 - `VDD -> 5V0`
-- `RX -> GPIO17` (board TX, connect to sensor `RX`)
-- `TX -> GPIO18` (board RX, connect to sensor `TX`)
+- `RX -> GPIO17`, meaning board TX to sensor `RX`
+- `TX -> GPIO18`, meaning board RX to sensor `TX`
 - `SEL -> leave floating`
 - `GND -> GND`
 
@@ -85,40 +74,17 @@ Wiring notes:
 
 - `SCD41 / SGP41 / BMP390` are `3.3V I2C` devices
 - `SPS30` must remain on `UART`; do not pull `SEL` to `GND`
-- All grounds must be shared
-- The RGB LED is already on the board and needs no external wiring
+- All modules must share the same ground
 
-## SCD41 Compensation
+## Quick Start
 
-The firmware currently applies two configured `SCD41` compensation values:
+Requirements:
 
-1. `SCD41` altitude compensation
-2. `SCD41` temperature offset
+- `ESP-IDF v6.0`
+- An `ESP32-S3` board that can be powered and flashed reliably
+- At least one correctly wired sensor
 
-They are loaded on boot and pushed to the sensor immediately after you save settings through the web console.
-
-In addition, if `BMP390` provides a valid pressure reading during runtime, the firmware continuously applies dynamic pressure compensation through `SCD41 set_ambient_pressure`.
-
-Compensation priority:
-
-1. On boot or after a config update, the firmware first applies the configured `SCD41` altitude and temperature-offset values
-2. During runtime, as long as `BMP390` keeps producing valid pressure data, `SCD41` switches to dynamic pressure compensation from `BMP390`
-3. If `BMP390` pressure updates stop for a while, the system falls back to the configured `SCD41` altitude compensation
-
-## SGP41 Learning Period
-
-`SGP41` does not produce trustworthy `VOC Index / NOx Index` values immediately after startup.
-
-- The first `10` seconds are used for sensor conditioning
-- `VOC Index` is only marked valid after the algorithm stabilizes, which is about `1.5` hours with the current setup
-- `NOx Index` takes longer to learn, about `5.8` hours with the current setup
-- The web console and `Home Assistant` show separate validity states and remaining stabilization time for `VOC` and `NOx`
-
-This means "SGP41 online" after boot does not automatically mean the gas indexes are already usable.
-
-## Flashing
-
-Load your `ESP-IDF` environment first. On the current machine, the example path is:
+Build and flash example:
 
 ```bash
 source ~/.espressif/v6.0/esp-idf/export.sh
@@ -126,163 +92,139 @@ idf.py build
 idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 ```
 
-If your `ESP-IDF` installation lives elsewhere, replace `export.sh` with your own path.
+Common development commands:
 
-Using the board's right-side `USB to UART` port is recommended for flashing and logs.
+```bash
+idf.py menuconfig
+idf.py build
+idf.py -p /dev/cu.wchusbserialXXXX flash monitor
+```
 
-## Automatic GitHub Releases
-
-The repository can now publish releases automatically from `PROJECT_VER`:
-
-- `PROJECT_VER` in `CMakeLists.txt` is used as the release baseline
-- Embedded firmware version resolution uses this priority: `AIRMON_RELEASE_VERSION` environment variable > exact git tag (for example `v0.1.4`) > `PROJECT_VER`
-- As a result, firmware built by the release workflow, or built locally from an exact `vX.Y.Z` tag, shows the same version in the web console as the released firmware version
-- The workflow reads the baseline `major.minor` and automatically increments `patch`
-- For example, if the baseline is `0.1.0` and the latest tag is `v0.1.3`, the next release becomes `v0.1.4`
-- If you change the baseline to `0.2.0`, subsequent releases move to `0.2.x`
-- The same workflow then builds the firmware and publishes it to GitHub Releases
-- The release includes auto-generated notes and compiled binary artifacts
-
-Artifacts currently uploaded to a release:
-
-- OTA application image `air_quality_monitor-ota-<version>.bin`
-- Full flash image `air_quality_monitor-full-<version>.bin`
-- `bootloader.bin`
-- `partition-table.bin`
-- `ota_data_initial.bin`
-- `flasher_args.json`
-- `SHA256SUMS.txt`
-
-Relevant files:
-
-- Auto-tag, build, and release workflow: `.github/workflows/release-on-tag.yml`
-- Release note category config: `.github/release.yml`
-
-Workflow usage:
-
-1. Commit and push to `main` or `master` as usual
-2. The workflow calculates the next patch version, creates the tag, builds, and publishes the release
-3. You only need to edit `PROJECT_VER` in `CMakeLists.txt` when you want to bump major or minor
-
-If a commit already has a matching `v*` tag, the workflow reuses that tag instead of generating another patch tag for the same commit.
-
-If a tag already exists but assets were not uploaded because a workflow run failed, you can manually run `Build And Release Firmware` and provide the tag explicitly, for example `v0.1.0`, to republish the release assets.
+Using the board's `USB to UART` port is recommended for flashing and logs.
 
 ## First Boot and Provisioning
 
-### 1. BLE Provisioning on First Boot
-
-If the device does not yet have saved `Wi-Fi` configuration, the firmware goes straight into `BLE` provisioning. No default `Wi-Fi` credentials are built into the public codebase.
-
-### 2. BLE Provisioning Fallback
-
-If no working `Wi-Fi` is available or the device stays offline long enough, it enters `ESP BLE Prov`.
-
-- BLE Service Name: `airmon-<device_id>`
-- PoP: `<device_id>`
-
-Here `device_id` is the lower-case hexadecimal string built from the last 3 bytes of the device `MAC`, for example `a1b2c3`.
-
-### 3. Join the LAN
-
-Use Espressif's official `ESP BLE Prov` app or another compatible client to send `Wi-Fi` credentials. The device then joins the LAN automatically.
-
-### 4. Open the Local Web Console and Add MQTT
-
-Once the device gets an IP, open that IP in a browser and enter a single `MQTT URL` in the web console:
-
-- For example: `mqtt://user:password@192.168.1.20:1883`
-
-The device restarts automatically after saving.
+1. If no `Wi-Fi` credentials are stored, the firmware enters `BLE` provisioning automatically.
+2. The default `BLE Service Name` is `airmon-<device_id>`.
+3. The default `PoP` is `<device_id>`.
+4. `device_id` is derived from the last 3 bytes of the device `MAC`, for example `a1b2c3`.
+5. Use Espressif's `ESP BLE Prov` app or another compatible client to send `Wi-Fi` credentials.
+6. Once the device gets an IP address, open that IP in a browser to reach the local web console.
+7. If the device stays offline long enough, it falls back to `BLE` provisioning automatically.
 
 Notes:
 
-- `Wi-Fi` alone is enough for LAN access
-- The device starts `MQTT` and publishes Discovery only after `MQTT URL` is configured
-- `MQTT URL` format is `mqtt://[user:password@]host[:port]`
-- If the username or password contains reserved characters such as `@ / :`, they must be URL-encoded
+- The public codebase does not ship with default `Wi-Fi` credentials
+- `Wi-Fi` alone is enough for LAN access, but `MQTT` does not start until `MQTT URL` is configured
+- `Home Assistant Discovery` is published only after `MQTT URL` is saved successfully
+- Updating `MQTT URL` triggers a device restart, while `SCD41` compensation-only changes are applied immediately
 
 ## Local Web Console
 
-The local web console provides:
+The frontend source is `components/provisioning_web/index.html`, and it is embedded into the firmware at build time.
 
-- Device status, network status, and the latest error
-- `CO2 / temperature / relative humidity / VOC / NOx / PM / particle counts / typical particle size`
-- `BMP390` temperature, current pressure, `BMP390 Ready`, and `BMP390 Valid`
-- Separate `SGP41 VOC/NOx` learning states and remaining stabilization time
-- Current `CO2` compensation source
-- `Wi-Fi / MQTT URL` configuration
-- `SCD41` temperature offset
-- `SCD41` altitude compensation
-- `SCD41 ASC`
-- `SCD41 FRC`
-- `SPS30` sleep / wake
-- Manually trigger `SPS30` fan cleaning
-- On-board `RGB` status LED switch
-- Republish `Home Assistant Discovery`
-- `OTA` upgrade
-- Restart and factory reset
+The console is organized into three main areas:
 
-Configuration semantics:
+- Realtime monitoring: composite air quality, `PM AQI`, `CO2 / temperature / humidity / VOC / NOx / PM / particle counts / particle profile / pressure trend / short-term rain outlook`
+- Project configuration: `MQTT URL`, `SCD41` altitude compensation, temperature offset, and `ASC`
+- Maintenance: `SPS30` continuous sampling, fan cleaning, `RGB` status LED, Discovery republish, `FRC`, manual OTA, GitHub OTA, restart, and factory reset
 
-- `SCD41 temperature offset`: always applies
-- `SCD41 altitude compensation`: applied on boot first, and also used as fallback if `BMP390` dynamic pressure compensation is temporarily unavailable
-- `SGP41 VOC / NOx`: formal index values are shown only after their learning phases complete; the page shows remaining time during learning
+Current console characteristics:
 
-The current web console has no login or authentication and is only suitable for trusted local networks.
-
-The frontend source lives in `components/provisioning_web/index.html` and is embedded into the firmware at build time.
-
-## OTA Notes
-
-- `OTA` upgrades the whole application image, not only backend logic
-- Because the web console frontend is embedded in the firmware, `OTA` upgrades the frontend together with the firmware
-- If the browser still shows the old style after `OTA`, it is usually a caching issue; force-refresh once
+- Works on both desktop and mobile browsers
+- Saved `MQTT` credentials are not echoed back into the page
+- Shows `SGP41` learning state, `BMP390` compensation source, and device diagnostics
+- No authentication is implemented; use it only on trusted local networks
 
 ## MQTT / Home Assistant
 
 Defaults:
 
-- `device_name = aq-monitor-<device_id>`
-- `discovery_prefix = homeassistant`
-- `topic_root = air_quality_monitor/<device_id>`
-- `mqtt_port = 1883`
-- `publish_interval_sec = 10`
+| Item | Default |
+| --- | --- |
+| `device_name` | `aq-monitor-<device_id>` |
+| `discovery_prefix` | `homeassistant` |
+| `topic_root` | `air_quality_monitor/<device_id>` |
+| `mqtt_port` | `1883` |
+| `publish_interval_sec` | `10` |
 
-In the web console, `MQTT` now only needs a single `MQTT URL`, for example:
+The web console accepts a single `MQTT URL`, for example:
 
-- `mqtt://user:password@192.168.1.20:1883`
+```text
+mqtt://user:password@192.168.1.20:1883
+```
 
-Main reported data includes:
+`MQTT URL` rules:
 
-- `CO2 / temperature / relative humidity`
-- `VOC Index / NOx Index`
-- `BMP390 temperature / pressure`
-- `PM1.0 / PM2.5 / PM4.0 / PM10.0`
-- Particle number concentrations
-- Typical particle size
-- `Composite Air Quality / Basis / Driver / Note`
-- `PM AQI Estimate / AQI level / dominant pollutant`
-- `Wi-Fi RSSI / Uptime / Heap / Firmware Version / Last Error / IP / AP SSID / Device ID`
-- `Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
-- Online state for `SCD41 / SGP41 / BMP390 / SPS30 / RGB status LED`
-- Data validity state for `SCD41 / SGP41 / BMP390 / PM`
-- `BMP390 Ready / BMP390 Valid`
-- `CO2 Compensation Source`
-- `SCD41 ASC`
-- `SPS30 Sleep`
-- `SPS30 Fan Cleaning`
-- `RGB Status LED`
-- `Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+- Format: `mqtt://[user:password@]host[:port]`
+- Only host, port, username, and password are supported
+- Reserved characters such as `@ / :` in username or password must be URL-encoded
 
-## Runtime Notes
+By default, the firmware exposes these entity categories to `Home Assistant`:
 
-- The system still starts if one sensor is missing, and other online sensors continue to work
-- When `BMP390` is healthy, `SCD41` uses dynamic pressure compensation; the local web console also shows the current `CO2` compensation source
-- If `BMP390` is unavailable, other sensors continue reporting; pressure and `BMP390` temperature are empty in both the local console and `MQTT`, and compensation source falls back to configured `SCD41` altitude compensation
-- After power-on, `SGP41` first goes through a short conditioning phase for `NOx`, then enters the algorithm learning stage
-- `All Sensors Ready` should be interpreted as all four physical sensors being ready: `SCD41 / SGP41 / BMP390 / SPS30`
-- `CO2 Ventilation Status` is a ventilation grade; `VOC / NOx Event Level` is based on Sensirion's relative gas-index event intensity and does not represent absolute concentration
-- `VOC / NOx Index`, particle counts, and typical particle size continue to be reported, but are not part of `EPA AQI`
-- The on-board `RGB` LED follows the unified overall air-quality assessment result
-- If no sensors are ready yet, the on-board LED blinks in a waiting state
+- Environment telemetry: `CO2 / temperature / humidity / VOC / NOx / PM / particle counts / typical particle size`
+- Derived signals: `PM AQI`, composite air quality, particle profile, pressure trend, humidity trend, dew-point spread, and short-term rain outlook
+- Diagnostics: `Wi-Fi RSSI / Uptime / Heap / IP / Device ID / Firmware Version / Last Error`
+- State entities: `Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
+- Control entities: `SCD41 ASC / SPS30 Sleep / SPS30 Fan Cleaning / RGB Status LED / Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+
+## OTA and GitHub Releases
+
+The firmware supports two upgrade paths:
+
+- Local manual OTA upload
+- Direct upgrade from `GitHub Releases`
+
+Manual OTA notes:
+
+- The upload page expects the OTA application image, not the full serial-flash image
+- Use `air_quality_monitor-ota-<version>.bin` from the release assets when possible
+- `OTA` upgrades the whole application, including the embedded web frontend
+
+Default compile-time GitHub OTA settings:
+
+| Config | Default |
+| --- | --- |
+| `AIRMON_GITHUB_RELEASE_OWNER` | `HiMyCocoo` |
+| `AIRMON_GITHUB_RELEASE_REPO` | `air-quality-monitor` |
+| `AIRMON_GITHUB_OTA_ASSET_PREFIX` | `air_quality_monitor-ota-` |
+
+If you fork this repository and want to keep direct GitHub OTA, update these values accordingly.
+
+The repository already contains an automated release workflow:
+
+- Pushes to `main` or `master` use `PROJECT_VER` as the `major.minor` baseline and auto-increment the `patch`
+- The workflow builds firmware, creates or reuses a matching `vX.Y.Z` tag, and publishes to `GitHub Releases`
+- You can also run `Build And Release Firmware` manually to republish assets for an existing tag
+
+Current release assets:
+
+- `air_quality_monitor-ota-<version>.bin`
+- `air_quality_monitor-full-<version>.bin`
+- `bootloader-<version>.bin`
+- `partition-table-<version>.bin`
+- `ota_data_initial-<version>.bin`
+- `flasher_args-<version>.json`
+- `SHA256SUMS.txt`
+
+## Project Structure
+
+| Path | Purpose |
+| --- | --- |
+| `main/` | Application entry point, status LED logic, provisioning, and main loop |
+| `components/sensors/` | Drivers and sampling logic for `SCD41 / SGP41 / BMP390 / SPS30` |
+| `components/air_quality/` | `AQI`, composite air-quality logic, particle profile, and rain heuristic |
+| `components/mqtt_ha/` | `MQTT` publishing, `Home Assistant Discovery`, and remote control entities |
+| `components/provisioning_web/` | Local web console and HTTP API |
+| `components/platform/` | Persistent config, `Wi-Fi`, and platform-level settings |
+| `.github/workflows/` | GitHub release build and publishing workflow |
+| `scripts/` | Versioning and release helper scripts |
+
+## Runtime Notes and Limitations
+
+- Missing one sensor does not block the rest of the system; corresponding fields simply become empty or invalid
+- `SCD41` compensation priority is: configured altitude and temperature offset first, then dynamic `BMP390` pressure compensation when available, then fallback to altitude compensation if `BMP390` stops updating
+- With the current defaults, `SGP41 VOC` usually needs about `1.5` hours to stabilize, and `NOx` about `5.8` hours
+- The on-board `RGB` LED follows the composite air-quality result; when sensors are not ready yet, it enters a waiting blink pattern
+- If the browser still shows the old UI after `OTA`, it is usually a cache issue; force-refresh once
+- The rain heuristic currently assumes `CST-8` and Hangzhou seasonal context; adjust it if you deploy in a different region
