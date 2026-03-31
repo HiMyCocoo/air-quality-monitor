@@ -28,6 +28,14 @@
 
 static const char *TAG = "provisioning_web";
 
+/*
+ * Reverse proxies such as Cloudflare Tunnel append multiple forwarding headers
+ * on top of modern browser request headers. The ESP-IDF default request header
+ * limit (typically 1024 bytes) is easy to exceed in that setup, causing
+ * "Header fields are too long" before the request reaches our handlers.
+ */
+#define WEB_HTTP_MAX_REQ_HDR_LEN 4096
+
 #define MQTT_PORT_MIN 1
 #define MQTT_PORT_MAX 65535
 #define MQTT_DEFAULT_PORT 1883
@@ -1972,6 +1980,7 @@ esp_err_t provisioning_web_start(const char *device_id,
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 14;
     config.stack_size = 8192;
+    config.max_req_hdr_len = WEB_HTTP_MAX_REQ_HDR_LEN;
     ESP_RETURN_ON_ERROR(httpd_start(&s_ctx.server, &config), TAG, "httpd_start failed");
 
     const httpd_uri_t uris[] = {
