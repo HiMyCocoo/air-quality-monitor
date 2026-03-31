@@ -1120,6 +1120,7 @@
       font-weight: 700;
       color: var(--text-main);
       letter-spacing: -0.01em;
+      flex-shrink: 0;
     }
 
     .nav-brand svg {
@@ -1129,6 +1130,9 @@
     .nav-tabs {
       display: flex;
       gap: 4px;
+      flex: 1;
+      min-width: 0;
+      justify-content: flex-end;
     }
 
     .nav-btn {
@@ -1266,6 +1270,25 @@
     .tab-actions button {
       width: 100%;
       max-width: 360px;
+    }
+
+    .button-cell {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .button-cell-end {
+      justify-content: flex-end;
+    }
+
+    .button-cell-start {
+      justify-content: flex-start;
+    }
+
+    .danger-actions {
+      display: flex;
+      gap: 12px;
+      margin-left: auto;
     }
 
     .toggle-row {
@@ -1472,8 +1495,30 @@
     }
 
     @media (max-width: 768px) {
+      .top-nav {
+        margin-bottom: 24px;
+      }
+
+      .container {
+        padding: 28px 16px;
+      }
+
+      .glass-panel {
+        padding: 24px;
+        border-radius: 20px;
+      }
+
+      .main-grid {
+        gap: 18px;
+      }
+
       .nav-container {
-        padding: 0 16px;
+        height: auto;
+        min-height: 64px;
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
       }
 
       .nav-brand span {
@@ -1481,13 +1526,121 @@
       }
 
       .nav-tabs {
-        overflow-x: auto;
-        padding-bottom: 4px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        justify-content: stretch;
+      }
+
+      .nav-tabs::-webkit-scrollbar {
+        display: none;
       }
 
       .nav-btn {
         font-size: 0.9rem;
-        padding: 8px 12px;
+        padding: 10px 8px;
+        min-height: 44px;
+        white-space: normal;
+      }
+
+      h2 {
+        margin-bottom: 20px;
+      }
+
+      .summary-banner {
+        padding: 18px 20px;
+      }
+
+      .summary-banner strong {
+        font-size: 1.3rem;
+      }
+
+      .summary-banner span {
+        font-size: 0.98rem;
+      }
+
+      .metric {
+        padding: 18px;
+      }
+
+      .metric-primary {
+        min-height: 168px;
+        padding: 24px 20px;
+      }
+
+      .metric-primary strong {
+        font-size: 2.5rem;
+      }
+
+      .metric-featured {
+        min-height: 188px;
+        padding: 26px 22px;
+      }
+
+      .metric-featured strong {
+        font-size: 3.3rem;
+      }
+
+      .metric-featured .metric-unit {
+        font-size: 1.35rem;
+      }
+
+      .metric-secondary strong {
+        font-size: 1.95rem;
+      }
+
+      .particle-card {
+        min-height: 96px;
+        padding: 12px 14px;
+      }
+
+      .settings-card {
+        margin-bottom: 20px;
+      }
+
+      .settings-header,
+      .settings-body {
+        padding: 20px;
+      }
+
+      .settings-footer {
+        padding: 16px 20px;
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .settings-footer button {
+        width: 100%;
+      }
+
+      .settings-footer p.desc {
+        width: 100%;
+      }
+
+      .overview-group,
+      .inner-card,
+      .control-card,
+      .maintenance-tool-block,
+      .ota-module {
+        padding: 18px;
+      }
+
+      .danger-actions {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .danger-actions button {
+        flex: 1 1 0;
+      }
+
+      .button-cell {
+        justify-content: stretch;
+      }
+
+      .button-cell button {
+        width: 100%;
       }
 
       .overview-grid {
@@ -1517,6 +1670,48 @@
         flex-direction: column;
       }
 
+      .tab-actions button {
+        max-width: none;
+      }
+
+      .ota-card-header,
+      .ota-grid-layout {
+        padding: 20px;
+      }
+
+      .ota-stat-box {
+        grid-template-columns: 1fr;
+      }
+
+      .ota-actions-row {
+        flex-direction: column;
+      }
+
+      .ota-actions-row button {
+        width: 100%;
+      }
+
+      .current-version-badge {
+        align-self: flex-start;
+      }
+
+      .ota-warning-footer {
+        margin: 0 20px 20px;
+      }
+
+      #toast-container {
+        top: 16px;
+        width: calc(100% - 32px);
+      }
+
+      .toast {
+        width: 100%;
+      }
+
+      .no-wrap {
+        white-space: normal;
+      }
+
       .control-grid {
         grid-template-columns: 1fr;
       }
@@ -1534,11 +1729,188 @@
       }
     }
 
+    @media (max-width: 480px) {
+      body {
+        padding-bottom: 40px;
+      }
+
+      .container {
+        padding: 20px 12px;
+      }
+
+      .glass-panel {
+        padding: 20px 18px;
+        border-radius: 18px;
+      }
+
+      .main-grid {
+        gap: 16px;
+      }
+
+      h2 {
+        font-size: 1.12rem;
+        margin-bottom: 18px;
+      }
+
+      h3 {
+        font-size: 0.98rem;
+        margin: 18px 0 10px;
+      }
+
+      .summary-banner {
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 18px;
+      }
+
+      .summary-banner strong {
+        font-size: 1.16rem;
+      }
+
+      .summary-banner span {
+        font-size: 0.92rem;
+      }
+
+      .summary-banner-compact {
+        padding: 12px 14px;
+        gap: 8px;
+      }
+
+      .summary-banner-compact strong {
+        white-space: normal;
+      }
+
+      .metric {
+        padding: 16px;
+      }
+
+      .metric span,
+      .metric small {
+        font-size: 0.78rem;
+      }
+
+      .metric-primary {
+        min-height: auto;
+        padding: 20px 18px;
+      }
+
+      .metric-primary strong {
+        font-size: 2.1rem;
+      }
+
+      .metric-primary .metric-unit {
+        font-size: 1.08rem;
+      }
+
+      .metric-featured {
+        min-height: auto;
+        padding: 22px 18px;
+      }
+
+      .metric-featured strong {
+        font-size: 2.7rem;
+      }
+
+      .metric-featured .metric-unit {
+        font-size: 1.15rem;
+      }
+
+      .metric-featured small {
+        font-size: 0.95rem;
+      }
+
+      .metric-secondary strong {
+        font-size: 1.72rem;
+      }
+
+      .kv {
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .kv strong {
+        max-width: 100%;
+        text-align: left;
+      }
+
+      .mini-kv {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .overview-grid,
+      .air-metrics-secondary,
+      .particle-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .overview-group,
+      .inner-card,
+      .control-card,
+      .maintenance-tool-block,
+      .ota-module {
+        padding: 16px;
+        border-radius: 16px;
+      }
+
+      .settings-header,
+      .settings-body,
+      .settings-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .toggle-row {
+        padding: 14px 16px;
+        gap: 12px;
+      }
+
+      .nav-container {
+        padding: 10px 12px;
+      }
+
+      .nav-btn {
+        padding: 9px 6px;
+        font-size: 0.84rem;
+      }
+
+      .current-version-badge {
+        width: 100%;
+        justify-content: center;
+        white-space: normal;
+      }
+
+      .ota-card-header,
+      .ota-grid-layout {
+        padding: 16px;
+        gap: 16px;
+      }
+
+      .ota-stat-box {
+        padding: 12px;
+      }
+
+      .ota-actions-row button {
+        font-size: 0.92rem;
+      }
+
+      .ota-warning-footer {
+        margin: 0 16px 16px;
+        padding: 12px 14px;
+      }
+
+      .danger-actions {
+        flex-direction: column;
+      }
+    }
+
     @media (max-width: 1200px) {
       .button-stack-narrow {
         grid-template-columns: 1fr;
       }
+    }
 
+    @media (max-width: 1200px) and (min-width: 769px) {
       .air-metrics-primary {
         grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
       }
@@ -1918,7 +2290,7 @@
                   <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">向 MQTT Broker 重新推送 Home
                     Assistant 发现消息谱。</p>
                 </div>
-                <div style="display:flex; align-items:flex-end; justify-content: flex-end;">
+                <div class="button-cell button-cell-end">
                   <button id="republish_btn" class="ghost" onclick="republishDiscovery()">推送 Discovery 配置</button>
                 </div>
               </div>
@@ -1930,7 +2302,7 @@
                 <div>
                   <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">手动触发 SPS30 内置自动风扇清洁流程。仅在传感器运行中可用，执行约 10 秒，期间 PM 数据会短暂失效。</p>
                 </div>
-                <div style="display:flex; align-items:flex-end; justify-content: flex-end;">
+                <div class="button-cell button-cell-end">
                   <button id="sps30_fan_cleaning_btn" class="ghost no-wrap" onclick="startSps30FanCleaning()">执行风扇清洁</button>
                 </div>
               </div>
@@ -1943,7 +2315,7 @@
                   <label>FRC 参考值 (ppm)</label>
                   <input id="frc_reference_ppm" type="number" placeholder="400" />
                 </div>
-                <div style="display:flex; align-items:flex-end;">
+                <div class="button-cell button-cell-start">
                   <button id="frc_apply_btn" class="ghost no-wrap" onclick="applyFrc()">执行 FRC 校准</button>
                 </div>
               </div>
@@ -2046,7 +2418,7 @@
         <div class="settings-footer"
           style="background: rgba(229, 62, 62, 0.05); border-top: 1px solid rgba(229, 62, 62, 0.2);">
           <p class="desc">恢复后将清除 Wi-Fi、MQTT 与传感器补偿配置，并回到 BLE 配网模式。</p>
-          <div style="display:flex; gap: 12px; margin-left:auto;">
+          <div class="danger-actions">
             <button onclick="restartDevice()" class="ghost"
               style="border-color: rgba(229, 62, 62, 0.6); color: var(--color-unhealthy);">仅重新启动</button>
             <button onclick="factoryReset()" class="danger">恢复出厂设置</button>
