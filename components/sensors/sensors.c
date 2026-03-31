@@ -21,10 +21,12 @@
 #define PM_HISTORY_LEN 6
 #define BMP390_PRESSURE_HISTORY_LEN 37
 #define BMP390_PRESSURE_SAMPLE_INTERVAL_MS (300000LL)
+#define BMP390_PRESSURE_HISTORY_MAX_GAP_MS (BMP390_PRESSURE_SAMPLE_INTERVAL_MS * 2LL)
 #define BMP390_PRESSURE_TREND_WINDOW_MS (3LL * 60LL * 60LL * 1000LL)
 #define BMP390_PRESSURE_TREND_MIN_SPAN_MS (60LL * 60LL * 1000LL)
 #define SCD41_HUMIDITY_HISTORY_LEN 37
 #define SCD41_HUMIDITY_SAMPLE_INTERVAL_MS (300000LL)
+#define SCD41_HUMIDITY_HISTORY_MAX_GAP_MS (SCD41_HUMIDITY_SAMPLE_INTERVAL_MS * 2LL)
 #define SCD41_HUMIDITY_TREND_WINDOW_MS (3LL * 60LL * 60LL * 1000LL)
 #define SCD41_HUMIDITY_TREND_MIN_SPAN_MS (60LL * 60LL * 1000LL)
 #define SCD41_FRC_STABILIZATION_MS (180000LL)
@@ -631,8 +633,6 @@ static void sensors_mark_scd41_invalid_locked(void)
     s_ctx.snapshot.humidity_trend_valid = false;
     s_ctx.snapshot.humidity_trend_rh_3h = 0.0f;
     s_ctx.snapshot.humidity_trend_span_min = 0;
-    s_ctx.scd41_humidity_history_count = 0;
-    s_ctx.scd41_humidity_history_index = 0;
 }
 
 static void sensors_mark_sps30_invalid_locked(void)
@@ -650,6 +650,36 @@ static void sensors_mark_sps30_invalid_locked(void)
     s_ctx.snapshot.typical_particle_size_um = 0.0f;
 }
 
+static void sensors_clear_bmp390_pressure_history_locked(void)
+{
+    s_ctx.bmp390_pressure_history_count = 0;
+    s_ctx.bmp390_pressure_history_index = 0;
+}
+
+static void sensors_seed_bmp390_pressure_history_locked(float pressure_hpa, int64_t now_ms)
+{
+    s_ctx.bmp390_pressure_history[0].pressure_hpa = pressure_hpa;
+    s_ctx.bmp390_pressure_history[0].captured_at_ms = now_ms;
+    s_ctx.bmp390_pressure_history_count = 1;
+    s_ctx.bmp390_pressure_history_index = 1 % BMP390_PRESSURE_HISTORY_LEN;
+    s_ctx.bmp390_history_dirty = true;
+}
+
+static void sensors_clear_scd41_humidity_history_locked(void)
+{
+    s_ctx.scd41_humidity_history_count = 0;
+    s_ctx.scd41_humidity_history_index = 0;
+}
+
+static void sensors_seed_scd41_humidity_history_locked(float humidity_rh, int64_t now_ms)
+{
+    s_ctx.scd41_humidity_history[0].humidity_rh = humidity_rh;
+    s_ctx.scd41_humidity_history[0].captured_at_ms = now_ms;
+    s_ctx.scd41_humidity_history_count = 1;
+    s_ctx.scd41_humidity_history_index = 1 % SCD41_HUMIDITY_HISTORY_LEN;
+    s_ctx.scd41_humidity_history_dirty = true;
+}
+
 static void sensors_mark_bmp390_invalid_locked(void)
 {
     s_ctx.snapshot.bmp390_valid = false;
@@ -658,8 +688,6 @@ static void sensors_mark_bmp390_invalid_locked(void)
     s_ctx.snapshot.pressure_trend_valid = false;
     s_ctx.snapshot.pressure_trend_hpa_3h = 0.0f;
     s_ctx.snapshot.pressure_trend_span_min = 0;
-    s_ctx.bmp390_pressure_history_count = 0;
-    s_ctx.bmp390_pressure_history_index = 0;
 }
 
 static void sensors_mark_sgp41_invalid_locked(void)
@@ -685,16 +713,21 @@ static void sensors_update_bmp390_pressure_trend_locked(float pressure_hpa, int6
     }
 
     if (s_ctx.bmp390_pressure_history_count == 0) {
-        s_ctx.bmp390_pressure_history[0].pressure_hpa = pressure_hpa;
-        s_ctx.bmp390_pressure_history[0].captured_at_ms = now_ms;
-        s_ctx.bmp390_pressure_history_count = 1;
-        s_ctx.bmp390_pressure_history_index = 1 % BMP390_PRESSURE_HISTORY_LEN;
+        sensors_seed_bmp390_pressure_history_locked(pressure_hpa, now_ms);
         return;
     }
 
     size_t newest_index =
         (s_ctx.bmp390_pressure_history_index + BMP390_PRESSURE_HISTORY_LEN - 1) % BMP390_PRESSURE_HISTORY_LEN;
     int64_t newest_at_ms = s_ctx.bmp390_pressure_history[newest_index].captured_at_ms;
+    /* Restored samples from before the current boot can have negative timestamps. */
+    int64_t gap_ms = now_ms - newest_at_ms;
+    if (gap_ms >= BMP390_PRESSURE_HISTORY_MAX_GAP_MS) {
+        sensors_clear_bmp390_pressure_history_locked();
+        sensors_seed_bmp390_pressure_history_locked(pressure_hpa, now_ms);
+        return;
+    }
+
     if ((now_ms - newest_at_ms) >= BMP390_PRESSURE_SAMPLE_INTERVAL_MS) {
         size_t write_index = s_ctx.bmp390_pressure_history_index;
         s_ctx.bmp390_pressure_history[write_index].pressure_hpa = pressure_hpa;
@@ -718,7 +751,7 @@ static void sensors_update_bmp390_pressure_trend_locked(float pressure_hpa, int6
         size_t index = (oldest_index + i) % BMP390_PRESSURE_HISTORY_LEN;
         float candidate_pressure_hpa = s_ctx.bmp390_pressure_history[index].pressure_hpa;
         int64_t candidate_at_ms = s_ctx.bmp390_pressure_history[index].captured_at_ms;
-        if (!isfinite(candidate_pressure_hpa) || candidate_pressure_hpa <= 0.0f || candidate_at_ms <= 0) {
+        if (!isfinite(candidate_pressure_hpa) || candidate_pressure_hpa <= 0.0f) {
             continue;
         }
         if (candidate_at_ms < window_start_ms) {
@@ -757,16 +790,21 @@ static void sensors_update_scd41_humidity_trend_locked(float humidity_rh, int64_
     }
 
     if (s_ctx.scd41_humidity_history_count == 0) {
-        s_ctx.scd41_humidity_history[0].humidity_rh = humidity_rh;
-        s_ctx.scd41_humidity_history[0].captured_at_ms = now_ms;
-        s_ctx.scd41_humidity_history_count = 1;
-        s_ctx.scd41_humidity_history_index = 1 % SCD41_HUMIDITY_HISTORY_LEN;
+        sensors_seed_scd41_humidity_history_locked(humidity_rh, now_ms);
         return;
     }
 
     size_t newest_index =
         (s_ctx.scd41_humidity_history_index + SCD41_HUMIDITY_HISTORY_LEN - 1) % SCD41_HUMIDITY_HISTORY_LEN;
     int64_t newest_at_ms = s_ctx.scd41_humidity_history[newest_index].captured_at_ms;
+    /* Restored samples from before the current boot can have negative timestamps. */
+    int64_t gap_ms = now_ms - newest_at_ms;
+    if (gap_ms >= SCD41_HUMIDITY_HISTORY_MAX_GAP_MS) {
+        sensors_clear_scd41_humidity_history_locked();
+        sensors_seed_scd41_humidity_history_locked(humidity_rh, now_ms);
+        return;
+    }
+
     if ((now_ms - newest_at_ms) >= SCD41_HUMIDITY_SAMPLE_INTERVAL_MS) {
         size_t write_index = s_ctx.scd41_humidity_history_index;
         s_ctx.scd41_humidity_history[write_index].humidity_rh = humidity_rh;
@@ -790,8 +828,7 @@ static void sensors_update_scd41_humidity_trend_locked(float humidity_rh, int64_
         size_t index = (oldest_index + i) % SCD41_HUMIDITY_HISTORY_LEN;
         float candidate_humidity_rh = s_ctx.scd41_humidity_history[index].humidity_rh;
         int64_t candidate_at_ms = s_ctx.scd41_humidity_history[index].captured_at_ms;
-        if (!isfinite(candidate_humidity_rh) || candidate_humidity_rh < 0.0f || candidate_humidity_rh > 100.0f ||
-            candidate_at_ms <= 0) {
+        if (!isfinite(candidate_humidity_rh) || candidate_humidity_rh < 0.0f || candidate_humidity_rh > 100.0f) {
             continue;
         }
         if (candidate_at_ms < window_start_ms) {
