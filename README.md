@@ -7,7 +7,7 @@
 ![Home%20Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5)
 ![OTA](https://img.shields.io/badge/OTA-GitHub%20Release%20%2B%20Local-2EA44F)
 
-基于 `YD-ESP32-S3` 的室内空气质量监测节点，面向局域网部署和 `Home Assistant` 集成。固件集成 `BLE` 配网、本地响应式 Web 管理后台、`MQTT Discovery`、手动 OTA，以及基于 `GitHub Releases` 的在线升级。
+基于 `YD-ESP32-S3` 的室内空气质量监测节点，面向局域网部署和 `Home Assistant` 集成。固件集成 `BLE` 配网、本地响应式 Web 管理后台（支持简体中文 / English 切换）、`MQTT Discovery`、手动 OTA，以及基于 `GitHub Releases` 的在线升级。
 
 ## 项目特性
 
@@ -16,7 +16,7 @@
 - `BMP390` 在运行时为 `SCD41` 提供动态气压补偿，`BMP390` 不可用时自动回退到 `SCD41` 海拔补偿
 - `SGP41` 按 Sensirion 官方 conditioning 和学习流程运行，`VOC / NOx` 只有在稳定后才标记为有效
 - 缺少单个传感器时不会阻断整机启动，其余在线传感器继续工作
-- 本地 Web 后台同时适配桌面和手机访问
+- 本地 Web 后台同时适配桌面和手机访问，支持简体中文 / English 切换
 - 自动接入 `Home Assistant`，同时暴露状态类实体和控制类实体
 - 支持本地固件上传 OTA，也支持直接从 `GitHub Releases` 检查和下载升级
 
@@ -132,6 +132,7 @@ idf.py -p /dev/cu.wchusbserialXXXX flash monitor
 当前后台特性：
 
 - 支持桌面和手机访问
+- 支持简体中文与英文界面切换，语言选择会保存在浏览器本地
 - 保存 `MQTT URL` 时不会回显已保存的用户名和密码
 - 支持从页面查看 `SGP41` 学习状态、`BMP390` 补偿来源和设备运行诊断
 - 当前无登录认证，只适合信任的局域网

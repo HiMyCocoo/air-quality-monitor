@@ -7,7 +7,7 @@
 ![Home%20Assistant](https://img.shields.io/badge/Home%20Assistant-MQTT%20Discovery-41BDF5)
 ![OTA](https://img.shields.io/badge/OTA-GitHub%20Release%20%2B%20Local-2EA44F)
 
-An indoor air-quality monitoring node built around `YD-ESP32-S3` for local-network deployment and `Home Assistant` integration. The firmware includes `BLE` provisioning, a responsive local web console, `MQTT Discovery`, manual OTA, and direct upgrades from `GitHub Releases`.
+An indoor air-quality monitoring node built around `YD-ESP32-S3` for local-network deployment and `Home Assistant` integration. The firmware includes `BLE` provisioning, a responsive local web console with Simplified Chinese / English switching, `MQTT Discovery`, manual OTA, and direct upgrades from `GitHub Releases`.
 
 ## Highlights
 
@@ -16,7 +16,7 @@ An indoor air-quality monitoring node built around `YD-ESP32-S3` for local-netwo
 - `BMP390` provides runtime ambient-pressure compensation for `SCD41`, with automatic fallback to configured `SCD41` altitude compensation
 - `SGP41` follows Sensirion conditioning and learning behavior, and `VOC / NOx` are only marked valid after stabilization
 - The firmware keeps working when one sensor is missing; other online sensors continue reporting
-- The local web console is usable on both desktop and mobile browsers
+- The local web console is usable on both desktop and mobile browsers, with Simplified Chinese / English switching
 - Integrates with `Home Assistant` through `MQTT Discovery`, including both telemetry and control entities
 - Supports both local file OTA and direct upgrade from `GitHub Releases`
 
@@ -132,6 +132,7 @@ The console is organized into three main areas:
 Current console characteristics:
 
 - Works on both desktop and mobile browsers
+- Supports live switching between Simplified Chinese and English, with the choice persisted in the browser
 - Saved `MQTT` credentials are not echoed back into the page
 - Shows `SGP41` learning state, `BMP390` compensation source, and device diagnostics
 - No authentication is implemented; use it only on trusted local networks
