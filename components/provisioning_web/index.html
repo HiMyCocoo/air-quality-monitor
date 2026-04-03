@@ -2449,6 +2449,15 @@
               </div>
             </div>
             <p id="github_ota_meta" class="hint" style="margin-top:0; margin-bottom:16px;" data-i18n="ota.autoCheckHint">页面加载后会自动检查一次 GitHub 最新 Release，并每 2 分钟自动刷新。</p>
+            <div id="github_ota_progress" class="ota-progress" hidden style="margin-bottom:16px;">
+              <div class="ota-progress-head">
+                <span id="github_ota_progress_label" data-i18n="ota.idleState">等待检查</span>
+                <strong id="github_ota_progress_percent">0%</strong>
+              </div>
+              <div class="ota-progress-track">
+                <div id="github_ota_progress_fill" class="ota-progress-fill"></div>
+              </div>
+            </div>
             <div class="ota-actions-row">
               <button id="github_ota_check_btn" class="ghost" onclick="checkGithubRelease()" data-i18n="ota.checkButton">检查更新</button>
               <button id="github_ota_update_btn" onclick="updateFirmwareFromGithub()" data-i18n="ota.updateButton">直接升级</button>
@@ -2538,6 +2547,10 @@
     const githubOtaMetaEl = document.getElementById('github_ota_meta');
     const githubOtaCheckBtn = document.getElementById('github_ota_check_btn');
     const githubOtaUpdateBtn = document.getElementById('github_ota_update_btn');
+    const githubOtaProgressEl = document.getElementById('github_ota_progress');
+    const githubOtaProgressLabelEl = document.getElementById('github_ota_progress_label');
+    const githubOtaProgressPercentEl = document.getElementById('github_ota_progress_percent');
+    const githubOtaProgressFillEl = document.getElementById('github_ota_progress_fill');
     const otaProgressEl = document.getElementById('ota_progress');
     const otaProgressLabelEl = document.getElementById('ota_progress_label');
     const otaProgressPercentEl = document.getElementById('ota_progress_percent');
@@ -3421,18 +3434,32 @@
       }
     }
 
+    function setOtaProgressState(containerEl, labelEl, percentEl, fillEl, { visible, label, progress }) {
+      containerEl.hidden = !visible;
+      labelEl.textContent = label;
+      const clamped = Math.max(0, Math.min(100, Number(progress) || 0));
+      percentEl.textContent = `${Math.round(clamped)}%`;
+      fillEl.style.width = `${clamped}%`;
+    }
+
     function setOtaUploadState({ visible, uploading, busy, label, progress, uploadButtonText }) {
       otaBusy = busy != null ? !!busy : !!uploading;
-      otaProgressEl.hidden = !visible;
-      otaProgressLabelEl.textContent = label;
-      const clamped = Math.max(0, Math.min(100, Number(progress) || 0));
-      otaProgressPercentEl.textContent = `${Math.round(clamped)}%`;
-      otaProgressFillEl.style.width = `${clamped}%`;
+      setOtaProgressState(otaProgressEl, otaProgressLabelEl, otaProgressPercentEl, otaProgressFillEl, { visible, label, progress });
       firmwareInput.disabled = otaBusy;
       otaUploadBtn.disabled = otaBusy;
       otaUploadBtn.textContent = uploadButtonText || (otaBusy && uploading
         ? t('ota.uploadButtonBusy')
         : otaBusy ? t('ota.uploadButtonProcessing') : t('ota.uploadButton'));
+    }
+
+    function setGithubOtaProgressState({ visible, label, progress }) {
+      setOtaProgressState(
+        githubOtaProgressEl,
+        githubOtaProgressLabelEl,
+        githubOtaProgressPercentEl,
+        githubOtaProgressFillEl,
+        { visible, label, progress }
+      );
     }
 
     function getXhrErrorMessage(xhr, fallback) {
@@ -3468,8 +3495,20 @@
       firmwareNameEl.textContent = file ? file.name : t('ota.noFileSelected');
     }
 
-    function otaProgressVisible(ota) {
-      return ['uploading', 'downloading', 'success', 'error'].includes(ota?.state);
+    function otaProgressSource(ota) {
+      return ota?.source || 'none';
+    }
+
+    function otaGithubProgressVisible(ota) {
+      const source = otaProgressSource(ota);
+      return ota?.state === 'downloading' ||
+        ((ota?.state === 'success' || ota?.state === 'error') && source === 'github');
+    }
+
+    function otaUploadProgressVisible(ota) {
+      const source = otaProgressSource(ota);
+      return ota?.state === 'uploading' ||
+        ((ota?.state === 'success' || ota?.state === 'error') && source === 'upload');
     }
 
     function buildOtaMetaText(ota) {
@@ -3536,13 +3575,19 @@
       githubOtaUpdateBtn.textContent = busy && ota?.state === 'downloading' ? t('ota.updateButtonBusy') : t('ota.updateButtonDirect');
 
       if (!hasOta) {
+        setGithubOtaProgressState({ visible: false, label: t('ota.idleState'), progress: 0 });
         setOtaUploadState({ visible: false, busy: false, label: t('ota.waitingUpload'), progress: 0 });
         return;
       }
 
       const progressLabel = translate(otaStateLabels, ota.state, t('ota.waitingUpload'));
+      setGithubOtaProgressState({
+        visible: otaGithubProgressVisible(ota),
+        label: progressLabel,
+        progress: ota.progress_percent
+      });
       setOtaUploadState({
-        visible: otaProgressVisible(ota),
+        visible: otaUploadProgressVisible(ota),
         busy: busy || restartPending,
         uploading: ota.state === 'uploading',
         label: progressLabel,

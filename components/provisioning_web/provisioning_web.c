@@ -68,6 +68,12 @@ typedef enum {
     OTA_STATE_ERROR,
 } ota_state_t;
 
+typedef enum {
+    OTA_SOURCE_NONE = 0,
+    OTA_SOURCE_GITHUB,
+    OTA_SOURCE_UPLOAD,
+} ota_source_t;
+
 typedef struct {
     int major;
     int minor;
@@ -93,6 +99,7 @@ typedef struct {
     SemaphoreHandle_t lock;
     TaskHandle_t task;
     ota_state_t state;
+    ota_source_t source;
     bool enabled;
     bool busy;
     bool update_available;
@@ -235,6 +242,19 @@ static const char *ota_state_key(ota_state_t state)
     case OTA_STATE_IDLE:
     default:
         return "idle";
+    }
+}
+
+static const char *ota_source_key(ota_source_t source)
+{
+    switch (source) {
+    case OTA_SOURCE_GITHUB:
+        return "github";
+    case OTA_SOURCE_UPLOAD:
+        return "upload";
+    case OTA_SOURCE_NONE:
+    default:
+        return "none";
     }
 }
 
@@ -383,9 +403,10 @@ static void ota_store_release_info_locked(const ota_release_info_t *info, bool u
     strlcpy(s_ctx.ota.release_url, info->release_url, sizeof(s_ctx.ota.release_url));
 }
 
-static void ota_prepare_locked(ota_state_t state, const char *status_text)
+static void ota_prepare_locked(ota_state_t state, ota_source_t source, const char *status_text)
 {
     s_ctx.ota.state = state;
+    s_ctx.ota.source = source;
     s_ctx.ota.busy = true;
     s_ctx.ota.restart_pending = false;
     s_ctx.ota.progress_percent = 0;
@@ -400,6 +421,7 @@ static void ota_finish_ready_locked(const ota_release_info_t *info)
 {
     ota_store_release_info_locked(info, true);
     s_ctx.ota.busy = false;
+    s_ctx.ota.source = OTA_SOURCE_GITHUB;
     s_ctx.ota.state = OTA_STATE_READY;
     s_ctx.ota.progress_percent = 0;
     s_ctx.ota.last_checked_at_ms = esp_timer_get_time() / 1000;
@@ -410,6 +432,7 @@ static void ota_finish_up_to_date_locked(const ota_release_info_t *info)
 {
     ota_store_release_info_locked(info, false);
     s_ctx.ota.busy = false;
+    s_ctx.ota.source = OTA_SOURCE_GITHUB;
     s_ctx.ota.state = OTA_STATE_IDLE;
     s_ctx.ota.progress_percent = 0;
     s_ctx.ota.last_checked_at_ms = esp_timer_get_time() / 1000;
@@ -895,7 +918,7 @@ static void github_ota_task(void *arg)
     if (ota_lock_take(pdMS_TO_TICKS(1000))) {
         if (update_available) {
             ota_store_release_info_locked(&info, true);
-            ota_prepare_locked(OTA_STATE_DOWNLOADING, "正在从 GitHub 下载 OTA 固件...");
+            ota_prepare_locked(OTA_STATE_DOWNLOADING, OTA_SOURCE_GITHUB, "正在从 GitHub 下载 OTA 固件...");
             strlcpy(s_ctx.ota.latest_version, info.version, sizeof(s_ctx.ota.latest_version));
             strlcpy(s_ctx.ota.release_tag, info.tag, sizeof(s_ctx.ota.release_tag));
             strlcpy(s_ctx.ota.asset_name, info.asset_name, sizeof(s_ctx.ota.asset_name));
@@ -950,6 +973,7 @@ static void ota_append_status_json(cJSON *root, const char *current_version)
     cJSON_AddBoolToObject(ota_json, "update_available", snapshot.update_available);
     cJSON_AddBoolToObject(ota_json, "restart_pending", snapshot.restart_pending);
     cJSON_AddStringToObject(ota_json, "state", ota_state_key(snapshot.state));
+    cJSON_AddStringToObject(ota_json, "source", ota_source_key(snapshot.source));
     cJSON_AddStringToObject(ota_json, "current_version", current_version != NULL ? current_version : "");
     cJSON_AddStringToObject(ota_json, "latest_version", snapshot.latest_version);
     cJSON_AddStringToObject(ota_json, "release_tag", snapshot.release_tag);
@@ -1780,7 +1804,7 @@ static esp_err_t github_ota_check_handler(httpd_req_t *req)
         ota_lock_give();
         return send_error_json(req, "409 Conflict", "OTA 升级正在进行中，请稍后再试");
     }
-    ota_prepare_locked(OTA_STATE_CHECKING, "正在查询 GitHub 最新版本...");
+    ota_prepare_locked(OTA_STATE_CHECKING, OTA_SOURCE_GITHUB, "正在查询 GitHub 最新版本...");
     ota_lock_give();
 
     ota_release_info_t info = {0};
@@ -1821,7 +1845,7 @@ static esp_err_t github_ota_update_handler(httpd_req_t *req)
         ota_lock_give();
         return send_error_json(req, "409 Conflict", "OTA 升级正在进行中，请稍后再试");
     }
-    ota_prepare_locked(OTA_STATE_CHECKING, "正在查询 GitHub 最新版本...");
+    ota_prepare_locked(OTA_STATE_CHECKING, OTA_SOURCE_GITHUB, "正在查询 GitHub 最新版本...");
     ota_lock_give();
 
     TaskHandle_t task = NULL;
@@ -1866,7 +1890,7 @@ static esp_err_t ota_handler(httpd_req_t *req)
         ota_lock_give();
         return send_error_json(req, "409 Conflict", "OTA 升级正在进行中，请稍后再试");
     }
-    ota_prepare_locked(OTA_STATE_UPLOAD, "正在上传本地固件...");
+    ota_prepare_locked(OTA_STATE_UPLOAD, OTA_SOURCE_UPLOAD, "正在上传本地固件...");
     s_ctx.ota.total_bytes = (size_t)req->content_len;
     ota_lock_give();
 
@@ -1977,6 +2001,7 @@ esp_err_t provisioning_web_start(const char *device_id,
     s_ctx.ota.lock = xSemaphoreCreateMutex();
     ESP_RETURN_ON_FALSE(s_ctx.ota.lock != NULL, ESP_ERR_NO_MEM, TAG, "ota mutex alloc failed");
     s_ctx.ota.enabled = github_ota_is_configured();
+    s_ctx.ota.source = OTA_SOURCE_NONE;
     s_ctx.ota.state = OTA_STATE_IDLE;
     ota_set_status_text_locked(s_ctx.ota.enabled ? "等待检查 GitHub 最新版本" : "当前固件未启用 GitHub 自动更新");
 
