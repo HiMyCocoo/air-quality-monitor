@@ -855,7 +855,7 @@ static void supervisor_task(void *arg)
         if (!do_factory_reset && !do_restart && !s_app.provisioning_mode) {
             if (platform_wifi_is_connected()) {
                 s_app.wifi_offline_since_ms = 0;
-                if (!s_app.mqtt_started) {
+                if (!s_app.mqtt_started && platform_config_has_mqtt(&s_app.config)) {
                     do_start_mqtt = true;
                 }
             } else {
@@ -935,7 +935,6 @@ void app_main(void)
 
     if (use_ble_provisioning) {
         ESP_ERROR_CHECK(app_start_ble_provisioning());
-        s_app.provisioning_mode = true;
     } else {
         s_app.provisioning_mode = false;
         ESP_ERROR_CHECK(app_start_web());

@@ -43,6 +43,19 @@ typedef enum {
   CO2_COMPENSATION_SOURCE_BMP390,
 } co2_compensation_source_t;
 
+static inline const char *co2_compensation_source_key(co2_compensation_source_t source)
+{
+  switch (source) {
+  case CO2_COMPENSATION_SOURCE_ALTITUDE:
+    return "altitude";
+  case CO2_COMPENSATION_SOURCE_BMP390:
+    return "bmp390";
+  case CO2_COMPENSATION_SOURCE_NONE:
+  default:
+    return "none";
+  }
+}
+
 typedef struct {
   bool scd41_valid;
   bool sgp41_valid;

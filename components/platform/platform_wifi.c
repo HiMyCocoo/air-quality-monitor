@@ -1,5 +1,6 @@
 #include "platform_wifi.h"
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -20,10 +21,10 @@ static const char *TAG = "platform_wifi";
 static EventGroupHandle_t s_wifi_event_group;
 static esp_netif_t *s_sta_netif;
 static esp_netif_t *s_ap_netif;
-static platform_wifi_mode_t s_mode = PLATFORM_WIFI_MODE_OFF;
+static _Atomic platform_wifi_mode_t s_mode = PLATFORM_WIFI_MODE_OFF;
 static int s_retry_count;
 static int s_retry_limit;
-static bool s_connected;
+static _Atomic bool s_connected;
 static platform_wifi_event_cb_t s_event_cb;
 static void *s_event_ctx;
 static esp_event_handler_instance_t s_wifi_handler_instance;
@@ -31,7 +32,7 @@ static esp_event_handler_instance_t s_ip_handler_instance;
 
 static void notify_state(bool connected)
 {
-    s_connected = connected;
+    atomic_store(&s_connected, connected);
     if (s_event_cb != NULL) {
         s_event_cb(connected, s_event_ctx);
     }

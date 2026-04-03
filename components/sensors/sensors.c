@@ -371,24 +371,27 @@ typedef struct {
     bmp390_persisted_entry_t entries[BMP390_PRESSURE_HISTORY_LEN];
 } bmp390_persisted_history_t;
 
-static esp_err_t sensors_store_bmp390_history(int64_t now_ms)
+static void sensors_serialize_bmp390_history_locked(bmp390_persisted_history_t *persisted, int64_t now_ms)
 {
-    bmp390_persisted_history_t persisted = {0};
-    persisted.version = TREND_STATE_VERSION;
-    persisted.count   = (uint32_t)s_ctx.bmp390_pressure_history_count;
-    persisted.write_index = (uint32_t)s_ctx.bmp390_pressure_history_index;
+    memset(persisted, 0, sizeof(*persisted));
+    persisted->version = TREND_STATE_VERSION;
+    persisted->count   = (uint32_t)s_ctx.bmp390_pressure_history_count;
+    persisted->write_index = (uint32_t)s_ctx.bmp390_pressure_history_index;
 
     for (size_t i = 0; i < s_ctx.bmp390_pressure_history_count; ++i) {
-        persisted.entries[i].pressure_hpa = s_ctx.bmp390_pressure_history[i].pressure_hpa;
-        persisted.entries[i].offset_ms    = now_ms - s_ctx.bmp390_pressure_history[i].captured_at_ms;
+        persisted->entries[i].pressure_hpa = s_ctx.bmp390_pressure_history[i].pressure_hpa;
+        persisted->entries[i].offset_ms    = now_ms - s_ctx.bmp390_pressure_history[i].captured_at_ms;
     }
+}
 
+static esp_err_t sensors_store_bmp390_history(const bmp390_persisted_history_t *persisted)
+{
     nvs_handle_t handle;
     esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK) {
         return err;
     }
-    err = nvs_set_blob(handle, BMP390_HISTORY_KEY, &persisted, sizeof(persisted));
+    err = nvs_set_blob(handle, BMP390_HISTORY_KEY, persisted, sizeof(*persisted));
     if (err == ESP_OK) {
         err = nvs_commit(handle);
     }
@@ -442,6 +445,8 @@ static void sensors_checkpoint_bmp390_history(bool force)
     }
 
     int64_t now_ms = esp_timer_get_time() / 1000;
+    bmp390_persisted_history_t persisted = {0};
+    uint32_t saved_count = 0;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     bool should_save = s_ctx.bmp390_history_dirty &&
@@ -450,17 +455,19 @@ static void sensors_checkpoint_bmp390_history(bool force)
         xSemaphoreGive(s_ctx.lock);
         return;
     }
-
-    esp_err_t err = sensors_store_bmp390_history(now_ms);
-    if (err == ESP_OK) {
-        s_ctx.bmp390_history_dirty = false;
-        s_ctx.bmp390_history_saved_at_ms = now_ms;
-    }
+    sensors_serialize_bmp390_history_locked(&persisted, now_ms);
+    saved_count = (uint32_t)s_ctx.bmp390_pressure_history_count;
     xSemaphoreGive(s_ctx.lock);
 
+    esp_err_t err = sensors_store_bmp390_history(&persisted);
+
     if (err == ESP_OK) {
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+        s_ctx.bmp390_history_dirty = false;
+        s_ctx.bmp390_history_saved_at_ms = now_ms;
+        xSemaphoreGive(s_ctx.lock);
         ESP_LOGI(TAG, "BMP390 pressure history checkpoint saved: %u samples",
-                 (unsigned)s_ctx.bmp390_pressure_history_count);
+                 (unsigned)saved_count);
     }
 }
 
@@ -478,24 +485,27 @@ typedef struct {
     scd41_persisted_humidity_entry_t entries[SCD41_HUMIDITY_HISTORY_LEN];
 } scd41_persisted_humidity_history_t;
 
-static esp_err_t sensors_store_scd41_humidity_history(int64_t now_ms)
+static void sensors_serialize_scd41_humidity_history_locked(scd41_persisted_humidity_history_t *persisted, int64_t now_ms)
 {
-    scd41_persisted_humidity_history_t persisted = {0};
-    persisted.version     = TREND_STATE_VERSION;
-    persisted.count       = (uint32_t)s_ctx.scd41_humidity_history_count;
-    persisted.write_index = (uint32_t)s_ctx.scd41_humidity_history_index;
+    memset(persisted, 0, sizeof(*persisted));
+    persisted->version     = TREND_STATE_VERSION;
+    persisted->count       = (uint32_t)s_ctx.scd41_humidity_history_count;
+    persisted->write_index = (uint32_t)s_ctx.scd41_humidity_history_index;
 
     for (size_t i = 0; i < s_ctx.scd41_humidity_history_count; ++i) {
-        persisted.entries[i].humidity_rh = s_ctx.scd41_humidity_history[i].humidity_rh;
-        persisted.entries[i].offset_ms   = now_ms - s_ctx.scd41_humidity_history[i].captured_at_ms;
+        persisted->entries[i].humidity_rh = s_ctx.scd41_humidity_history[i].humidity_rh;
+        persisted->entries[i].offset_ms   = now_ms - s_ctx.scd41_humidity_history[i].captured_at_ms;
     }
+}
 
+static esp_err_t sensors_store_scd41_humidity_history(const scd41_persisted_humidity_history_t *persisted)
+{
     nvs_handle_t handle;
     esp_err_t err = nvs_open(TREND_STATE_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK) {
         return err;
     }
-    err = nvs_set_blob(handle, SCD41_HUMIDITY_HISTORY_KEY, &persisted, sizeof(persisted));
+    err = nvs_set_blob(handle, SCD41_HUMIDITY_HISTORY_KEY, persisted, sizeof(*persisted));
     if (err == ESP_OK) {
         err = nvs_commit(handle);
     }
@@ -550,6 +560,8 @@ static void sensors_checkpoint_scd41_humidity_history(bool force)
     }
 
     int64_t now_ms = esp_timer_get_time() / 1000;
+    scd41_persisted_humidity_history_t persisted = {0};
+    uint32_t saved_count = 0;
 
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     bool should_save = s_ctx.scd41_humidity_history_dirty &&
@@ -558,17 +570,19 @@ static void sensors_checkpoint_scd41_humidity_history(bool force)
         xSemaphoreGive(s_ctx.lock);
         return;
     }
-
-    esp_err_t err = sensors_store_scd41_humidity_history(now_ms);
-    if (err == ESP_OK) {
-        s_ctx.scd41_humidity_history_dirty = false;
-        s_ctx.scd41_humidity_history_saved_at_ms = now_ms;
-    }
+    sensors_serialize_scd41_humidity_history_locked(&persisted, now_ms);
+    saved_count = (uint32_t)s_ctx.scd41_humidity_history_count;
     xSemaphoreGive(s_ctx.lock);
 
+    esp_err_t err = sensors_store_scd41_humidity_history(&persisted);
+
     if (err == ESP_OK) {
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+        s_ctx.scd41_humidity_history_dirty = false;
+        s_ctx.scd41_humidity_history_saved_at_ms = now_ms;
+        xSemaphoreGive(s_ctx.lock);
         ESP_LOGI(TAG, "SCD41 humidity history checkpoint saved: %u samples",
-                 (unsigned)s_ctx.scd41_humidity_history_count);
+                 (unsigned)saved_count);
     }
 }
 

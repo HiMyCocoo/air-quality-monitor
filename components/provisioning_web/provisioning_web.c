@@ -1328,18 +1328,7 @@ static void fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, device
     }
 }
 
-static const char *co2_compensation_source_key(co2_compensation_source_t source)
-{
-    switch (source) {
-    case CO2_COMPENSATION_SOURCE_ALTITUDE:
-        return "altitude";
-    case CO2_COMPENSATION_SOURCE_BMP390:
-        return "bmp390";
-    case CO2_COMPENSATION_SOURCE_NONE:
-    default:
-        return "none";
-    }
-}
+
 
 static esp_err_t root_handler(httpd_req_t *req)
 {
@@ -1929,6 +1918,20 @@ static esp_err_t ota_handler(httpd_req_t *req)
             ota_lock_give();
         }
         return send_error_json(req, "400 Bad Request", "固件校验失败，请确认上传的是 OTA 应用固件");
+    }
+    /* Validate that the uploaded firmware belongs to the same project. */
+    esp_app_desc_t new_desc = {0};
+    esp_err_t desc_err = esp_ota_get_partition_description(partition, &new_desc);
+    if (desc_err == ESP_OK) {
+        const esp_app_desc_t *running_desc = esp_app_get_description();
+        if (running_desc != NULL && strncmp(new_desc.project_name, running_desc->project_name,
+                                            sizeof(new_desc.project_name)) != 0) {
+            if (ota_lock_take(pdMS_TO_TICKS(1000))) {
+                ota_finish_error_locked("固件项目名称不匹配，拒绝刷入非本项目固件");
+                ota_lock_give();
+            }
+            return send_error_json(req, "400 Bad Request", "固件项目名称不匹配，拒绝刷入非本项目固件");
+        }
     }
     esp_err_t boot_err = esp_ota_set_boot_partition(partition);
     if (boot_err != ESP_OK) {

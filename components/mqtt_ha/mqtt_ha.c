@@ -13,6 +13,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
 #include "mqtt_client.h"
 
 static const char *TAG = "mqtt_ha";
@@ -56,18 +57,23 @@ typedef struct {
 } mqtt_ctx_t;
 
 static mqtt_ctx_t s_ctx;
+static portMUX_TYPE s_error_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static void mqtt_set_last_error(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    portENTER_CRITICAL(&s_error_mux);
     vsnprintf(s_ctx.last_error, sizeof(s_ctx.last_error), fmt, args);
+    portEXIT_CRITICAL(&s_error_mux);
     va_end(args);
 }
 
 static void mqtt_clear_last_error(void)
 {
+    portENTER_CRITICAL(&s_error_mux);
     s_ctx.last_error[0] = '\0';
+    portEXIT_CRITICAL(&s_error_mux);
 }
 
 static const char *mqtt_connect_return_code_text(int code)
@@ -88,18 +94,6 @@ static const char *mqtt_connect_return_code_text(int code)
     }
 }
 
-static const char *co2_compensation_source_key(co2_compensation_source_t source)
-{
-    switch (source) {
-    case CO2_COMPENSATION_SOURCE_ALTITUDE:
-        return "altitude";
-    case CO2_COMPENSATION_SOURCE_BMP390:
-        return "bmp390";
-    case CO2_COMPENSATION_SOURCE_NONE:
-    default:
-        return "none";
-    }
-}
 
 static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"co2", "CO2", "co2", "ppm", "carbon_dioxide", "measurement", NULL, false},
@@ -599,7 +593,9 @@ void mqtt_ha_get_last_error(char *buffer, size_t buffer_len)
     if (buffer == NULL || buffer_len == 0) {
         return;
     }
+    portENTER_CRITICAL(&s_error_mux);
     strlcpy(buffer, s_ctx.last_error, buffer_len);
+    portEXIT_CRITICAL(&s_error_mux);
 }
 
 void mqtt_ha_set_control_state(bool scd41_asc_enabled, uint16_t frc_reference_ppm)
