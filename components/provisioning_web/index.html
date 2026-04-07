@@ -118,19 +118,38 @@
 
     /* Glass Panels */
     .glass-panel {
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--glass-border);
       border-radius: var(--card-radius);
       padding: 32px;
       box-shadow: var(--glass-shadow);
       transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -150%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.6s ease;
+    }
+
+    .glass-panel:hover::before {
+      left: 150%;
     }
 
     .glass-panel:hover {
-      box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
-      transform: translateY(-2px);
+      box-shadow: 0 16px 48px 0 rgba(31, 38, 135, 0.15);
+      border-color: rgba(255,255,255,0.6);
+      transform: translateY(-3px);
     }
 
     /* Typography */
@@ -172,27 +191,6 @@
       opacity: 0.9;
     }
 
-    .summary-banner-compact {
-      padding: 14px 18px;
-      margin-bottom: 0;
-      margin-top: 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .summary-banner-compact strong {
-      display: inline;
-      font-size: 1.02rem;
-      margin-bottom: 0;
-      white-space: nowrap;
-    }
-
-    .summary-banner-compact span {
-      font-size: 0.92rem;
-      line-height: 1.45;
-    }
 
     /* Unified Air Insight Card */
     .air-insight-unified {
@@ -257,12 +255,6 @@
       line-height: 1.55;
       opacity: 0.88;
       border-top: 1px solid rgba(0, 0, 0, 0.06);
-    }
-    .air-insight-reference {
-      font-size: 0.82rem;
-      opacity: 0.6;
-      padding-top: 8px;
-      line-height: 1.45;
     }
 
     .summary-good {
@@ -421,24 +413,31 @@
     .particle-card {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      min-height: 104px;
-      padding: 14px 16px;
+      gap: 6px;
+      min-height: 88px;
+      padding: 12px 14px;
       background: rgba(255, 255, 255, 0.68);
       border: 1px solid rgba(255, 255, 255, 0.82);
-      border-radius: 16px;
+      border-radius: 14px;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      transition: var(--transition);
+    }
+
+    .particle-card:hover {
+      background: rgba(255, 255, 255, 0.85);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(31, 38, 135, 0.08);
     }
 
     .particle-card-label {
-      font-size: 0.92rem;
+      font-size: 0.88rem;
       font-weight: 600;
       color: var(--text-muted);
-      line-height: 1.35;
+      line-height: 1.2;
     }
 
     .particle-card-value {
-      font-size: 1.65rem;
+      font-size: 1.45rem;
       font-weight: 700;
       color: var(--text-main);
       line-height: 1.1;
@@ -932,13 +931,15 @@
     }
 
     button.danger {
-      background: var(--accent);
-      box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+      background: linear-gradient(135deg, var(--accent) 0%, #ff4b4b 100%);
+      border: 1px solid rgba(255, 107, 107, 0.5);
+      box-shadow: 0 4px 14px rgba(255, 107, 107, 0.25);
     }
 
     button.danger:hover:not(:disabled) {
-      background: var(--accent-hover);
-      box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+      background: linear-gradient(135deg, #ff4b4b 0%, #e53e3e 100%);
+      box-shadow: 0 6px 18px rgba(255, 107, 107, 0.35);
+      transform: translateY(-2px);
     }
 
     button.ghost.danger {
@@ -1274,13 +1275,18 @@
 
     .nav-btn:hover:not(:disabled) {
       color: var(--text-main);
-      background: rgba(0, 0, 0, 0.04);
-      transform: none;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      transform: translateY(-1px);
     }
 
     .nav-btn[aria-selected='true'] {
       color: var(--primary);
-      background: rgba(82, 106, 242, 0.08);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 12px rgba(82, 106, 242, 0.15);
+      font-weight: 700;
     }
 
     .nav-btn:focus-visible {
@@ -1929,14 +1935,6 @@
         font-size: 0.92rem;
       }
 
-      .summary-banner-compact {
-        padding: 12px 14px;
-        gap: 8px;
-      }
-
-      .summary-banner-compact strong {
-        white-space: normal;
-      }
 
       .air-insight-unified {
         padding: 14px 16px;
@@ -1966,9 +1964,6 @@
       .air-insight-guidance {
         font-size: 0.85rem;
         padding: 8px 0 4px;
-      }
-      .air-insight-reference {
-        font-size: 0.78rem;
       }
 
       .metric {
@@ -2797,34 +2792,12 @@
         'time.sec': '秒',
         'time.min': '分',
         'time.hour': '小时',
-        'particle.fineMeaning': '说明空气里以更容易长时间悬浮、也更容易深入呼吸道的细颗粒为主，常见于烹饪烟雾、燃烧源或室外污染输入。',
-        'particle.coarseMeaning': '说明空气里以较大颗粒为主，通常更容易沉降，常见于扬尘、扫地、纤维、花粉或机械扰动。',
-        'particle.mixedMeaning': '说明细颗粒和粗颗粒都比较明显，通常是室内活动与外部输入共同作用。',
-        'particle.unknownMeaning': '等待足够的颗粒物样本后再判读模态主导。',
-        'particle.explanation': '{leading} 当前质量主导区间在 {massBand}，数量主导区间在 {countBand}，典型粒径 {typicalSize} µm。',
-        'particle.compactScientific': 'PM2.5 约占 PM10 的 {fineShare}%，粗颗粒（PM10-2.5）约占 {coarseShare}%，质量峰值在 {massPeak}，数量峰值在 {countPeak}，典型粒径 {typicalSize} µm',
-        'particle.compactEnglish': '质量主导区间 {massBand}，数量主导区间 {countBand}，典型粒径 {typicalSize} µm',
-        'particle.sceneTitle': '环境判断',
-        'particle.scienceTitle': '科学依据',
-        'particle.scene.background': '颗粒物负荷接近日常室内背景水平。',
-        'particle.scene.fine-source': '细颗粒占主导，更像是正在发生的细颗粒源事件，而不是落尘为主。',
-        'particle.scene.fine-stale': '细颗粒占主导，而且正在通风偏弱的房间里累积。',
-        'particle.scene.coarse-dust': '粗颗粒占主导，更像是灰尘或走动、打扫带来的再悬浮。',
-        'particle.scene.mixed-activity': '细粗颗粒同时活跃，说明室内活动和空气交换大概率都在起作用。',
-        'particle.scene.unavailable': '请等待更稳定的颗粒物样本后再判断环境状态。',
-        'particle.guidance.background': '维持日常通风和常规清洁即可，暂时不需要额外干预。',
-        'particle.guidance.fine-source': '优先做源头控制：开油烟机或净化器，暂停香薰/蜡烛；如果怀疑室外有烟霾，不要盲目长时间开窗。',
-        'particle.guidance.fine-stale': '先做一次短时对流通风或开启排风，把细颗粒和 CO2 一起排掉；如果刚做完饭，油烟机多开一会儿。',
-        'particle.guidance.coarse-dust': '优先湿拖、湿擦或 HEPA 吸尘，不要干扫；少在室内抖动织物，风大或扬尘时尽量关窗。',
-        'particle.guidance.mixed-activity': '同时处理“源头 + 通风”：在室外空气更好时短时通风，随后再清洁地面和台面，减少二次扬尘。',
-        'particle.guidance.unavailable': '先等颗粒物样本稳定，再根据画像决定处理动作。',
         'particle.support.co2High': 'CO2 {value} ppm，说明新风交换偏弱。',
         'particle.support.co2Low': 'CO2 {value} ppm，说明通风暂时不是主要矛盾。',
         'particle.support.rhLow': '湿度 {value}% 偏低，灰尘更容易被走动和清扫重新扬起。',
         'particle.support.rhHighFine': '湿度 {value}% 偏高，细颗粒会更闷，也更容易吸湿变大。',
         'particle.support.tempWarm': '温度 {value}°C 偏高，体感会更闷。',
         'particle.support.tempCool': '温度 {value}°C 已经偏低，通风时注意别让房间继续变冷。',
-        'particle.science': 'PM2.5 占 PM10 的 {fineShare}%，PM10-2.5 占 {coarseShare}%；质量主峰在 {massBand}，数量主峰在 {countBand}，典型粒径 {typicalSize} µm。',
         'particle.insightTitle': '空气状况分析',
         'particle.simpleScene.background': '空气良好，颗粒物处于日常室内背景水平，无需担心。',
         'particle.simpleScene.fine-source': '细颗粒偏高，可能来自烹饪油烟、燃烧或室外污染输入。',
@@ -2902,7 +2875,6 @@
         'metrics.scd41Unavailable': 'SCD41 暂不可用',
         'particle.section.mass': 'PM 质量浓度',
         'particle.section.count': '颗粒数',
-        'particle.section.interpretation': '画像判读',
         'particle.pm1Meta': '超细到细颗粒质量浓度',
         'particle.pm25Meta': '最常用的细颗粒指标',
         'particle.pm4Meta': '介于 PM2.5 和 PM10 之间',
@@ -2912,16 +2884,6 @@
         'particle.count25Meta': '2.5 微米以内的总体颗粒数',
         'particle.count40Meta': '4.0 微米以内的总体颗粒数',
         'particle.count100Meta': '10.0 微米以内的总体颗粒数',
-        'particle.massBand': '质量主导区间',
-        'particle.massBandMeta': '哪一段粒径对总质量贡献最大',
-        'particle.countBand': '数量主导区间',
-        'particle.countBandMeta': '哪一段粒径的颗粒个数最多',
-        'particle.typicalSize': '典型粒径',
-        'particle.typicalSizeMeta': '当前样本的代表性粒径',
-        'particle.fineShare': 'PM2.5 占比',
-        'particle.fineShareMeta': '细颗粒在 PM10 中的质量占比',
-        'particle.coarseShare': '粗颗粒占比',
-        'particle.coarseShareMeta': 'PM10-2.5 在 PM10 中的质量占比',
         'action.configSaveFailed': '配置保存失败',
         'action.configSavedRestartRuntime': 'MQTT 配置已保存，系统将重启以重新连接服务端。SCD41 补偿参数已即时下发。',
         'action.configSavedRestart': 'MQTT 配置已保存，系统将重启以重新连接服务端。',
@@ -3055,34 +3017,12 @@
         'time.sec': 'sec',
         'time.min': 'min',
         'time.hour': 'hr',
-        'particle.fineMeaning': 'Fine particles dominate the air right now. They stay suspended longer and penetrate deeper into the respiratory tract, often due to cooking smoke, combustion sources, or outdoor pollution infiltration.',
-        'particle.coarseMeaning': 'Larger particles dominate the air right now. They settle more easily and are often caused by dust, sweeping, fibers, pollen, or mechanical disturbance.',
-        'particle.mixedMeaning': 'Both fine and coarse particles are noticeable right now, which usually means indoor activity and outdoor input are contributing at the same time.',
-        'particle.unknownMeaning': 'Wait for more particle samples before interpreting the dominant particle mode.',
-        'particle.explanation': '{leading} Dominant mass band {massBand}, dominant count band {countBand}, typical size {typicalSize} µm.',
-        'particle.compactScientific': 'PM2.5 is {fineShare}% of PM10, PM10-2.5 is {coarseShare}%, mass peaks at {massPeak}, counts peak at {countPeak}, typical size {typicalSize} µm',
-        'particle.compactEnglish': 'Mass is led by {massBand}, counts are led by {countBand}, typical size {typicalSize} µm',
-        'particle.sceneTitle': 'Current Environment',
-        'particle.scienceTitle': 'Scientific Basis',
-        'particle.scene.background': 'Particle load is close to a normal indoor background.',
-        'particle.scene.fine-source': 'Fine particles dominate, which looks more like an active source event than settled dust.',
-        'particle.scene.fine-stale': 'Fine particles dominate and are building up in a room with limited fresh-air exchange.',
-        'particle.scene.coarse-dust': 'Coarse particles dominate, which looks more like dust or resuspension from movement and cleaning.',
-        'particle.scene.mixed-activity': 'Fine and coarse particles are both active, suggesting indoor activity and air exchange are both involved.',
-        'particle.scene.unavailable': 'Wait for a more stable particle sample before judging the environment.',
-        'particle.guidance.background': 'Keep routine ventilation and regular cleaning. No extra intervention is needed right now.',
-        'particle.guidance.fine-source': 'Prioritize source control: run the range hood or purifier, stop candles/incense, and avoid opening windows if outdoor haze or smoke is suspected.',
-        'particle.guidance.fine-stale': 'Do a short cross-ventilation flush or start exhaust now so fine particles and CO2 leave together. If this followed cooking, keep the hood running longer.',
-        'particle.guidance.coarse-dust': 'Prefer damp wiping or a HEPA vacuum over dry sweeping, reduce shaking fabrics indoors, and keep windows closed during dusty or windy periods.',
-        'particle.guidance.mixed-activity': 'Handle both source and air exchange: ventilate briefly if outdoor air is cleaner, then clean floors and surfaces to cut re-suspended dust.',
-        'particle.guidance.unavailable': 'Wait for a stable sample before acting on the particle profile.',
         'particle.support.co2High': 'CO2 {value} ppm also points to weak fresh-air exchange.',
         'particle.support.co2Low': 'CO2 {value} ppm suggests ventilation is not the main issue right now.',
         'particle.support.rhLow': 'Humidity {value}% is low enough for dust to resuspend more easily.',
         'particle.support.rhHighFine': 'Humidity {value}% is high enough to make fine aerosols feel muggy and grow more easily.',
         'particle.support.tempWarm': 'Temperature {value}°C makes the room feel warmer and stuffier.',
         'particle.support.tempCool': 'Temperature {value}°C is already on the cool side, so avoid over-ventilating for too long.',
-        'particle.science': 'PM2.5 accounts for {fineShare}% of PM10 and PM10-2.5 accounts for {coarseShare}%. Mass peaks at {massBand}, counts peak at {countBand}, and typical size is {typicalSize} µm.',
         'particle.insightTitle': 'Air Quality Analysis',
         'particle.simpleScene.background': 'Air is clean. Particles are at normal indoor background levels.',
         'particle.simpleScene.fine-source': 'Fine particles are elevated, likely from cooking, combustion, or outdoor pollution.',
@@ -3160,7 +3100,6 @@
         'metrics.scd41Unavailable': 'SCD41 unavailable',
         'particle.section.mass': 'PM Mass Concentration',
         'particle.section.count': 'Particle Count',
-        'particle.section.interpretation': 'Profile Interpretation',
         'particle.pm1Meta': 'Ultrafine to fine particle mass concentration',
         'particle.pm25Meta': 'Most widely used fine-particle indicator',
         'particle.pm4Meta': 'Intermediate band between PM2.5 and PM10',
@@ -3170,16 +3109,6 @@
         'particle.count25Meta': 'Total particle count below 2.5 µm',
         'particle.count40Meta': 'Total particle count below 4.0 µm',
         'particle.count100Meta': 'Total particle count below 10.0 µm',
-        'particle.massBand': 'Dominant Mass Band',
-        'particle.massBandMeta': 'Particle-size band contributing the most mass',
-        'particle.countBand': 'Dominant Count Band',
-        'particle.countBandMeta': 'Particle-size band contributing the most counts',
-        'particle.typicalSize': 'Typical Size',
-        'particle.typicalSizeMeta': 'Representative particle size of the current sample',
-        'particle.fineShare': 'PM2.5 Share',
-        'particle.fineShareMeta': 'Mass share of fine particles within PM10',
-        'particle.coarseShare': 'Coarse Share',
-        'particle.coarseShareMeta': 'Mass share of PM10-2.5 within PM10',
         'action.configSaveFailed': 'Failed to save configuration',
         'action.configSavedRestartRuntime': 'MQTT configuration was saved. The system will restart to reconnect, and the SCD41 compensation settings were applied immediately.',
         'action.configSavedRestart': 'MQTT configuration was saved. The system will restart to reconnect to the broker.',
@@ -3373,81 +3302,12 @@
     function particleCard(label, value, meta = '') {
       return `<article class='particle-card'><span class='particle-card-label'>${label}</span><strong class='particle-card-value'>${value || '--'}</strong>${meta ? `<small class='particle-card-meta'>${meta}</small>` : ''}</article>`;
     }
-    function normalizeMicronText(value) {
-      return String(value || '').replace(/\bum\b/g, 'µm');
-    }
     function metric(label, value, meta = '', variant = 'secondary', unitBadge = '', tone = '') { return `<div class='metric metric-${variant}${tone ? ` metric-tone-${tone}` : ''}'><span>${label}</span><div class='metric-value'><strong>${value || '--'}</strong>${unitBadge ? `<em class='metric-unit'>${unitBadge}</em>` : ''}</div>${meta ? `<small>${meta}</small>` : ''}</div>`; }
     function summaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-${tone || 'neutral'}'><strong>${value}</strong><span>${detail}</span></div>`; }
-    function compactSummaryBanner(value, detail, tone = 'neutral') { return `<div class='summary-banner summary-banner-compact summary-${tone || 'neutral'}'><strong>${value}</strong>${detail ? `<span>${detail}</span>` : ''}</div>`; }
 
     function localizedOverall(value) { return translate(categoryLabels, value, t('common.assessmentUnavailable')); }
-    function parseParticleInsight(note) {
-      if (!note) return null;
-      const text = String(note).trim();
-      const scientificPattern = /^PM2\.5 (?:is |share )([0-9.]+)%(?: of PM10)?, (?:PM10-2\.5 is |coarse share )([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\./;
-      const match = text.match(scientificPattern);
-      if (!match) return null;
-      return {
-        fineShare: Number(match[1]),
-        coarseShare: Number(match[2]),
-        dominantMassBand: normalizeMicronText(match[3]),
-        dominantCountBand: normalizeMicronText(match[4]),
-        typicalSize: Number(match[5])
-      };
-    }
-    function particleInsightData(d) {
-      const snapshot = d?.snapshot || {};
-      const fineShare = toFiniteNumber(snapshot.particle_fine_share_pct);
-      const coarseShare = toFiniteNumber(snapshot.particle_coarse_share_pct);
-      const typicalSize = toFiniteNumber(snapshot.typical_particle_size_um);
-      const dominantMassBand = snapshot.particle_dominant_mass_band;
-      const dominantCountBand = snapshot.particle_dominant_count_band;
-      if (Number.isFinite(fineShare) && Number.isFinite(coarseShare) &&
-        Number.isFinite(typicalSize) && dominantMassBand && dominantCountBand) {
-        return {
-          fineShare,
-          coarseShare,
-          dominantMassBand: normalizeMicronText(dominantMassBand),
-          dominantCountBand: normalizeMicronText(dominantCountBand),
-          typicalSize
-        };
-      }
-      return parseParticleInsight(snapshot.particle_profile_note);
-    }
     function particleSituationKey(d) {
       return d?.snapshot?.particle_situation_key || 'unavailable';
-    }
-    function particleSituationText(d) {
-      switch (particleSituationKey(d)) {
-        case 'background':
-          return t('particle.scene.background');
-        case 'fine-source':
-          return t('particle.scene.fine-source');
-        case 'fine-stale':
-          return t('particle.scene.fine-stale');
-        case 'coarse-dust':
-          return t('particle.scene.coarse-dust');
-        case 'mixed-activity':
-          return t('particle.scene.mixed-activity');
-        default:
-          return t('particle.scene.unavailable');
-      }
-    }
-    function particleGuidanceText(d) {
-      switch (particleSituationKey(d)) {
-        case 'background':
-          return t('particle.guidance.background');
-        case 'fine-source':
-          return t('particle.guidance.fine-source');
-        case 'fine-stale':
-          return t('particle.guidance.fine-stale');
-        case 'coarse-dust':
-          return t('particle.guidance.coarse-dust');
-        case 'mixed-activity':
-          return t('particle.guidance.mixed-activity');
-        default:
-          return t('particle.guidance.unavailable');
-      }
     }
     function particleSupportNotes(d) {
       const parts = [];
@@ -3474,17 +3334,6 @@
       }
       return parts;
     }
-    function particleScienceText(d) {
-      const parsed = particleInsightData(d);
-      if (!parsed) return compactParticleNote(d?.snapshot?.particle_profile_note);
-      return t('particle.science', {
-        fineShare: parsed.fineShare.toFixed(0),
-        coarseShare: parsed.coarseShare.toFixed(0),
-        massBand: parsed.dominantMassBand,
-        countBand: parsed.dominantCountBand,
-        typicalSize: parsed.typicalSize.toFixed(2)
-      });
-    }
     function particleSummaryTone(d) {
       switch (particleSituationKey(d)) {
         case 'background':
@@ -3498,63 +3347,8 @@
           return 'neutral';
       }
     }
-    function particleProfileMeaning(key) {
-      switch (key) {
-        case 'fine':
-          return t('particle.fineMeaning');
-        case 'coarse':
-          return t('particle.coarseMeaning');
-        case 'mixed':
-          return t('particle.mixedMeaning');
-        default:
-          return t('particle.unknownMeaning');
-      }
-    }
-    function particleProfileExplanation(d) {
-      const parsed = particleInsightData(d);
-      const leading = particleProfileMeaning(d.snapshot.particle_profile_key);
-      if (!parsed) return leading;
-      return t('particle.explanation', {
-        leading,
-        massBand: parsed.dominantMassBand,
-        countBand: parsed.dominantCountBand,
-        typicalSize: parsed.typicalSize.toFixed(2)
-      });
-    }
     function particleSection(title, items) {
       return `<section class='particle-section'><h4>${title}</h4><div class='particle-grid particle-section-grid'>${items.join('')}</div></section>`;
-    }
-    function compactParticleNote(note) {
-      if (!note) return '';
-      const text = String(note).trim();
-      const scientificPattern = /^PM2\.5 is ([0-9.]+)% of PM10, PM10-2\.5 is ([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\.$/;
-      const scientificMatch = text.match(scientificPattern);
-      if (scientificMatch) {
-        return t('particle.compactScientific', {
-          fineShare: scientificMatch[1],
-          coarseShare: scientificMatch[2],
-          massPeak: normalizeMicronText(scientificMatch[3]),
-          countPeak: normalizeMicronText(scientificMatch[4]),
-          typicalSize: scientificMatch[5]
-        });
-      }
-      const englishPattern = /^Mass is led by (.+), counts are led by (.+), typical size ([0-9.]+) um\.$/;
-      const match = text.match(englishPattern);
-      if (match) {
-        return t('particle.compactEnglish', {
-          massBand: normalizeMicronText(match[1]),
-          countBand: normalizeMicronText(match[2]),
-          typicalSize: match[3]
-        });
-      }
-      if (currentLanguage !== 'zh-CN') {
-        return text.replace(/\bum\b/g, 'µm');
-      }
-      return text
-        .replace(/\bum\b/g, 'µm')
-        .replace(/。$/, '')
-        .replace(/^以/, '')
-        .replace(/为主，常见于/, '，常见于');
     }
     function simpleSituationText(d) {
       switch (particleSituationKey(d)) {
@@ -3585,7 +3379,6 @@
       const situationLabel = translate(particleSituationLabels, d.snapshot.particle_situation, t('common.unavailable'));
       const descText = simpleSituationText(d);
       const guidanceText = simpleGuidanceText(d);
-      const scienceText = particleScienceText(d);
       const support = particleSupportNotes(d);
       const supportHtml = support.length
         ? `<p class="insight-desc" style="margin-bottom:6px;opacity:0.82;font-size:0.9rem">${support.join(currentLanguage === 'zh-CN' ? '；' : '; ')}</p>`
@@ -3600,7 +3393,6 @@
         `<div class="air-insight-indicators">${chips.join('')}</div>` +
         supportHtml +
         `<div class="air-insight-guidance">💡 ${guidanceText}</div>` +
-        (scienceText ? `<div class="air-insight-reference">📊 ${scienceText}</div>` : '') +
         `</div>`;
     }
 
@@ -4121,8 +3913,6 @@
       syncSps30State(d.snapshot.sps30_sleeping, d.diag.sps30_ready);
       syncStatusLedState(d.diag.status_led_enabled, d.diag.status_led_ready);
 
-      const particleInsight = particleInsightData(d);
-      const particleSupport = particleSupportNotes(d);
       particleMetricsEl.innerHTML = `<div class='particle-sections'>${[
         particleSection(t('particle.section.mass'), [
           particleCard('PM1.0', num(d.snapshot.pm1_0, 1, 'µg/m³'), t('particle.pm1Meta')),
@@ -4136,13 +3926,6 @@
           particleCard('<2.5 µm', num(d.snapshot.particles_2_5um, 1, '#/cm³'), t('particle.count25Meta')),
           particleCard('<4.0 µm', num(d.snapshot.particles_4_0um, 1, '#/cm³'), t('particle.count40Meta')),
           particleCard('<10.0 µm', num(d.snapshot.particles_10_0um, 1, '#/cm³'), t('particle.count100Meta'))
-        ]),
-        particleSection(t('particle.section.interpretation'), [
-          particleCard(t('particle.massBand'), particleInsight ? particleInsight.dominantMassBand.replace(' µm', '<em class="kv-unit">µm</em>') : '--', t('particle.massBandMeta')),
-          particleCard(t('particle.countBand'), particleInsight ? particleInsight.dominantCountBand.replace(' µm', '<em class="kv-unit">µm</em>') : '--', t('particle.countBandMeta')),
-          particleCard(t('particle.typicalSize'), num(d.snapshot.typical_particle_size_um, 2, 'µm'), t('particle.typicalSizeMeta')),
-          particleCard(t('particle.fineShare'), particleInsight ? `${particleInsight.fineShare.toFixed(0)}%` : '--', t('particle.fineShareMeta')),
-          particleCard(t('particle.coarseShare'), particleInsight ? `${particleInsight.coarseShare.toFixed(0)}%` : '--', t('particle.coarseShareMeta'))
         ])
       ].join('')}</div>`;
 
