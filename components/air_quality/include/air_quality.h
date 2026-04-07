@@ -5,7 +5,7 @@
 #include "device_types.h"
 
 #define AIR_QUALITY_BASIS_LEN 64
-#define AIR_QUALITY_NOTE_LEN 160
+#define AIR_QUALITY_NOTE_LEN 224
 #define AIR_QUALITY_PARTICLE_LABEL_LEN 24
 
 typedef enum {
@@ -71,6 +71,15 @@ typedef enum {
 } air_quality_particle_profile_t;
 
 typedef enum {
+    AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE = 0,
+    AIR_QUALITY_PARTICLE_SITUATION_BACKGROUND,
+    AIR_QUALITY_PARTICLE_SITUATION_FINE_SOURCE,
+    AIR_QUALITY_PARTICLE_SITUATION_FINE_STALE,
+    AIR_QUALITY_PARTICLE_SITUATION_COARSE_DUST,
+    AIR_QUALITY_PARTICLE_SITUATION_MIXED_ACTIVITY,
+} air_quality_particle_situation_t;
+
+typedef enum {
     AIR_QUALITY_PRESSURE_TREND_UNAVAILABLE = 0,
     AIR_QUALITY_PRESSURE_TREND_RISING_FAST,
     AIR_QUALITY_PRESSURE_TREND_RISING,
@@ -99,9 +108,13 @@ typedef enum {
 typedef struct {
     bool valid;
     air_quality_particle_profile_t profile;
+    air_quality_particle_situation_t situation;
+    float fine_share_pct;
+    float coarse_share_pct;
     char dominant_mass_band[AIR_QUALITY_PARTICLE_LABEL_LEN];
     char dominant_count_band[AIR_QUALITY_PARTICLE_LABEL_LEN];
     char note[AIR_QUALITY_NOTE_LEN];
+    char advice[AIR_QUALITY_NOTE_LEN];
 } air_quality_particle_insight_t;
 
 typedef struct {
@@ -144,3 +157,5 @@ const char *air_quality_signal_level_label(air_quality_signal_level_t level);
 const char *air_quality_signal_level_key(air_quality_signal_level_t level);
 const char *air_quality_particle_profile_label(air_quality_particle_profile_t profile);
 const char *air_quality_particle_profile_key(air_quality_particle_profile_t profile);
+const char *air_quality_particle_situation_label(air_quality_particle_situation_t situation);
+const char *air_quality_particle_situation_key(air_quality_particle_situation_t situation);

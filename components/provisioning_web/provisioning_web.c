@@ -1486,12 +1486,37 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNumberToObject(snapshot_json, "pm2_5", snapshot.pm2_5);
         cJSON_AddNumberToObject(snapshot_json, "pm4_0", snapshot.pm4_0);
         cJSON_AddNumberToObject(snapshot_json, "pm10_0", snapshot.pm10_0);
-        cJSON_AddStringToObject(snapshot_json, "particle_profile",
-                                air_quality_particle_profile_label(particle.profile));
-        cJSON_AddStringToObject(snapshot_json, "particle_profile_key",
-                                air_quality_particle_profile_key(particle.profile));
-        cJSON_AddStringToObject(snapshot_json, "particle_profile_note",
-                                particle.note[0] ? particle.note : "Unavailable");
+        if (particle.valid) {
+            cJSON_AddStringToObject(snapshot_json, "particle_profile",
+                                    air_quality_particle_profile_label(particle.profile));
+            cJSON_AddStringToObject(snapshot_json, "particle_profile_key",
+                                    air_quality_particle_profile_key(particle.profile));
+            cJSON_AddStringToObject(snapshot_json, "particle_situation",
+                                    air_quality_particle_situation_label(particle.situation));
+            cJSON_AddStringToObject(snapshot_json, "particle_situation_key",
+                                    air_quality_particle_situation_key(particle.situation));
+            cJSON_AddStringToObject(snapshot_json, "particle_profile_note",
+                                    particle.note[0] ? particle.note : "Unavailable");
+            cJSON_AddStringToObject(snapshot_json, "particle_advice",
+                                    particle.advice[0] ? particle.advice : "Unavailable");
+            cJSON_AddNumberToObject(snapshot_json, "particle_fine_share_pct", particle.fine_share_pct);
+            cJSON_AddNumberToObject(snapshot_json, "particle_coarse_share_pct", particle.coarse_share_pct);
+            cJSON_AddStringToObject(snapshot_json, "particle_dominant_mass_band", particle.dominant_mass_band);
+            cJSON_AddStringToObject(snapshot_json, "particle_dominant_count_band", particle.dominant_count_band);
+        } else {
+            cJSON_AddNullToObject(snapshot_json, "particle_profile");
+            cJSON_AddStringToObject(snapshot_json, "particle_profile_key",
+                                    air_quality_particle_profile_key(AIR_QUALITY_PARTICLE_PROFILE_UNAVAILABLE));
+            cJSON_AddNullToObject(snapshot_json, "particle_situation");
+            cJSON_AddStringToObject(snapshot_json, "particle_situation_key",
+                                    air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
+            cJSON_AddNullToObject(snapshot_json, "particle_profile_note");
+            cJSON_AddNullToObject(snapshot_json, "particle_advice");
+            cJSON_AddNullToObject(snapshot_json, "particle_fine_share_pct");
+            cJSON_AddNullToObject(snapshot_json, "particle_coarse_share_pct");
+            cJSON_AddNullToObject(snapshot_json, "particle_dominant_mass_band");
+            cJSON_AddNullToObject(snapshot_json, "particle_dominant_count_band");
+        }
         cJSON_AddNumberToObject(snapshot_json, "particles_0_5um", snapshot.particles_0_5um);
         cJSON_AddNumberToObject(snapshot_json, "particles_1_0um", snapshot.particles_1_0um);
         cJSON_AddNumberToObject(snapshot_json, "particles_2_5um", snapshot.particles_2_5um);
@@ -1504,8 +1529,17 @@ static esp_err_t status_handler(httpd_req_t *req)
         cJSON_AddNullToObject(snapshot_json, "pm4_0");
         cJSON_AddNullToObject(snapshot_json, "pm10_0");
         cJSON_AddNullToObject(snapshot_json, "particle_profile");
-        cJSON_AddNullToObject(snapshot_json, "particle_profile_key");
+        cJSON_AddStringToObject(snapshot_json, "particle_profile_key",
+                                air_quality_particle_profile_key(AIR_QUALITY_PARTICLE_PROFILE_UNAVAILABLE));
+        cJSON_AddNullToObject(snapshot_json, "particle_situation");
+        cJSON_AddStringToObject(snapshot_json, "particle_situation_key",
+                                air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
         cJSON_AddNullToObject(snapshot_json, "particle_profile_note");
+        cJSON_AddNullToObject(snapshot_json, "particle_advice");
+        cJSON_AddNullToObject(snapshot_json, "particle_fine_share_pct");
+        cJSON_AddNullToObject(snapshot_json, "particle_coarse_share_pct");
+        cJSON_AddNullToObject(snapshot_json, "particle_dominant_mass_band");
+        cJSON_AddNullToObject(snapshot_json, "particle_dominant_count_band");
         cJSON_AddNullToObject(snapshot_json, "particles_0_5um");
         cJSON_AddNullToObject(snapshot_json, "particles_1_0um");
         cJSON_AddNullToObject(snapshot_json, "particles_2_5um");

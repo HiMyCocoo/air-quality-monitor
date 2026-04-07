@@ -2686,6 +2686,27 @@
         'particle.explanation': '{leading} 当前质量主导区间在 {massBand}，数量主导区间在 {countBand}，典型粒径 {typicalSize} µm。',
         'particle.compactScientific': 'PM2.5 约占 PM10 的 {fineShare}%，粗颗粒（PM10-2.5）约占 {coarseShare}%，质量峰值在 {massPeak}，数量峰值在 {countPeak}，典型粒径 {typicalSize} µm',
         'particle.compactEnglish': '质量主导区间 {massBand}，数量主导区间 {countBand}，典型粒径 {typicalSize} µm',
+        'particle.sceneTitle': '环境判断',
+        'particle.scienceTitle': '科学依据',
+        'particle.scene.background': '颗粒物负荷接近日常室内背景水平。',
+        'particle.scene.fine-source': '细颗粒占主导，更像是正在发生的细颗粒源事件，而不是落尘为主。',
+        'particle.scene.fine-stale': '细颗粒占主导，而且正在通风偏弱的房间里累积。',
+        'particle.scene.coarse-dust': '粗颗粒占主导，更像是灰尘或走动、打扫带来的再悬浮。',
+        'particle.scene.mixed-activity': '细粗颗粒同时活跃，说明室内活动和空气交换大概率都在起作用。',
+        'particle.scene.unavailable': '请等待更稳定的颗粒物样本后再判断环境状态。',
+        'particle.guidance.background': '维持日常通风和常规清洁即可，暂时不需要额外干预。',
+        'particle.guidance.fine-source': '优先做源头控制：开油烟机或净化器，暂停香薰/蜡烛；如果怀疑室外有烟霾，不要盲目长时间开窗。',
+        'particle.guidance.fine-stale': '先做一次短时对流通风或开启排风，把细颗粒和 CO2 一起排掉；如果刚做完饭，油烟机多开一会儿。',
+        'particle.guidance.coarse-dust': '优先湿拖、湿擦或 HEPA 吸尘，不要干扫；少在室内抖动织物，风大或扬尘时尽量关窗。',
+        'particle.guidance.mixed-activity': '同时处理“源头 + 通风”：在室外空气更好时短时通风，随后再清洁地面和台面，减少二次扬尘。',
+        'particle.guidance.unavailable': '先等颗粒物样本稳定，再根据画像决定处理动作。',
+        'particle.support.co2High': 'CO2 {value} ppm，说明新风交换偏弱。',
+        'particle.support.co2Low': 'CO2 {value} ppm，说明通风暂时不是主要矛盾。',
+        'particle.support.rhLow': '湿度 {value}% 偏低，灰尘更容易被走动和清扫重新扬起。',
+        'particle.support.rhHighFine': '湿度 {value}% 偏高，细颗粒会更闷，也更容易吸湿变大。',
+        'particle.support.tempWarm': '温度 {value}°C 偏高，体感会更闷。',
+        'particle.support.tempCool': '温度 {value}°C 已经偏低，通风时注意别让房间继续变冷。',
+        'particle.science': 'PM2.5 占 PM10 的 {fineShare}%，PM10-2.5 占 {coarseShare}%；质量主峰在 {massBand}，数量主峰在 {countBand}，典型粒径 {typicalSize} µm。',
         'wifi.waitingProvisioning': '等待配网',
         'co2Comp.bmp390': 'BMP390 动态气压',
         'co2Comp.altitude': 'SCD41 海拔补偿',
@@ -2910,6 +2931,27 @@
         'particle.explanation': '{leading} Dominant mass band {massBand}, dominant count band {countBand}, typical size {typicalSize} µm.',
         'particle.compactScientific': 'PM2.5 is {fineShare}% of PM10, PM10-2.5 is {coarseShare}%, mass peaks at {massPeak}, counts peak at {countPeak}, typical size {typicalSize} µm',
         'particle.compactEnglish': 'Mass is led by {massBand}, counts are led by {countBand}, typical size {typicalSize} µm',
+        'particle.sceneTitle': 'Current Environment',
+        'particle.scienceTitle': 'Scientific Basis',
+        'particle.scene.background': 'Particle load is close to a normal indoor background.',
+        'particle.scene.fine-source': 'Fine particles dominate, which looks more like an active source event than settled dust.',
+        'particle.scene.fine-stale': 'Fine particles dominate and are building up in a room with limited fresh-air exchange.',
+        'particle.scene.coarse-dust': 'Coarse particles dominate, which looks more like dust or resuspension from movement and cleaning.',
+        'particle.scene.mixed-activity': 'Fine and coarse particles are both active, suggesting indoor activity and air exchange are both involved.',
+        'particle.scene.unavailable': 'Wait for a more stable particle sample before judging the environment.',
+        'particle.guidance.background': 'Keep routine ventilation and regular cleaning. No extra intervention is needed right now.',
+        'particle.guidance.fine-source': 'Prioritize source control: run the range hood or purifier, stop candles/incense, and avoid opening windows if outdoor haze or smoke is suspected.',
+        'particle.guidance.fine-stale': 'Do a short cross-ventilation flush or start exhaust now so fine particles and CO2 leave together. If this followed cooking, keep the hood running longer.',
+        'particle.guidance.coarse-dust': 'Prefer damp wiping or a HEPA vacuum over dry sweeping, reduce shaking fabrics indoors, and keep windows closed during dusty or windy periods.',
+        'particle.guidance.mixed-activity': 'Handle both source and air exchange: ventilate briefly if outdoor air is cleaner, then clean floors and surfaces to cut re-suspended dust.',
+        'particle.guidance.unavailable': 'Wait for a stable sample before acting on the particle profile.',
+        'particle.support.co2High': 'CO2 {value} ppm also points to weak fresh-air exchange.',
+        'particle.support.co2Low': 'CO2 {value} ppm suggests ventilation is not the main issue right now.',
+        'particle.support.rhLow': 'Humidity {value}% is low enough for dust to resuspend more easily.',
+        'particle.support.rhHighFine': 'Humidity {value}% is high enough to make fine aerosols feel muggy and grow more easily.',
+        'particle.support.tempWarm': 'Temperature {value}°C makes the room feel warmer and stuffier.',
+        'particle.support.tempCool': 'Temperature {value}°C is already on the cool side, so avoid over-ventilating for too long.',
+        'particle.science': 'PM2.5 accounts for {fineShare}% of PM10 and PM10-2.5 accounts for {coarseShare}%. Mass peaks at {massBand}, counts peak at {countBand}, and typical size is {typicalSize} µm.',
         'wifi.waitingProvisioning': 'Waiting for provisioning',
         'co2Comp.bmp390': 'BMP390 dynamic pressure',
         'co2Comp.altitude': 'SCD41 altitude compensation',
@@ -3042,6 +3084,7 @@
         noxSignal: { 'Background': '背景水平', 'Trace NOx Event': '轻微 NOx 事件', 'NOx Event': 'NOx 事件', 'High NOx Event': '明显 NOx 事件', 'Severe NOx Event': '强 NOx 事件', 'Unavailable': '暂不可用' },
         comfort: { 'Low': '偏低', 'Acceptable': '可接受', 'High': '偏高', 'Unavailable': '暂不可用' },
         profile: { 'Fine-Mode Dominant': '细颗粒模态主导', 'Mixed-Mode': '细粗混合', 'Coarse-Mode Dominant': '粗颗粒模态主导', 'Unavailable': '暂不可用' },
+        particleSituation: { 'Clean Background': '背景水平较低', 'Fine Particle Source Event': '细颗粒源事件', 'Fine Particle Build-up': '细颗粒累积', 'Dust / Coarse Disturbance': '扬尘/粗颗粒扰动', 'Mixed Activity Episode': '混合活动场景', 'Unavailable': '暂不可用' },
         pressureTrend: { 'Rising Fast': '快速回升', 'Rising': '缓慢回升', 'Stable': '基本稳定', 'Falling': '持续下降', 'Falling Fast': '快速下降', 'Unavailable': '暂不可用' },
         rainOutlook: { 'Unlikely': '暂不明显', 'Slight Chance': '略有升高', 'Possible': '可能有雨', 'Likely Soon': '较可能短时降雨', 'Unavailable': '暂不可用' },
         otaState: { idle: '等待检查', checking: '正在查询', uploading: '正在上传', downloading: '正在下载', ready: '可直接升级', success: '升级完成', error: '升级失败' },
@@ -3055,6 +3098,7 @@
         noxSignal: { 'Background': 'Background', 'Trace NOx Event': 'Trace NOx Event', 'NOx Event': 'NOx Event', 'High NOx Event': 'High NOx Event', 'Severe NOx Event': 'Severe NOx Event', 'Unavailable': 'Unavailable' },
         comfort: { 'Low': 'Low', 'Acceptable': 'Acceptable', 'High': 'High', 'Unavailable': 'Unavailable' },
         profile: { 'Fine-Mode Dominant': 'Fine-Mode Dominant', 'Mixed-Mode': 'Mixed-Mode', 'Coarse-Mode Dominant': 'Coarse-Mode Dominant', 'Unavailable': 'Unavailable' },
+        particleSituation: { 'Clean Background': 'Clean Background', 'Fine Particle Source Event': 'Fine Particle Source Event', 'Fine Particle Build-up': 'Fine Particle Build-up', 'Dust / Coarse Disturbance': 'Dust / Coarse Disturbance', 'Mixed Activity Episode': 'Mixed Activity Episode', 'Unavailable': 'Unavailable' },
         pressureTrend: { 'Rising Fast': 'Rising Fast', 'Rising': 'Rising', 'Stable': 'Stable', 'Falling': 'Falling', 'Falling Fast': 'Falling Fast', 'Unavailable': 'Unavailable' },
         rainOutlook: { 'Unlikely': 'Unlikely', 'Slight Chance': 'Slight Chance', 'Possible': 'Possible', 'Likely Soon': 'Likely Soon', 'Unavailable': 'Unavailable' },
         otaState: { idle: 'Waiting to Check', checking: 'Checking', uploading: 'Uploading', downloading: 'Downloading', ready: 'Ready to Update', success: 'Update Complete', error: 'Update Failed' },
@@ -3069,6 +3113,7 @@
     const noxSignalLabels = 'noxSignal';
     const comfortLabels = 'comfort';
     const profileLabels = 'profile';
+    const particleSituationLabels = 'particleSituation';
     const pressureTrendLabels = 'pressureTrend';
     const rainOutlookLabels = 'rainOutlook';
     const otaStateLabels = 'otaState';
@@ -3161,6 +3206,11 @@
       const v = digits === null ? n : n.toFixed(digits);
       return unit ? `${v}<em class="kv-unit">${unit}</em>` : `${v}`;
     }
+    function toFiniteNumber(value) {
+      if (value == null || value === '') return Number.NaN;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : Number.NaN;
+    }
     function fmtAge(seconds) {
       if (seconds == null || seconds === '') return '--';
       const sec = Number(seconds);
@@ -3190,7 +3240,7 @@
     function parseParticleInsight(note) {
       if (!note) return null;
       const text = String(note).trim();
-      const scientificPattern = /^PM2\.5 is ([0-9.]+)% of PM10, PM10-2\.5 is ([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\.$/;
+      const scientificPattern = /^PM2\.5 (?:is |share )([0-9.]+)%(?: of PM10)?, (?:PM10-2\.5 is |coarse share )([0-9.]+)%, mass peaks at (.+), counts peak at (.+), typical size ([0-9.]+) um\./;
       const match = text.match(scientificPattern);
       if (!match) return null;
       return {
@@ -3200,6 +3250,109 @@
         dominantCountBand: normalizeMicronText(match[4]),
         typicalSize: Number(match[5])
       };
+    }
+    function particleInsightData(d) {
+      const snapshot = d?.snapshot || {};
+      const fineShare = toFiniteNumber(snapshot.particle_fine_share_pct);
+      const coarseShare = toFiniteNumber(snapshot.particle_coarse_share_pct);
+      const typicalSize = toFiniteNumber(snapshot.typical_particle_size_um);
+      const dominantMassBand = snapshot.particle_dominant_mass_band;
+      const dominantCountBand = snapshot.particle_dominant_count_band;
+      if (Number.isFinite(fineShare) && Number.isFinite(coarseShare) &&
+        Number.isFinite(typicalSize) && dominantMassBand && dominantCountBand) {
+        return {
+          fineShare,
+          coarseShare,
+          dominantMassBand: normalizeMicronText(dominantMassBand),
+          dominantCountBand: normalizeMicronText(dominantCountBand),
+          typicalSize
+        };
+      }
+      return parseParticleInsight(snapshot.particle_profile_note);
+    }
+    function particleSituationKey(d) {
+      return d?.snapshot?.particle_situation_key || 'unavailable';
+    }
+    function particleSituationText(d) {
+      switch (particleSituationKey(d)) {
+        case 'background':
+          return t('particle.scene.background');
+        case 'fine-source':
+          return t('particle.scene.fine-source');
+        case 'fine-stale':
+          return t('particle.scene.fine-stale');
+        case 'coarse-dust':
+          return t('particle.scene.coarse-dust');
+        case 'mixed-activity':
+          return t('particle.scene.mixed-activity');
+        default:
+          return t('particle.scene.unavailable');
+      }
+    }
+    function particleGuidanceText(d) {
+      switch (particleSituationKey(d)) {
+        case 'background':
+          return t('particle.guidance.background');
+        case 'fine-source':
+          return t('particle.guidance.fine-source');
+        case 'fine-stale':
+          return t('particle.guidance.fine-stale');
+        case 'coarse-dust':
+          return t('particle.guidance.coarse-dust');
+        case 'mixed-activity':
+          return t('particle.guidance.mixed-activity');
+        default:
+          return t('particle.guidance.unavailable');
+      }
+    }
+    function particleSupportNotes(d) {
+      const parts = [];
+      const co2 = toFiniteNumber(d?.snapshot?.co2_ppm);
+      const humidity = toFiniteNumber(d?.snapshot?.humidity_rh);
+      const temperature = toFiniteNumber(d?.snapshot?.temperature_c);
+      const situation = particleSituationKey(d);
+      if (Number.isFinite(co2) && co2 > 1000) {
+        parts.push(t('particle.support.co2High', { value: Math.round(co2) }));
+      } else if (Number.isFinite(co2) && co2 > 0 && (situation === 'fine-source' || situation === 'background')) {
+        parts.push(t('particle.support.co2Low', { value: Math.round(co2) }));
+      }
+      if (Number.isFinite(humidity) && humidity < 35) {
+        parts.push(t('particle.support.rhLow', { value: Math.round(humidity) }));
+      } else if (Number.isFinite(humidity) && humidity > 60 &&
+        (situation === 'fine-source' || situation === 'fine-stale')) {
+        parts.push(t('particle.support.rhHighFine', { value: Math.round(humidity) }));
+      }
+      if (Number.isFinite(temperature) && temperature >= 27 &&
+        (situation === 'fine-stale' || situation === 'mixed-activity')) {
+        parts.push(t('particle.support.tempWarm', { value: temperature.toFixed(1) }));
+      } else if (Number.isFinite(temperature) && temperature <= 18 && situation === 'background') {
+        parts.push(t('particle.support.tempCool', { value: temperature.toFixed(1) }));
+      }
+      return parts;
+    }
+    function particleScienceText(d) {
+      const parsed = particleInsightData(d);
+      if (!parsed) return compactParticleNote(d?.snapshot?.particle_profile_note);
+      return t('particle.science', {
+        fineShare: parsed.fineShare.toFixed(0),
+        coarseShare: parsed.coarseShare.toFixed(0),
+        massBand: parsed.dominantMassBand,
+        countBand: parsed.dominantCountBand,
+        typicalSize: parsed.typicalSize.toFixed(2)
+      });
+    }
+    function particleSummaryTone(d) {
+      switch (particleSituationKey(d)) {
+        case 'background':
+          return 'good';
+        case 'fine-source':
+        case 'fine-stale':
+        case 'coarse-dust':
+        case 'mixed-activity':
+          return 'moderate';
+        default:
+          return 'neutral';
+      }
     }
     function particleProfileMeaning(key) {
       switch (key) {
@@ -3214,7 +3367,7 @@
       }
     }
     function particleProfileExplanation(d) {
-      const parsed = parseParticleInsight(d.snapshot.particle_profile_note);
+      const parsed = particleInsightData(d);
       const leading = particleProfileMeaning(d.snapshot.particle_profile_key);
       if (!parsed) return leading;
       return t('particle.explanation', {
@@ -3777,7 +3930,8 @@
       syncSps30State(d.snapshot.sps30_sleeping, d.diag.sps30_ready);
       syncStatusLedState(d.diag.status_led_enabled, d.diag.status_led_ready);
 
-      const particleInsight = parseParticleInsight(d.snapshot.particle_profile_note);
+      const particleInsight = particleInsightData(d);
+      const particleSupport = particleSupportNotes(d);
       particleMetricsEl.innerHTML = `<div class='particle-sections'>${[
         particleSection(t('particle.section.mass'), [
           particleCard('PM1.0', num(d.snapshot.pm1_0, 1, 'µg/m³'), t('particle.pm1Meta')),
@@ -3801,11 +3955,23 @@
         ])
       ].join('')}</div>`;
 
-      particleSummaryEl.innerHTML = compactSummaryBanner(
-        translate(profileLabels, d.snapshot.particle_profile),
-        particleProfileExplanation(d),
-        d.snapshot.particle_profile_key || 'neutral'
-      );
+      particleSummaryEl.innerHTML = [
+        compactSummaryBanner(
+          translate(profileLabels, d.snapshot.particle_profile),
+          particleProfileExplanation(d),
+          particleSummaryTone(d)
+        ),
+        summaryBanner(
+          `${t('particle.sceneTitle')} · ${translate(particleSituationLabels, d.snapshot.particle_situation, t('common.unavailable'))}`,
+          joinLocalized([particleSituationText(d), particleGuidanceText(d), ...particleSupport]),
+          particleSummaryTone(d)
+        ),
+        summaryBanner(
+          t('particle.scienceTitle'),
+          particleScienceText(d),
+          'neutral'
+        )
+      ].join('');
     }
 
     async function fetchStatus() {

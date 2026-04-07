@@ -143,7 +143,11 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"overall_air_quality_driver", "Composite Air Quality Driver", "overall_air_quality_driver", NULL, NULL, NULL, NULL, false},
     {"overall_air_quality_note", "Composite Air Quality Note", "overall_air_quality_note", NULL, NULL, NULL, NULL, false},
     {"particle_profile", "Particle Profile", "particle_profile", NULL, NULL, NULL, NULL, false},
+    {"particle_situation", "Particle Situation", "particle_situation", NULL, NULL, NULL, NULL, false},
     {"particle_profile_note", "Particle Profile Note", "particle_profile_note", NULL, NULL, NULL, NULL, false},
+    {"particle_advice", "Particle Advice", "particle_advice", NULL, NULL, NULL, NULL, false},
+    {"particle_fine_share_pct", "PM2.5 Share of PM10", "particle_fine_share_pct", "%", NULL, "measurement", NULL, false},
+    {"particle_coarse_share_pct", "PM10-2.5 Share of PM10", "particle_coarse_share_pct", "%", NULL, "measurement", NULL, false},
     {"particles_0_5um", "Particles <0.5µm", "particles_0_5um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_1_0um", "Particles <1.0µm", "particles_1_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"particles_2_5um", "Particles <2.5µm", "particles_2_5um", "#/cm³", NULL, "measurement", NULL, false},
@@ -164,7 +168,8 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"us_aqi_level_key", "PM AQI Estimate Level Key", "us_aqi_level_key", NULL, NULL, NULL, "diagnostic", false},
     {"overall_air_quality_key", "Composite Air Quality Key", "overall_air_quality_key", NULL, NULL, NULL, "diagnostic", false},
     {"particle_profile_key", "Particle Profile Key", "particle_profile_key", NULL, NULL, NULL, "diagnostic", false},
-};
+    {"particle_situation_key", "Particle Situation Key", "particle_situation_key", NULL, NULL, NULL, "diagnostic", false},
+    };
 
 static const binary_sensor_entity_t BINARY_SENSOR_ENTITIES[] = {
     {"provisioning_mode", "Provisioning Mode", "provisioning_mode", "running", "diagnostic", true},
@@ -769,8 +774,28 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNumberToObject(state, "pm2_5", snapshot->pm2_5);
         cJSON_AddNumberToObject(state, "pm4_0", snapshot->pm4_0);
         cJSON_AddNumberToObject(state, "pm10_0", snapshot->pm10_0);
-        cJSON_AddStringToObject(state, "particle_profile", air_quality_particle_profile_label(particle.profile));
-        cJSON_AddStringToObject(state, "particle_profile_note", particle.note[0] ? particle.note : "Unavailable");
+        if (particle.valid) {
+            cJSON_AddStringToObject(state, "particle_profile", air_quality_particle_profile_label(particle.profile));
+            cJSON_AddStringToObject(state, "particle_situation", air_quality_particle_situation_label(particle.situation));
+            cJSON_AddStringToObject(state, "particle_profile_note", particle.note[0] ? particle.note : "Unavailable");
+            cJSON_AddStringToObject(state, "particle_advice", particle.advice[0] ? particle.advice : "Unavailable");
+            cJSON_AddNumberToObject(state, "particle_fine_share_pct", particle.fine_share_pct);
+            cJSON_AddNumberToObject(state, "particle_coarse_share_pct", particle.coarse_share_pct);
+            cJSON_AddStringToObject(state, "particle_dominant_mass_band", particle.dominant_mass_band);
+            cJSON_AddStringToObject(state, "particle_dominant_count_band", particle.dominant_count_band);
+            cJSON_AddStringToObject(state, "particle_situation_key", air_quality_particle_situation_key(particle.situation));
+        } else {
+            cJSON_AddNullToObject(state, "particle_profile");
+            cJSON_AddNullToObject(state, "particle_situation");
+            cJSON_AddNullToObject(state, "particle_profile_note");
+            cJSON_AddNullToObject(state, "particle_advice");
+            cJSON_AddNullToObject(state, "particle_fine_share_pct");
+            cJSON_AddNullToObject(state, "particle_coarse_share_pct");
+            cJSON_AddNullToObject(state, "particle_dominant_mass_band");
+            cJSON_AddNullToObject(state, "particle_dominant_count_band");
+            cJSON_AddStringToObject(state, "particle_situation_key",
+                                    air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
+        }
         cJSON_AddNumberToObject(state, "particles_0_5um", snapshot->particles_0_5um);
         cJSON_AddNumberToObject(state, "particles_1_0um", snapshot->particles_1_0um);
         cJSON_AddNumberToObject(state, "particles_2_5um", snapshot->particles_2_5um);
@@ -783,7 +808,14 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         cJSON_AddNullToObject(state, "pm4_0");
         cJSON_AddNullToObject(state, "pm10_0");
         cJSON_AddNullToObject(state, "particle_profile");
+        cJSON_AddNullToObject(state, "particle_situation");
         cJSON_AddNullToObject(state, "particle_profile_note");
+        cJSON_AddNullToObject(state, "particle_advice");
+        cJSON_AddNullToObject(state, "particle_fine_share_pct");
+        cJSON_AddNullToObject(state, "particle_coarse_share_pct");
+        cJSON_AddNullToObject(state, "particle_dominant_mass_band");
+        cJSON_AddNullToObject(state, "particle_dominant_count_band");
+        cJSON_AddStringToObject(state, "particle_situation_key", air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
         cJSON_AddNullToObject(state, "particles_0_5um");
         cJSON_AddNullToObject(state, "particles_1_0um");
         cJSON_AddNullToObject(state, "particles_2_5um");
