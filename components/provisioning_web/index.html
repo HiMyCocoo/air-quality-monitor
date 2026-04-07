@@ -194,6 +194,77 @@
       line-height: 1.45;
     }
 
+    /* Unified Air Insight Card */
+    .air-insight-unified {
+      padding: 22px 24px;
+      border-radius: 16px;
+      margin-bottom: 18px;
+      margin-top: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+    .air-insight-unified .insight-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .air-insight-unified .insight-desc {
+      font-size: 0.95rem;
+      line-height: 1.65;
+      margin-bottom: 14px;
+      opacity: 0.92;
+    }
+    .air-insight-indicators {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .insight-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.5);
+      font-size: 0.88rem;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .insight-chip .chip-label {
+      font-weight: 600;
+      opacity: 0.7;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .insight-chip .chip-value {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .insight-chip .chip-meta {
+      opacity: 0.75;
+      font-size: 0.8rem;
+    }
+    .insight-chip-unavailable {
+      opacity: 0.45;
+    }
+    .air-insight-guidance {
+      font-size: 0.92rem;
+      padding: 10px 0 6px;
+      line-height: 1.55;
+      opacity: 0.88;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .air-insight-reference {
+      font-size: 0.82rem;
+      opacity: 0.6;
+      padding-top: 8px;
+      line-height: 1.45;
+    }
+
     .summary-good {
       background: linear-gradient(135deg, var(--bg-good) 0%, #c6f6d5 100%);
       color: var(--color-good);
@@ -1633,6 +1704,20 @@
         font-size: 0.98rem;
       }
 
+      .air-insight-unified {
+        padding: 18px 20px;
+      }
+      .air-insight-unified .insight-title {
+        font-size: 1.05rem;
+      }
+      .air-insight-indicators {
+        gap: 8px;
+      }
+      .insight-chip {
+        padding: 5px 12px;
+        font-size: 0.84rem;
+      }
+
       .metric {
         padding: 18px;
       }
@@ -1851,6 +1936,39 @@
 
       .summary-banner-compact strong {
         white-space: normal;
+      }
+
+      .air-insight-unified {
+        padding: 14px 16px;
+        margin-top: 10px;
+        margin-bottom: 14px;
+      }
+      .air-insight-unified .insight-title {
+        font-size: 0.98rem;
+        margin-bottom: 8px;
+      }
+      .air-insight-unified .insight-desc {
+        font-size: 0.88rem;
+        margin-bottom: 10px;
+      }
+      .air-insight-indicators {
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .insight-chip {
+        padding: 4px 10px;
+        font-size: 0.82rem;
+        gap: 4px;
+      }
+      .insight-chip .chip-value {
+        font-size: 0.9rem;
+      }
+      .air-insight-guidance {
+        font-size: 0.85rem;
+        padding: 8px 0 4px;
+      }
+      .air-insight-reference {
+        font-size: 0.78rem;
       }
 
       .metric {
@@ -2240,8 +2358,8 @@
           <div id="airMetricsSecondary" class="air-metrics-secondary"></div>
           <section class="particle-overview">
             <h3 data-i18n="realtime.particleProfileTitle">颗粒物画像</h3>
-            <div id="particleMetrics" class="particle-grid"></div>
             <div id="particleSummary"></div>
+            <div id="particleMetrics" class="particle-grid"></div>
           </section>
         </section>
 
@@ -2707,6 +2825,19 @@
         'particle.support.tempWarm': '温度 {value}°C 偏高，体感会更闷。',
         'particle.support.tempCool': '温度 {value}°C 已经偏低，通风时注意别让房间继续变冷。',
         'particle.science': 'PM2.5 占 PM10 的 {fineShare}%，PM10-2.5 占 {coarseShare}%；质量主峰在 {massBand}，数量主峰在 {countBand}，典型粒径 {typicalSize} µm。',
+        'particle.insightTitle': '空气状况分析',
+        'particle.simpleScene.background': '空气良好，颗粒物处于日常室内背景水平，无需担心。',
+        'particle.simpleScene.fine-source': '细颗粒偏高，可能来自烹饪油烟、燃烧或室外污染输入。',
+        'particle.simpleScene.fine-stale': '细颗粒正在室内累积，通风可能不足。',
+        'particle.simpleScene.coarse-dust': '灰尘或粗颗粒偏高，可能与走动、清扫或室外扬尘有关。',
+        'particle.simpleScene.mixed-activity': '细颗粒和粗颗粒同时偏高，室内活动与室外输入共同影响。',
+        'particle.simpleScene.unavailable': '正在采集数据，稍后即可查看分析。',
+        'particle.simpleGuidance.background': '保持日常通风即可，无需额外处理。',
+        'particle.simpleGuidance.fine-source': '开启油烟机或净化器，减少污染源。',
+        'particle.simpleGuidance.fine-stale': '建议短时通风换气，排出累积的颗粒和 CO₂。',
+        'particle.simpleGuidance.coarse-dust': '建议湿拖或 HEPA 吸尘，避免干扫扬尘。',
+        'particle.simpleGuidance.mixed-activity': '先短时通风，再清洁地面减少二次扬尘。',
+        'particle.simpleGuidance.unavailable': '等待数据稳定后再做处理。',
         'wifi.waitingProvisioning': '等待配网',
         'co2Comp.bmp390': 'BMP390 动态气压',
         'co2Comp.altitude': 'SCD41 海拔补偿',
@@ -2952,6 +3083,19 @@
         'particle.support.tempWarm': 'Temperature {value}°C makes the room feel warmer and stuffier.',
         'particle.support.tempCool': 'Temperature {value}°C is already on the cool side, so avoid over-ventilating for too long.',
         'particle.science': 'PM2.5 accounts for {fineShare}% of PM10 and PM10-2.5 accounts for {coarseShare}%. Mass peaks at {massBand}, counts peak at {countBand}, and typical size is {typicalSize} µm.',
+        'particle.insightTitle': 'Air Quality Analysis',
+        'particle.simpleScene.background': 'Air is clean. Particles are at normal indoor background levels.',
+        'particle.simpleScene.fine-source': 'Fine particles are elevated, likely from cooking, combustion, or outdoor pollution.',
+        'particle.simpleScene.fine-stale': 'Fine particles are building up indoors due to limited fresh air exchange.',
+        'particle.simpleScene.coarse-dust': 'Dust or coarse particles are elevated, likely from movement, cleaning, or outdoor sources.',
+        'particle.simpleScene.mixed-activity': 'Both fine and coarse particles are elevated from indoor activity and outdoor input.',
+        'particle.simpleScene.unavailable': 'Collecting data. Analysis will be available shortly.',
+        'particle.simpleGuidance.background': 'Maintain routine ventilation. No extra action needed.',
+        'particle.simpleGuidance.fine-source': 'Run the range hood or air purifier to reduce the source.',
+        'particle.simpleGuidance.fine-stale': 'Open windows briefly to flush out accumulated particles and CO₂.',
+        'particle.simpleGuidance.coarse-dust': 'Use damp mopping or HEPA vacuum instead of dry sweeping.',
+        'particle.simpleGuidance.mixed-activity': 'Ventilate briefly, then clean floors and surfaces.',
+        'particle.simpleGuidance.unavailable': 'Wait for stable data before taking action.',
         'wifi.waitingProvisioning': 'Waiting for provisioning',
         'co2Comp.bmp390': 'BMP390 dynamic pressure',
         'co2Comp.altitude': 'SCD41 altitude compensation',
@@ -3411,6 +3555,53 @@
         .replace(/。$/, '')
         .replace(/^以/, '')
         .replace(/为主，常见于/, '，常见于');
+    }
+    function simpleSituationText(d) {
+      switch (particleSituationKey(d)) {
+        case 'background': return t('particle.simpleScene.background');
+        case 'fine-source': return t('particle.simpleScene.fine-source');
+        case 'fine-stale': return t('particle.simpleScene.fine-stale');
+        case 'coarse-dust': return t('particle.simpleScene.coarse-dust');
+        case 'mixed-activity': return t('particle.simpleScene.mixed-activity');
+        default: return t('particle.simpleScene.unavailable');
+      }
+    }
+    function simpleGuidanceText(d) {
+      switch (particleSituationKey(d)) {
+        case 'background': return t('particle.simpleGuidance.background');
+        case 'fine-source': return t('particle.simpleGuidance.fine-source');
+        case 'fine-stale': return t('particle.simpleGuidance.fine-stale');
+        case 'coarse-dust': return t('particle.simpleGuidance.coarse-dust');
+        case 'mixed-activity': return t('particle.simpleGuidance.mixed-activity');
+        default: return t('particle.simpleGuidance.unavailable');
+      }
+    }
+    function insightChip(label, value, meta, tone) {
+      const cls = tone === 'unavailable' ? ' insight-chip-unavailable' : '';
+      return `<div class="insight-chip${cls}"><span class="chip-label">${label}</span><span class="chip-value">${value}</span><span class="chip-meta">${meta}</span></div>`;
+    }
+    function renderAirInsightCard(d, vocMetric, noxMetric) {
+      const tone = particleSummaryTone(d);
+      const situationLabel = translate(particleSituationLabels, d.snapshot.particle_situation, t('common.unavailable'));
+      const descText = simpleSituationText(d);
+      const guidanceText = simpleGuidanceText(d);
+      const scienceText = particleScienceText(d);
+      const support = particleSupportNotes(d);
+      const supportHtml = support.length
+        ? `<p class="insight-desc" style="margin-bottom:6px;opacity:0.82;font-size:0.9rem">${support.join(currentLanguage === 'zh-CN' ? '；' : '; ')}</p>`
+        : '';
+      const chips = [
+        insightChip('VOC', vocMetric.value, vocMetric.meta, vocMetric.tone),
+        insightChip('NOx', noxMetric.value, noxMetric.meta, noxMetric.tone)
+      ];
+      return `<div class="air-insight-unified summary-${tone}">` +
+        `<div class="insight-title">${t('particle.insightTitle')} · ${situationLabel}</div>` +
+        `<p class="insight-desc">${descText}</p>` +
+        `<div class="air-insight-indicators">${chips.join('')}</div>` +
+        supportHtml +
+        `<div class="air-insight-guidance">💡 ${guidanceText}</div>` +
+        (scienceText ? `<div class="air-insight-reference">📊 ${scienceText}</div>` : '') +
+        `</div>`;
     }
 
     function wifiStatus(d) {
@@ -3955,23 +4146,7 @@
         ])
       ].join('')}</div>`;
 
-      particleSummaryEl.innerHTML = [
-        compactSummaryBanner(
-          translate(profileLabels, d.snapshot.particle_profile),
-          particleProfileExplanation(d),
-          particleSummaryTone(d)
-        ),
-        summaryBanner(
-          `${t('particle.sceneTitle')} · ${translate(particleSituationLabels, d.snapshot.particle_situation, t('common.unavailable'))}`,
-          joinLocalized([particleSituationText(d), particleGuidanceText(d), ...particleSupport]),
-          particleSummaryTone(d)
-        ),
-        summaryBanner(
-          t('particle.scienceTitle'),
-          particleScienceText(d),
-          'neutral'
-        )
-      ].join('');
+      particleSummaryEl.innerHTML = renderAirInsightCard(d, vocMetric, noxMetric);
     }
 
     async function fetchStatus() {
