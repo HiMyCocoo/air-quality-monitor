@@ -461,7 +461,13 @@ static void handle_command(const char *topic, int topic_len, const char *data, i
     } else if (CMD_IS("scd41_frc_reference_ppm")) {
         uint32_t ppm = (uint32_t)strtoul(payload, NULL, 10);
         if (ppm >= 400 && ppm <= 2000) {
-            s_ctx.frc_reference_ppm = (uint16_t)ppm;
+            esp_err_t err = ESP_OK;
+            if (s_ctx.callbacks.set_scd41_frc_reference_requested != NULL) {
+                err = s_ctx.callbacks.set_scd41_frc_reference_requested((uint16_t)ppm, s_ctx.user_ctx);
+            }
+            if (err == ESP_OK) {
+                s_ctx.frc_reference_ppm = (uint16_t)ppm;
+            }
         }
     } else if (CMD_IS("apply_scd41_frc")) {
         if (s_ctx.callbacks.apply_scd41_frc_requested != NULL && strcmp(payload, "PRESS") == 0) {
@@ -561,6 +567,11 @@ esp_err_t mqtt_ha_start(const device_config_t *config,
         .credentials.authentication.password = config->mqtt_password[0] ? config->mqtt_password : NULL,
         .credentials.client_id = device_id,
         .session.keepalive = 60,
+        .session.last_will.topic = s_ctx.availability_topic,
+        .session.last_will.msg = "offline",
+        .session.last_will.msg_len = 0,
+        .session.last_will.qos = 1,
+        .session.last_will.retain = true,
         .network.timeout_ms = 10000,
         .network.reconnect_timeout_ms = 5000,
     };

@@ -461,6 +461,21 @@ static esp_err_t app_request_set_scd41_asc(bool enabled, void *user_ctx)
     return ESP_OK;
 }
 
+static esp_err_t app_request_set_frc_reference(uint16_t ppm, void *user_ctx)
+{
+    (void)user_ctx;
+    if (ppm < 400 || ppm > 2000) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(s_app.lock, portMAX_DELAY);
+    s_app.frc_reference_ppm = ppm;
+    mqtt_ha_set_control_state(s_app.config.scd41_asc_enabled, s_app.frc_reference_ppm);
+    s_app.publish_now = true;
+    xSemaphoreGive(s_app.lock);
+    return ESP_OK;
+}
+
 static esp_err_t app_request_set_sps30_sleep(bool sleep, void *user_ctx)
 {
     (void)user_ctx;
@@ -513,12 +528,7 @@ static esp_err_t app_request_apply_frc(uint16_t ppm, void *user_ctx)
     if (err != ESP_OK) {
         return err;
     }
-    xSemaphoreTake(s_app.lock, portMAX_DELAY);
-    s_app.frc_reference_ppm = ppm;
-    mqtt_ha_set_control_state(s_app.config.scd41_asc_enabled, s_app.frc_reference_ppm);
-    s_app.publish_now = true;
-    xSemaphoreGive(s_app.lock);
-    return ESP_OK;
+    return app_request_set_frc_reference(ppm, user_ctx);
 }
 
 static void app_mqtt_connected(void *user_ctx)
@@ -579,6 +589,7 @@ static esp_err_t app_start_mqtt(void)
         .factory_reset_requested = app_request_factory_reset,
         .republish_requested = app_request_republish,
         .set_scd41_asc_requested = app_request_set_scd41_asc,
+        .set_scd41_frc_reference_requested = app_request_set_frc_reference,
         .set_sps30_sleep_requested = app_request_set_sps30_sleep,
         .start_sps30_fan_cleaning_requested = app_request_start_sps30_fan_cleaning,
         .set_status_led_requested = app_request_set_status_led,

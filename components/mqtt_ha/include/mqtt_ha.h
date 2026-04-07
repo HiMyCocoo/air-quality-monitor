@@ -12,6 +12,7 @@ typedef struct {
     void (*factory_reset_requested)(void *user_ctx);
     void (*republish_requested)(void *user_ctx);
     esp_err_t (*set_scd41_asc_requested)(bool enabled, void *user_ctx);
+    esp_err_t (*set_scd41_frc_reference_requested)(uint16_t ppm, void *user_ctx);
     esp_err_t (*set_sps30_sleep_requested)(bool sleep, void *user_ctx);
     esp_err_t (*start_sps30_fan_cleaning_requested)(void *user_ctx);
     esp_err_t (*set_status_led_requested)(bool enabled, void *user_ctx);
