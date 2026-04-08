@@ -8,8 +8,8 @@
 #include <string.h>
 #include <strings.h>
 
-#include "air_quality.h"
 #include "cJSON.h"
+#include "device_state_json.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -676,182 +676,19 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
         return ESP_ERR_INVALID_ARG;
     }
 
-    air_quality_assessment_t assessment = {0};
-    air_quality_compute_overall_assessment(snapshot, &assessment);
-    air_quality_particle_insight_t particle = {0};
-    air_quality_compute_particle_insight(snapshot, &particle);
-    air_quality_rain_analysis_t rain = {0};
-    air_quality_analyze_rain(snapshot, &rain);
-    air_quality_signal_level_t co2_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
-    air_quality_signal_level_t voc_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
-    air_quality_signal_level_t nox_rating = AIR_QUALITY_SIGNAL_UNAVAILABLE;
-    const char *temperature_rating = "Unavailable";
-    const char *humidity_rating = "Unavailable";
-
     cJSON *state = cJSON_CreateObject();
-    cJSON_AddBoolToObject(state, "scd41_valid", snapshot->scd41_valid);
-    cJSON_AddBoolToObject(state, "sgp41_valid", snapshot->sgp41_valid);
-    cJSON_AddBoolToObject(state, "sgp41_conditioning", snapshot->sgp41_conditioning);
-    cJSON_AddBoolToObject(state, "sgp41_voc_valid", snapshot->sgp41_voc_valid);
-    cJSON_AddBoolToObject(state, "sgp41_nox_valid", snapshot->sgp41_nox_valid);
-    cJSON_AddBoolToObject(state, "bmp390_valid", snapshot->bmp390_valid);
-    cJSON_AddBoolToObject(state, "pm_valid", snapshot->pm_valid);
-    cJSON_AddStringToObject(state, "co2_compensation_source",
-                            co2_compensation_source_key(snapshot->co2_compensation_source));
-    cJSON_AddNumberToObject(state,
-                            "sgp41_voc_stabilization_remaining_s",
-                            snapshot->sgp41_voc_stabilization_remaining_s);
-    cJSON_AddNumberToObject(state,
-                            "sgp41_nox_stabilization_remaining_s",
-                            snapshot->sgp41_nox_stabilization_remaining_s);
-    if (snapshot->scd41_valid) {
-        co2_rating = air_quality_rate_co2(snapshot->co2_ppm);
-        temperature_rating = air_quality_rate_temperature_label(snapshot->temperature_c);
-        humidity_rating = air_quality_rate_humidity_label(snapshot->humidity_rh);
-        cJSON_AddNumberToObject(state, "co2", snapshot->co2_ppm);
-        cJSON_AddStringToObject(state, "co2_rating", air_quality_co2_ventilation_label(co2_rating));
-        cJSON_AddNumberToObject(state, "temperature", snapshot->temperature_c);
-        cJSON_AddStringToObject(state, "temperature_rating", temperature_rating);
-        cJSON_AddNumberToObject(state, "humidity", snapshot->humidity_rh);
-        cJSON_AddStringToObject(state, "humidity_rating", humidity_rating);
-    } else {
-        cJSON_AddNullToObject(state, "co2");
-        cJSON_AddNullToObject(state, "co2_rating");
-        cJSON_AddNullToObject(state, "temperature");
-        cJSON_AddNullToObject(state, "temperature_rating");
-        cJSON_AddNullToObject(state, "humidity");
-        cJSON_AddNullToObject(state, "humidity_rating");
-    }
-    if (snapshot->humidity_trend_valid) {
-        cJSON_AddNumberToObject(state, "humidity_trend_rh_3h", snapshot->humidity_trend_rh_3h);
-        cJSON_AddNumberToObject(state, "humidity_trend_span_min", snapshot->humidity_trend_span_min);
-    } else {
-        cJSON_AddNullToObject(state, "humidity_trend_rh_3h");
-        cJSON_AddNullToObject(state, "humidity_trend_span_min");
-    }
-    if (snapshot->sgp41_voc_valid) {
-        voc_rating = air_quality_rate_voc_index(snapshot->voc_index);
-        cJSON_AddNumberToObject(state, "voc_index", snapshot->voc_index);
-        cJSON_AddStringToObject(state, "voc_rating", air_quality_voc_event_label(voc_rating));
-    } else {
-        cJSON_AddNullToObject(state, "voc_index");
-        cJSON_AddNullToObject(state, "voc_rating");
-    }
-    if (snapshot->sgp41_nox_valid) {
-        nox_rating = air_quality_rate_nox_index(snapshot->nox_index);
-        cJSON_AddNumberToObject(state, "nox_index", snapshot->nox_index);
-        cJSON_AddStringToObject(state, "nox_rating", air_quality_nox_event_label(nox_rating));
-    } else {
-        cJSON_AddNullToObject(state, "nox_index");
-        cJSON_AddNullToObject(state, "nox_rating");
-    }
-    if (snapshot->bmp390_valid) {
-        cJSON_AddNumberToObject(state, "bmp390_temperature", snapshot->bmp390_temperature_c);
-        cJSON_AddNumberToObject(state, "pressure", snapshot->pressure_hpa);
-    } else {
-        cJSON_AddNullToObject(state, "bmp390_temperature");
-        cJSON_AddNullToObject(state, "pressure");
-    }
-    if (snapshot->pressure_trend_valid) {
-        cJSON_AddNumberToObject(state, "pressure_trend_hpa_3h", snapshot->pressure_trend_hpa_3h);
-        cJSON_AddNumberToObject(state, "pressure_trend_span_min", snapshot->pressure_trend_span_min);
-    } else {
-        cJSON_AddNullToObject(state, "pressure_trend_hpa_3h");
-        cJSON_AddNullToObject(state, "pressure_trend_span_min");
-    }
-    if (rain.dew_point_spread_valid) {
-        cJSON_AddNumberToObject(state, "dew_point_spread_c", rain.dew_point_spread_c);
-    } else {
-        cJSON_AddNullToObject(state, "dew_point_spread_c");
-    }
-    cJSON_AddStringToObject(state, "pressure_trend", air_quality_pressure_trend_label(rain.pressure_trend));
-    cJSON_AddStringToObject(state, "pressure_trend_key", air_quality_pressure_trend_key(rain.pressure_trend));
-    cJSON_AddStringToObject(state, "rain_outlook", air_quality_rain_outlook_label(rain.outlook));
-    cJSON_AddStringToObject(state, "rain_outlook_key", air_quality_rain_outlook_key(rain.outlook));
-    cJSON_AddStringToObject(state, "rain_season", air_quality_rain_season_label(rain.season));
-    cJSON_AddStringToObject(state, "rain_season_key", air_quality_rain_season_key(rain.season));
-    cJSON_AddStringToObject(state, "rain_basis", rain.basis[0] ? rain.basis : "Unavailable");
-    if (snapshot->pm_valid) {
-        cJSON_AddNumberToObject(state, "pm1_0", snapshot->pm1_0);
-        cJSON_AddNumberToObject(state, "pm2_5", snapshot->pm2_5);
-        cJSON_AddNumberToObject(state, "pm4_0", snapshot->pm4_0);
-        cJSON_AddNumberToObject(state, "pm10_0", snapshot->pm10_0);
-        if (particle.valid) {
-            cJSON_AddStringToObject(state, "particle_profile", air_quality_particle_profile_label(particle.profile));
-            cJSON_AddStringToObject(state, "particle_situation", air_quality_particle_situation_label(particle.situation));
-            cJSON_AddStringToObject(state, "particle_profile_note", particle.note[0] ? particle.note : "Unavailable");
-            cJSON_AddStringToObject(state, "particle_advice", particle.advice[0] ? particle.advice : "Unavailable");
-            cJSON_AddNumberToObject(state, "particle_fine_share_pct", particle.fine_share_pct);
-            cJSON_AddNumberToObject(state, "particle_coarse_share_pct", particle.coarse_share_pct);
-            cJSON_AddStringToObject(state, "particle_dominant_mass_band", particle.dominant_mass_band);
-            cJSON_AddStringToObject(state, "particle_dominant_count_band", particle.dominant_count_band);
-            cJSON_AddStringToObject(state, "particle_situation_key", air_quality_particle_situation_key(particle.situation));
-        } else {
-            cJSON_AddNullToObject(state, "particle_profile");
-            cJSON_AddNullToObject(state, "particle_situation");
-            cJSON_AddNullToObject(state, "particle_profile_note");
-            cJSON_AddNullToObject(state, "particle_advice");
-            cJSON_AddNullToObject(state, "particle_fine_share_pct");
-            cJSON_AddNullToObject(state, "particle_coarse_share_pct");
-            cJSON_AddNullToObject(state, "particle_dominant_mass_band");
-            cJSON_AddNullToObject(state, "particle_dominant_count_band");
-            cJSON_AddStringToObject(state, "particle_situation_key",
-                                    air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
-        }
-        cJSON_AddNumberToObject(state, "particles_0_5um", snapshot->particles_0_5um);
-        cJSON_AddNumberToObject(state, "particles_1_0um", snapshot->particles_1_0um);
-        cJSON_AddNumberToObject(state, "particles_2_5um", snapshot->particles_2_5um);
-        cJSON_AddNumberToObject(state, "particles_4_0um", snapshot->particles_4_0um);
-        cJSON_AddNumberToObject(state, "particles_10_0um", snapshot->particles_10_0um);
-        cJSON_AddNumberToObject(state, "typical_particle_size_um", snapshot->typical_particle_size_um);
-    } else {
-        cJSON_AddNullToObject(state, "pm1_0");
-        cJSON_AddNullToObject(state, "pm2_5");
-        cJSON_AddNullToObject(state, "pm4_0");
-        cJSON_AddNullToObject(state, "pm10_0");
-        cJSON_AddNullToObject(state, "particle_profile");
-        cJSON_AddNullToObject(state, "particle_situation");
-        cJSON_AddNullToObject(state, "particle_profile_note");
-        cJSON_AddNullToObject(state, "particle_advice");
-        cJSON_AddNullToObject(state, "particle_fine_share_pct");
-        cJSON_AddNullToObject(state, "particle_coarse_share_pct");
-        cJSON_AddNullToObject(state, "particle_dominant_mass_band");
-        cJSON_AddNullToObject(state, "particle_dominant_count_band");
-        cJSON_AddStringToObject(state, "particle_situation_key", air_quality_particle_situation_key(AIR_QUALITY_PARTICLE_SITUATION_UNAVAILABLE));
-        cJSON_AddNullToObject(state, "particles_0_5um");
-        cJSON_AddNullToObject(state, "particles_1_0um");
-        cJSON_AddNullToObject(state, "particles_2_5um");
-        cJSON_AddNullToObject(state, "particles_4_0um");
-        cJSON_AddNullToObject(state, "particles_10_0um");
-        cJSON_AddNullToObject(state, "typical_particle_size_um");
-    }
-    if (assessment.us_aqi.valid) {
-        cJSON_AddNumberToObject(state, "us_aqi", assessment.us_aqi.aqi);
-        cJSON_AddStringToObject(state, "us_aqi_level", air_quality_category_label(assessment.us_aqi.category));
-        cJSON_AddStringToObject(state, "us_aqi_level_key", air_quality_category_key(assessment.us_aqi.category));
-        cJSON_AddStringToObject(state, "us_aqi_primary_pollutant", air_quality_pollutant_label(assessment.us_aqi.dominant_pollutant));
-    } else {
-        cJSON_AddNullToObject(state, "us_aqi");
-        cJSON_AddNullToObject(state, "us_aqi_level");
-        cJSON_AddStringToObject(state, "us_aqi_level_key", air_quality_category_key(AIR_QUALITY_CATEGORY_UNKNOWN));
-        cJSON_AddNullToObject(state, "us_aqi_primary_pollutant");
-    }
-    if (assessment.valid) {
-        cJSON_AddStringToObject(state, "overall_air_quality", air_quality_category_label(assessment.category));
-        cJSON_AddStringToObject(state, "overall_air_quality_key", air_quality_category_key(assessment.category));
-        cJSON_AddStringToObject(state, "overall_air_quality_driver", air_quality_factor_label(assessment.dominant_factor));
-    } else {
-        cJSON_AddNullToObject(state, "overall_air_quality");
-        cJSON_AddStringToObject(state, "overall_air_quality_key", air_quality_category_key(AIR_QUALITY_CATEGORY_UNKNOWN));
-        cJSON_AddNullToObject(state, "overall_air_quality_driver");
-    }
-    cJSON_AddStringToObject(state, "overall_air_quality_basis", assessment.basis[0] ? assessment.basis : "Unavailable");
-    cJSON_AddStringToObject(state, "overall_air_quality_note", assessment.note[0] ? assessment.note : "Unavailable");
-    cJSON_AddStringToObject(state, "particle_profile_key", air_quality_particle_profile_key(particle.profile));
-    cJSON_AddBoolToObject(state, "sps30_sleeping", snapshot->sps30_sleeping);
-    cJSON_AddBoolToObject(state, "scd41_asc_enabled", s_ctx.scd41_asc_enabled);
-    cJSON_AddBoolToObject(state, "status_led_enabled", diag->status_led_enabled);
-    cJSON_AddNumberToObject(state, "scd41_frc_reference_ppm", s_ctx.frc_reference_ppm);
+    device_state_json_options_t state_options = {
+        .include_control_state = true,
+        .status_led_enabled = diag->status_led_enabled,
+        .scd41_asc_enabled = s_ctx.scd41_asc_enabled,
+        .scd41_frc_reference_ppm = s_ctx.frc_reference_ppm,
+    };
+    ESP_RETURN_ON_ERROR(device_state_json_build_sensor_state(state,
+                                                             snapshot,
+                                                             DEVICE_STATE_JSON_PROFILE_MQTT,
+                                                             &state_options),
+                        TAG,
+                        "state json build failed");
 
     cJSON *diag_json = cJSON_CreateObject();
     int64_t now_ms = esp_timer_get_time() / 1000;

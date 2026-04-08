@@ -9,10 +9,22 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 
+#if defined(__has_include)
+#if __has_include("platform_config_local.h")
+#include "platform_config_local.h"
+#endif
+#endif
+
 #define CONFIG_NAMESPACE "airmon_cfg"
 #define CONFIG_KEY "config"
-#define DEFAULT_WIFI_SSID ""
-#define DEFAULT_WIFI_PASSWORD ""
+
+#ifndef AIRMON_LOCAL_DEFAULT_WIFI_SSID
+#define AIRMON_LOCAL_DEFAULT_WIFI_SSID ""
+#endif
+
+#ifndef AIRMON_LOCAL_DEFAULT_WIFI_PASSWORD
+#define AIRMON_LOCAL_DEFAULT_WIFI_PASSWORD ""
+#endif
 
 static const char *TAG = "platform_config";
 
@@ -58,8 +70,8 @@ void platform_config_apply_defaults(device_config_t *config, const char *device_
 {
     memset(config, 0, sizeof(*config));
     config->version = DEVICE_CONFIG_VERSION;
-    strlcpy(config->wifi_ssid, DEFAULT_WIFI_SSID, sizeof(config->wifi_ssid));
-    strlcpy(config->wifi_password, DEFAULT_WIFI_PASSWORD, sizeof(config->wifi_password));
+    strlcpy(config->wifi_ssid, AIRMON_LOCAL_DEFAULT_WIFI_SSID, sizeof(config->wifi_ssid));
+    strlcpy(config->wifi_password, AIRMON_LOCAL_DEFAULT_WIFI_PASSWORD, sizeof(config->wifi_password));
     config->mqtt_port = 1883;
     config->publish_interval_sec = CONFIG_AIRMON_PUBLISH_INTERVAL_DEFAULT;
     config->scd41_asc_enabled = false;
