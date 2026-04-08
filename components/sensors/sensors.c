@@ -50,12 +50,12 @@
 static const char *TAG = "sensors";
 
 typedef struct {
-    bool running;
-    bool scd41_initialized;
-    bool sgp41_initialized;
-    bool bmp390_initialized;
-    bool sps30_initialized;
-    bool sps30_sleeping;
+    volatile bool running;
+    volatile bool scd41_initialized;
+    volatile bool sgp41_initialized;
+    volatile bool bmp390_initialized;
+    volatile bool sps30_initialized;
+    volatile bool sps30_sleeping;
     TaskHandle_t task_handle;
     SemaphoreHandle_t lock;
     sensor_snapshot_t snapshot;
@@ -1766,7 +1766,7 @@ void sensors_stop(void)
 {
     if (s_ctx.running) {
         s_ctx.running = false;
-        for (int i = 0; i < 150 && s_ctx.task_handle != NULL; ++i) {
+        for (int i = 0; i < 300 && s_ctx.task_handle != NULL; ++i) {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }

@@ -94,6 +94,28 @@ config AIRMON_AP_FALLBACK_TIMEOUT_SEC
 config AIRMON_AP_SSID_PREFIX
     string "SoftAP SSID prefix"
     default "airmon"
+    help
+        The SoftAP used for BLE provisioning fallback uses open
+        authentication (no password). Any device in range can connect
+        to the AP while it is active. This is acceptable for most home
+        setups but should be considered before deploying in shared spaces.
+
+config AIRMON_TIMEZONE
+    string "POSIX timezone string"
+    default "CST-8"
+    help
+        POSIX TZ string applied at boot via setenv(TZ). Examples:
+        CST-8 for China/Shanghai, CET-1CEST for Central Europe,
+        EST5EDT for US Eastern. Used for NTP time display and
+        seasonal rain analysis.
+
+config AIRMON_NTP_SERVER_PRIMARY
+    string "Primary NTP server"
+    default "ntp.aliyun.com"
+
+config AIRMON_NTP_SERVER_BACKUP
+    string "Backup NTP server"
+    default "pool.ntp.org"
 
 config AIRMON_GITHUB_OTA_ENABLED
     bool "Enable GitHub OTA auto update"
@@ -115,6 +137,12 @@ config AIRMON_GITHUB_AUTH_TOKEN
     help
         Optional GitHub token used to access private repositories and
         private release assets. Leave empty for public repositories.
+
+        SECURITY WARNING: This token is compiled into the firmware
+        binary. If the firmware image is distributed or the OTA asset
+        is publicly accessible, the token may be extracted. Use a
+        fine-grained Personal Access Token with the minimum required
+        scope (read-only on the specific repository).
 
 config AIRMON_GITHUB_OTA_ASSET_PREFIX
     string "GitHub OTA asset filename prefix"

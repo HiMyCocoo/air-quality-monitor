@@ -625,7 +625,9 @@ void mqtt_ha_set_device_name(const char *device_name)
     if (device_name == NULL) {
         return;
     }
+    portENTER_CRITICAL(&s_error_mux);
     strlcpy(s_ctx.config.device_name, device_name, sizeof(s_ctx.config.device_name));
+    portEXIT_CRITICAL(&s_error_mux);
 }
 
 uint16_t mqtt_ha_get_frc_reference_ppm(void)

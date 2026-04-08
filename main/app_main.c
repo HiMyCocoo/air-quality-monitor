@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif_sntp.h"
+#include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -253,10 +254,11 @@ static esp_err_t app_start_time_sync(void)
     s_app.time_sync_started = true;
     xSemaphoreGive(s_app.lock);
 
-    setenv("TZ", "CST-8", 1);
+    setenv("TZ", CONFIG_AIRMON_TIMEZONE, 1);
     tzset();
 
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("ntp.aliyun.com");
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(2,
+        ESP_SNTP_SERVER_LIST(CONFIG_AIRMON_NTP_SERVER_PRIMARY, CONFIG_AIRMON_NTP_SERVER_BACKUP));
     config.wait_for_sync = false;
 
     esp_err_t err = esp_netif_sntp_init(&config);
@@ -270,11 +272,22 @@ static esp_err_t app_start_time_sync(void)
 
 static void app_fill_diag(device_diag_t *diag)
 {
+    memset(diag, 0, sizeof(*diag));
+
+    /* Fields owned by s_app – caller must hold s_app.lock. */
+    diag->provisioning_mode = s_app.provisioning_mode;
+    diag->status_led_enabled = s_app.status_led_enabled;
+    strlcpy(diag->ap_ssid, s_app.prov_service_name, sizeof(diag->ap_ssid));
+    strlcpy(diag->device_id, s_app.device_id, sizeof(diag->device_id));
+    strlcpy(diag->firmware_version, s_app.firmware_version, sizeof(diag->firmware_version));
+}
+
+static void app_fill_diag_external(device_diag_t *diag)
+{
     char sensor_error[LAST_ERROR_LEN] = {0};
     char mqtt_error[LAST_ERROR_LEN] = {0};
 
-    memset(diag, 0, sizeof(*diag));
-    diag->provisioning_mode = s_app.provisioning_mode;
+    /* Fields from external subsystems – must NOT hold s_app.lock. */
     diag->wifi_connected = platform_wifi_is_connected();
     diag->mqtt_connected = mqtt_ha_is_connected();
     diag->sensors_ready = sensors_all_ready();
@@ -283,13 +296,9 @@ static void app_fill_diag(device_diag_t *diag)
     diag->bmp390_ready = sensors_is_bmp390_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
     diag->status_led_ready = s_status_led.initialized;
-    diag->status_led_enabled = s_app.status_led_enabled;
     diag->wifi_rssi = platform_wifi_get_rssi();
     diag->uptime_sec = esp_timer_get_time() / 1000000ULL;
     diag->heap_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    strlcpy(diag->ap_ssid, s_app.prov_service_name, sizeof(diag->ap_ssid));
-    strlcpy(diag->device_id, s_app.device_id, sizeof(diag->device_id));
-    strlcpy(diag->firmware_version, s_app.firmware_version, sizeof(diag->firmware_version));
     platform_wifi_get_ip(diag->ip_addr, sizeof(diag->ip_addr));
     sensors_get_last_error(sensor_error, sizeof(sensor_error));
     mqtt_ha_get_last_error(mqtt_error, sizeof(mqtt_error));
@@ -316,6 +325,9 @@ static void app_fill_status(sensor_snapshot_t *snapshot, device_diag_t *diag, de
     *frc_ppm = s_app.frc_reference_ppm;
     app_fill_diag(diag);
     xSemaphoreGive(s_app.lock);
+
+    /* Collect external subsystem state without holding s_app.lock. */
+    app_fill_diag_external(diag);
 }
 
 static void app_schedule_action(bool factory_reset)
@@ -838,6 +850,7 @@ static void publisher_task(void *arg)
             app_fill_diag(&diag);
             mqtt_ha_set_control_state(s_app.config.scd41_asc_enabled, s_app.frc_reference_ppm);
             xSemaphoreGive(s_app.lock);
+            app_fill_diag_external(&diag);
             mqtt_ha_publish_state(&snapshot, &diag);
             last_publish_ms = esp_timer_get_time() / 1000;
         }
@@ -915,6 +928,11 @@ void app_main(void)
     }
     s_app.frc_reference_ppm = 400;
     s_app.status_led_enabled = true;
+
+    /* Mark the running firmware as valid so ESP-IDF will not roll back
+     * to the previous OTA image on the next reboot.  This should be
+     * called early – before anything that might crash on a bad update. */
+    esp_ota_mark_app_valid_cancel_rollback();
 
     app_build_device_id(s_app.device_id, sizeof(s_app.device_id));
     app_build_prov_service_name(s_app.prov_service_name, sizeof(s_app.prov_service_name));

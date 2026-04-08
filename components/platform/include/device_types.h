@@ -35,6 +35,7 @@ typedef struct {
   float scd41_temp_offset_c;
   bool scd41_asc_enabled;
   bool pms_control_pins_enabled;
+  uint8_t _reserved[64]; /* Padding for future fields without changing struct size in NVS */
 } device_config_t;
 
 typedef enum {
