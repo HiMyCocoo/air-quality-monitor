@@ -5,11 +5,14 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "esp_check.h"
 #include "led_strip_encoder.h"
 
 static const char *TAG = "led_encoder";
+
+#define LED_STRIP_NS_PER_SEC 1000000000ULL
 
 typedef struct {
     rmt_encoder_t base;
@@ -18,6 +21,12 @@ typedef struct {
     int state;
     rmt_symbol_word_t reset_code;
 } rmt_led_strip_encoder_t;
+
+static uint16_t rmt_ticks_from_ns(uint32_t resolution_hz, uint32_t ns)
+{
+    uint64_t ticks = ((uint64_t)resolution_hz * ns) / LED_STRIP_NS_PER_SEC;
+    return ticks > UINT16_MAX ? UINT16_MAX : (uint16_t)ticks;
+}
 
 RMT_ENCODER_FUNC_ATTR
 static size_t rmt_encode_led_strip(rmt_encoder_t *encoder,
@@ -103,15 +112,15 @@ esp_err_t rmt_new_led_strip_encoder(const led_strip_encoder_config_t *config, rm
     rmt_bytes_encoder_config_t bytes_encoder_config = {
         .bit0 = {
             .level0 = 1,
-            .duration0 = 0.3 * config->resolution / 1000000,
+            .duration0 = rmt_ticks_from_ns(config->resolution, 300),
             .level1 = 0,
-            .duration1 = 0.9 * config->resolution / 1000000,
+            .duration1 = rmt_ticks_from_ns(config->resolution, 900),
         },
         .bit1 = {
             .level0 = 1,
-            .duration0 = 0.9 * config->resolution / 1000000,
+            .duration0 = rmt_ticks_from_ns(config->resolution, 900),
             .level1 = 0,
-            .duration1 = 0.3 * config->resolution / 1000000,
+            .duration1 = rmt_ticks_from_ns(config->resolution, 300),
         },
         .flags.msb_first = 1,
     };

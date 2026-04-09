@@ -228,11 +228,9 @@ esp_err_t device_state_json_build_sensor_state(cJSON *json,
 
     if (options->include_sample_age_sec) {
         int64_t now_ms = esp_timer_get_time() / 1000;
-        add_number_or_null(json, "sample_age_sec",
-                           snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms,
-                           snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms
-                               ? (double)((now_ms - snapshot->updated_at_ms) / 1000)
-                               : 0.0);
+        bool sample_age_valid = snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms;
+        int64_t sample_age_sec = sample_age_valid ? (now_ms - snapshot->updated_at_ms) / 1000 : 0;
+        add_number_or_null(json, "sample_age_sec", sample_age_valid, (double)sample_age_sec);
     }
 
     if (options->include_control_state) {

@@ -710,7 +710,8 @@ esp_err_t mqtt_ha_publish_state(const sensor_snapshot_t *snapshot, const device_
     cJSON_AddBoolToObject(diag_json, "sps30_ready", diag->sps30_ready);
     cJSON_AddBoolToObject(diag_json, "status_led_ready", diag->status_led_ready);
     if (snapshot->updated_at_ms > 0 && now_ms >= snapshot->updated_at_ms) {
-        cJSON_AddNumberToObject(diag_json, "sample_age_sec", (now_ms - snapshot->updated_at_ms) / 1000);
+        int64_t sample_age_sec = (now_ms - snapshot->updated_at_ms) / 1000;
+        cJSON_AddNumberToObject(diag_json, "sample_age_sec", (double)sample_age_sec);
     } else {
         cJSON_AddNullToObject(diag_json, "sample_age_sec");
     }

@@ -1,10 +1,12 @@
 #include "provisioning_web.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "cJSON.h"
 #include "device_state_json.h"
@@ -425,7 +427,8 @@ static esp_err_t root_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     const size_t index_html_size = (index_html_gz_end - index_html_gz_start);
-    return httpd_resp_send(req, (const char *)index_html_gz_start, index_html_size);
+    ESP_RETURN_ON_FALSE(index_html_size <= (size_t)INT_MAX, ESP_FAIL, TAG, "index asset too large");
+    return httpd_resp_send(req, (const char *)index_html_gz_start, (ssize_t)index_html_size);
 }
 
 static esp_err_t status_handler(httpd_req_t *req)
@@ -505,47 +508,57 @@ static esp_err_t config_handler(httpd_req_t *req)
     }
 
     cJSON *item = NULL;
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "device_name")) && cJSON_IsString(item)) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "device_name");
+    if (cJSON_IsString(item)) {
         strlcpy(config.device_name, item->valuestring, sizeof(config.device_name));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "wifi_ssid")) && cJSON_IsString(item)) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "wifi_ssid");
+    if (cJSON_IsString(item)) {
         strlcpy(config.wifi_ssid, item->valuestring, sizeof(config.wifi_ssid));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "wifi_password")) && cJSON_IsString(item)) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "wifi_password");
+    if (cJSON_IsString(item)) {
         strlcpy(config.wifi_password, item->valuestring, sizeof(config.wifi_password));
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_url")) && cJSON_IsString(item)) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_url");
+    if (cJSON_IsString(item)) {
         char error[96];
         if (!parse_mqtt_url_string(item->valuestring, &config, error, sizeof(error))) {
             cJSON_Delete(json);
             return send_error_json(req, "400 Bad Request", error);
         }
     } else {
-        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_host")) && cJSON_IsString(item)) {
+        item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_host");
+        if (cJSON_IsString(item)) {
             strlcpy(config.mqtt_host, item->valuestring, sizeof(config.mqtt_host));
         }
-        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port")) != NULL) {
+        item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_port");
+        if (item != NULL) {
             if (!whole_number_in_range(item, MQTT_PORT_MIN, MQTT_PORT_MAX)) {
                 cJSON_Delete(json);
                 return send_error_json(req, "400 Bad Request", "MQTT 端口必须在 1 到 65535 之间");
             }
             config.mqtt_port = (uint16_t)item->valuedouble;
         }
-        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_username")) && cJSON_IsString(item)) {
+        item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_username");
+        if (cJSON_IsString(item)) {
             strlcpy(config.mqtt_username, item->valuestring, sizeof(config.mqtt_username));
         }
-        if ((item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_password")) && cJSON_IsString(item)) {
+        item = cJSON_GetObjectItemCaseSensitive(json, "mqtt_password");
+        if (cJSON_IsString(item)) {
             strlcpy(config.mqtt_password, item->valuestring, sizeof(config.mqtt_password));
         }
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_altitude_m")) != NULL) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "scd41_altitude_m");
+    if (item != NULL) {
         if (!whole_number_in_range(item, SCD41_ALTITUDE_MIN, SCD41_ALTITUDE_MAX)) {
             cJSON_Delete(json);
             return send_error_json(req, "400 Bad Request", "SCD41 海拔补偿必须在 0 到 3000 米之间");
         }
         config.scd41_altitude_m = (uint16_t)item->valuedouble;
     }
-    if ((item = cJSON_GetObjectItemCaseSensitive(json, "scd41_temp_offset_c")) != NULL) {
+    item = cJSON_GetObjectItemCaseSensitive(json, "scd41_temp_offset_c");
+    if (item != NULL) {
         if (!number_in_range(item, SCD41_TEMP_OFFSET_MIN, SCD41_TEMP_OFFSET_MAX)) {
             cJSON_Delete(json);
             return send_error_json(req, "400 Bad Request", "SCD41 温度偏移必须在 0 到 20 摄氏度之间");

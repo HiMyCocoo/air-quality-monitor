@@ -5,8 +5,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "air_quality.h"
-#include "driver/rmt_tx.h"
 #include "esp_app_desc.h"
 #include "esp_check.h"
 #include "esp_event.h"
@@ -29,25 +27,13 @@
 #include "sensors.h"
 #include "network_provisioning/manager.h"
 #include "network_provisioning/scheme_ble.h"
-#include "led_strip_encoder.h"
+#include "status_led.h"
 
 #ifndef MAX_BLE_DEVNAME_LEN
 #define MAX_BLE_DEVNAME_LEN 29
 #endif
 
 static const char *TAG = "app_main";
-
-#define STATUS_LED_GPIO 48
-#define STATUS_LED_RESOLUTION_HZ 10000000
-#define STATUS_LED_BRIGHTNESS 24
-#define STATUS_LED_UPDATE_MS 500
-
-typedef struct {
-    rmt_channel_handle_t channel;
-    rmt_encoder_handle_t encoder;
-    uint8_t last_pixels[3];
-    bool initialized;
-} status_led_t;
 
 typedef struct {
     SemaphoreHandle_t lock;
@@ -71,7 +57,6 @@ typedef struct {
 } app_ctx_t;
 
 static app_ctx_t s_app;
-static status_led_t s_status_led;
 
 static bool app_status_led_is_enabled(void)
 {
@@ -84,144 +69,10 @@ static bool app_status_led_is_enabled(void)
     return enabled;
 }
 
-static uint8_t app_status_led_scale(uint8_t value)
+static bool app_status_led_is_enabled_cb(void *user_ctx)
 {
-    return (uint8_t)((value * STATUS_LED_BRIGHTNESS) / 255U);
-}
-
-static esp_err_t app_status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
-{
-    if (!s_status_led.initialized) {
-        return ESP_OK;
-    }
-
-    /* WS2812B-compatible LED with GBR byte order (verify for your LED variant). */
-    uint8_t pixels[3] = {
-        app_status_led_scale(g),
-        app_status_led_scale(b),
-        app_status_led_scale(r),
-    };
-    if (memcmp(s_status_led.last_pixels, pixels, sizeof(pixels)) == 0) {
-        return ESP_OK;
-    }
-
-    memcpy(s_status_led.last_pixels, pixels, sizeof(pixels));
-    rmt_transmit_config_t tx_config = {
-        .loop_count = 0,
-    };
-    ESP_RETURN_ON_ERROR(rmt_transmit(s_status_led.channel,
-                                     s_status_led.encoder,
-                                     pixels,
-                                     sizeof(pixels),
-                                     &tx_config),
-                        TAG, "status led transmit failed");
-    return rmt_tx_wait_all_done(s_status_led.channel, 100);
-}
-
-static esp_err_t app_status_led_init(void)
-{
-    memset(&s_status_led, 0, sizeof(s_status_led));
-
-    rmt_tx_channel_config_t tx_chan_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .gpio_num = STATUS_LED_GPIO,
-        .mem_block_symbols = 64,
-        .resolution_hz = STATUS_LED_RESOLUTION_HZ,
-        .trans_queue_depth = 4,
-    };
-    ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_chan_config, &s_status_led.channel),
-                        TAG, "status led channel init failed");
-
-    led_strip_encoder_config_t encoder_config = {
-        .resolution = STATUS_LED_RESOLUTION_HZ,
-    };
-    esp_err_t err = rmt_new_led_strip_encoder(&encoder_config, &s_status_led.encoder);
-    if (err != ESP_OK) {
-        rmt_del_channel(s_status_led.channel);
-        memset(&s_status_led, 0, sizeof(s_status_led));
-        return err;
-    }
-
-    err = rmt_enable(s_status_led.channel);
-    if (err != ESP_OK) {
-        rmt_del_encoder(s_status_led.encoder);
-        rmt_del_channel(s_status_led.channel);
-        memset(&s_status_led, 0, sizeof(s_status_led));
-        return err;
-    }
-
-    s_status_led.initialized = true;
-    return app_status_led_set_rgb(0, 0, 0);
-}
-
-static void app_status_led_update(void)
-{
-    if (!app_status_led_is_enabled()) {
-        app_status_led_set_rgb(0, 0, 0);
-        return;
-    }
-
-    sensor_snapshot_t snapshot = {0};
-    if (sensors_get_snapshot(&snapshot) != ESP_OK) {
-        return;
-    }
-
-    uint8_t red = 0;
-    uint8_t green = 0;
-    uint8_t blue = 0;
-
-    air_quality_assessment_t assessment = {0};
-    air_quality_compute_overall_assessment(&snapshot, &assessment);
-    if (assessment.valid) {
-        switch (assessment.category) {
-        case AIR_QUALITY_CATEGORY_GOOD:
-            green = 255;
-            break;
-        case AIR_QUALITY_CATEGORY_MODERATE:
-            red = 255;
-            green = 180;
-            break;
-        case AIR_QUALITY_CATEGORY_UNHEALTHY_SENSITIVE:
-            red = 255;
-            green = 80;
-            break;
-        case AIR_QUALITY_CATEGORY_UNHEALTHY:
-            red = 255;
-            break;
-        case AIR_QUALITY_CATEGORY_VERY_UNHEALTHY:
-            red = 160;
-            blue = 255;
-            break;
-        case AIR_QUALITY_CATEGORY_HAZARDOUS:
-            red = 255;
-            blue = 120;
-            break;
-        case AIR_QUALITY_CATEGORY_UNKNOWN:
-        default:
-            blue = 255;
-            break;
-        }
-        app_status_led_set_rgb(red, green, blue);
-        return;
-    }
-
-    bool blink_on = ((esp_timer_get_time() / 1000 / STATUS_LED_UPDATE_MS) % 2) == 0;
-    if (sensors_any_ready()) {
-        blue = blink_on ? 255 : 0;
-    } else {
-        red = blink_on ? 255 : 0;
-        blue = blink_on ? 96 : 0;
-    }
-    app_status_led_set_rgb(red, green, blue);
-}
-
-static void status_led_task(void *arg)
-{
-    (void)arg;
-    while (true) {
-        app_status_led_update();
-        vTaskDelay(pdMS_TO_TICKS(STATUS_LED_UPDATE_MS));
-    }
+    (void)user_ctx;
+    return app_status_led_is_enabled();
 }
 
 static void app_time_sync_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -295,7 +146,7 @@ static void app_fill_diag_external(device_diag_t *diag)
     diag->sgp41_ready = sensors_is_sgp41_ready();
     diag->bmp390_ready = sensors_is_bmp390_ready();
     diag->sps30_ready = sensors_is_sps30_ready();
-    diag->status_led_ready = s_status_led.initialized;
+    diag->status_led_ready = status_led_is_ready();
     diag->wifi_rssi = platform_wifi_get_rssi();
     diag->uptime_sec = esp_timer_get_time() / 1000000ULL;
     diag->heap_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -517,7 +368,7 @@ static esp_err_t app_request_start_sps30_fan_cleaning(void *user_ctx)
 static esp_err_t app_request_set_status_led(bool enabled, void *user_ctx)
 {
     (void)user_ctx;
-    if (!s_status_led.initialized) {
+    if (!status_led_is_ready()) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -526,11 +377,7 @@ static esp_err_t app_request_set_status_led(bool enabled, void *user_ctx)
     s_app.publish_now = true;
     xSemaphoreGive(s_app.lock);
 
-    if (!enabled) {
-        return app_status_led_set_rgb(0, 0, 0);
-    }
-    app_status_led_update();
-    return ESP_OK;
+    return status_led_update_now();
 }
 
 static esp_err_t app_request_apply_frc(uint16_t ppm, void *user_ctx)
@@ -949,9 +796,9 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_handler_register(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, &app_time_sync_event_handler, NULL));
 
     ESP_ERROR_CHECK(sensors_start(&s_app.config));
-    esp_err_t led_err = app_status_led_init();
+    esp_err_t led_err = status_led_start(app_status_led_is_enabled_cb, NULL);
     if (led_err != ESP_OK) {
-        ESP_LOGW(TAG, "status led init failed on GPIO%d: %d", STATUS_LED_GPIO, led_err);
+        ESP_LOGW(TAG, "status led start failed: %d", led_err);
     }
 
     bool use_ble_provisioning = !platform_config_has_wifi(&s_app.config);
@@ -976,7 +823,4 @@ void app_main(void)
 
     xTaskCreate(publisher_task, "publisher_task", 6144, NULL, 4, NULL);
     xTaskCreate(supervisor_task, "supervisor_task", 6144, NULL, 4, NULL);
-    if (s_status_led.initialized) {
-        xTaskCreate(status_led_task, "status_led_task", 4096, NULL, 3, NULL);
-    }
 }

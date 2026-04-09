@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>空气监测节点后台</title>
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23526af2'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 53A19 19 0 0 1 26.7 15.1C42.2 12 46.3 10.6 52 4c2.7 4.7 4 9.8 4 17 0 15.2-11.8 32-26 32Z'/%3E%3Cpath d='M9 56c0-8 4.8-14.5 13.8-16.3C29 38.7 35 34.7 38 32'/%3E%3C/g%3E%3C/svg%3E" />
+  <style>
+/* AIRMON_INLINE_CSS: app.css */
+</style>
+</head>
+
+<body>
+  <header class="top-nav">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+          <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+        </svg>
+        <span>AirMonitor Panel</span>
+      </div>
+      <div class="nav-tabs" role="tablist" aria-label="设备后台功能分区" data-i18n-aria-label="nav.sectionAria">
+        <button id="tab-btn-realtime" class="nav-btn" type="button" role="tab" aria-selected="true"
+          aria-controls="tab-realtime" data-tab="realtime" data-i18n="nav.realtime">实时监测</button>
+        <button id="tab-btn-config" class="nav-btn" type="button" role="tab" aria-selected="false"
+          aria-controls="tab-config" data-tab="config" tabindex="-1" data-i18n="nav.config">项目配置</button>
+        <button id="tab-btn-maintenance" class="nav-btn" type="button" role="tab" aria-selected="false"
+          aria-controls="tab-maintenance" data-tab="maintenance" tabindex="-1" data-i18n="nav.maintenance">维护操作</button>
+      </div>
+      <div class="nav-lang-switch" role="group" aria-label="语言切换" data-i18n-aria-label="nav.languageAria">
+        <button id="lang-btn-zh" class="lang-btn" type="button" data-lang="zh-CN" aria-pressed="true" data-i18n="nav.langZh">简中</button>
+        <button id="lang-btn-en" class="lang-btn" type="button" data-lang="en" aria-pressed="false" data-i18n="nav.langEn">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="toast-container"></div>
+
+  <div class="container">
+
+    <section id="tab-realtime" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-realtime" data-tab="realtime">
+      <div class="main-grid">
+        <section class="glass-panel span-3">
+          <h2 data-i18n="realtime.airOverviewTitle">空气质量总览</h2>
+          <div id="airSummary"></div>
+          <div id="airMetricsPrimary" class="air-metrics-primary"></div>
+          <div id="airMetricsSecondary" class="air-metrics-secondary"></div>
+          <section class="particle-overview">
+            <h3 data-i18n="realtime.particleProfileTitle">颗粒物画像</h3>
+            <div id="particleSummary"></div>
+            <div id="particleMetrics" class="particle-grid"></div>
+          </section>
+        </section>
+
+        <section class="glass-panel span-3">
+          <h2 data-i18n="realtime.runtimeOverviewTitle">运行概览</h2>
+          <div class="overview-clusters">
+            <div class="overview-group">
+              <h3 data-i18n="realtime.networkStatusTitle">联网状态</h3>
+              <div id="overviewNetwork" class="kv-list"></div>
+            </div>
+            <div class="overview-group">
+              <h3 data-i18n="realtime.moduleStatusTitle">模块状态</h3>
+              <div id="overviewModules" class="kv-list"></div>
+            </div>
+            <div class="overview-group">
+              <h3 data-i18n="realtime.systemSamplingTitle">系统与采样</h3>
+              <div id="overviewSystem" class="kv-list"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-config" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" data-tab="config"
+      hidden>
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2 data-i18n="config.mqtt.title">MQTT 接入</h2>
+          <p data-i18n="config.mqtt.description">配置设备接入 Home Assistant 或外部 MQTT Broker 的连接参数。</p>
+        </div>
+        <div class="settings-body">
+          <div class="field-grid" style="margin-bottom:0;">
+            <div class="field-span-2">
+              <label data-i18n="config.mqtt.urlLabel">MQTT URL</label>
+              <input id="mqtt_url" type="text" placeholder="mqtt://user:password@192.168.1.20:1883" />
+              <div id="mqtt_privacy_hint" class="hint" style="margin-top: 8px;" data-i18n="config.mqtt.urlHint">格式：mqtt://[user:password@]host[:port]。用户密码中的特殊字符需 URL 编码。</div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-footer">
+          <p class="desc" data-i18n="config.mqtt.footer">填入后点击保存会自动尝试连接并发布 Discovery 机制。</p>
+          <button onclick="saveConfig()" data-i18n="config.mqtt.saveButton">保存配置</button>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2 data-i18n="config.sensor.title">传感器策略</h2>
+          <p data-i18n="config.sensor.description">调整核心环境传感器的采样行为和基准补偿参数。</p>
+        </div>
+        <div class="settings-body">
+          <div class="inner-stack">
+            <div class="inner-card">
+              <h3 data-i18n="config.sensor.scd41Title">SCD41 补偿参数</h3>
+              <div class="field-grid" style="margin-bottom:0;">
+                <div>
+                  <label data-i18n="config.sensor.altitudeLabel">海拔补偿（米）</label>
+                  <input id="scd41_altitude_m" type="number" placeholder="0 - 3000" data-i18n-placeholder="config.sensor.altitudePlaceholder" />
+                </div>
+                <div>
+                  <label data-i18n="config.sensor.tempOffsetLabel">温度偏移（°C）</label>
+                  <input id="scd41_temp_offset_c" type="number" step="0.1" placeholder="例如: 2.5" data-i18n-placeholder="config.sensor.tempOffsetPlaceholder" />
+                </div>
+              </div>
+            </div>
+
+            <div class="inner-card">
+              <h3 data-i18n="config.sensor.ascTitle">ASC 自校准</h3>
+              <div class="toggle-row"
+                style="margin-bottom:0; border:none; box-shadow:none; padding:0; background:transparent;">
+                <div class="toggle-copy">
+                  <span class="toggle-title" data-i18n="config.sensor.ascToggleTitle">自动自校准</span>
+                  <span id="asc_status_text" class="toggle-status" data-i18n="status.currentPlaceholder">当前：--</span>
+                </div>
+                <label class="switch" for="asc_toggle">
+                  <input id="asc_toggle" type="checkbox" role="switch" aria-label="SCD41 ASC 自校准开关" data-i18n-aria-label="config.sensor.ascToggleAria" />
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-footer">
+          <p class="desc" data-i18n="config.sensor.footer">修改策略后，系统可能需要短暂重置传感器实例以应用新参数。</p>
+          <button onclick="saveConfig()" class="ghost" data-i18n="config.sensor.applyButton">应用参数</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-maintenance" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-maintenance"
+      data-tab="maintenance" hidden>
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2 data-i18n="maintenance.switches.title">外设状态开关</h2>
+          <p data-i18n="maintenance.switches.description">控制系统特定模块的开关状态。此操作实时生效，无须额外保存。</p>
+        </div>
+        <div class="settings-body">
+          <div class="maintenance-toggle-stack">
+            <div class="toggle-row">
+              <div class="toggle-copy">
+                <span class="toggle-title" data-i18n="maintenance.switches.sps30Title">SPS30 连续采样</span>
+                <span id="sps30_status_text" class="toggle-status" data-i18n="status.currentPlaceholder">当前：--</span>
+              </div>
+              <label class="switch" for="sps30_toggle">
+                <input id="sps30_toggle" type="checkbox" role="switch" aria-label="SPS30 工作状态开关" data-i18n-aria-label="maintenance.switches.sps30Aria" />
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-copy">
+                <span class="toggle-title" data-i18n="maintenance.switches.rgbTitle">RGB 状态灯</span>
+                <span id="status_led_text" class="toggle-status" data-i18n="status.currentPlaceholder">当前：--</span>
+              </div>
+              <label class="switch" for="status_led_toggle">
+                <input id="status_led_toggle" type="checkbox" role="switch" aria-label="RGB 状态灯开关" data-i18n-aria-label="maintenance.switches.rgbAria" />
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2 data-i18n="maintenance.tools.title">校准与调试工具</h2>
+          <p data-i18n="maintenance.tools.description">强制触发环境传感器校准，或从 Home Assistant 重新同步实体。</p>
+        </div>
+        <div class="settings-body">
+          <div class="maintenance-tool-list">
+            <div class="maintenance-tool-block">
+              <h3 data-i18n="maintenance.tools.discoveryTitle">重发 Discovery</h3>
+              <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
+                <div>
+                  <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;" data-i18n="maintenance.tools.discoveryDesc">向 MQTT Broker 重新推送 Home Assistant 发现消息谱。</p>
+                </div>
+                <div class="button-cell button-cell-end">
+                  <button id="republish_btn" class="ghost" onclick="republishDiscovery()" data-i18n="maintenance.tools.discoveryButton">推送 Discovery 配置</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="maintenance-tool-block">
+              <h3 data-i18n="maintenance.tools.fanCleaningTitle">SPS30 自动风扇清洁</h3>
+              <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
+                <div>
+                  <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;" data-i18n="maintenance.tools.fanCleaningDesc">手动触发 SPS30 内置自动风扇清洁流程。仅在传感器运行中可用，执行约 10 秒，期间 PM 数据会短暂失效。</p>
+                </div>
+                <div class="button-cell button-cell-end">
+                  <button id="sps30_fan_cleaning_btn" class="ghost no-wrap" onclick="startSps30FanCleaning()" data-i18n="maintenance.tools.fanCleaningButton">执行风扇清洁</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="maintenance-tool-block">
+              <h3 data-i18n="maintenance.tools.frcTitle">FRC 强制校准</h3>
+              <div class="field-grid button-stack-narrow" style="margin-bottom:0;">
+                <div>
+                  <label data-i18n="maintenance.tools.frcLabel">FRC 参考值 (ppm)</label>
+                  <input id="frc_reference_ppm" type="number" placeholder="400" />
+                </div>
+                <div class="button-cell button-cell-start">
+                  <button id="frc_apply_btn" class="ghost no-wrap" onclick="applyFrc()" data-i18n="maintenance.tools.frcButton">执行 FRC 校准</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card ota-card">
+        <div class="ota-card-header">
+          <div class="ota-header-main">
+            <div>
+              <h2 style="margin:0 0 8px;" data-i18n="ota.title">固件升级 (OTA)</h2>
+              <p style="margin:0; color:var(--text-muted); font-size:0.9rem;" data-i18n="ota.description">在线检查 GitHub Releases 自动更新，或直接手动上传本地固件包。</p>
+            </div>
+            <div class="current-version-badge">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              <span><span id="firmware_version_label" data-i18n="ota.currentVersionLabel">当前版本</span>: <strong id="firmware_version_text">--</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ota-grid-layout">
+          <!-- GitHub Module -->
+          <div id="github_ota_section" class="ota-module">
+            <div class="ota-module-top">
+              <div class="ota-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+              </div>
+              <div>
+                <h3 class="ota-module-title" data-i18n="ota.githubTitle">GitHub 自动更新</h3>
+                <p id="github_repo_text" class="ota-module-desc">--</p>
+              </div>
+            </div>
+            <div class="ota-stat-box">
+              <div class="ota-stat-col">
+                <span class="ota-stat-label" data-i18n="ota.latestVersionLabel">最新版本</span>
+                <span id="github_latest_version_text" class="ota-stat-value">--</span>
+              </div>
+              <div class="ota-stat-col">
+                <span class="ota-stat-label" data-i18n="ota.statusLabel">更新状态</span>
+                <span id="github_ota_status_text" class="ota-stat-value" data-i18n="ota.idleState">等待检查</span>
+              </div>
+            </div>
+            <p id="github_ota_meta" class="hint" style="margin-top:0; margin-bottom:16px;" data-i18n="ota.autoCheckHint">页面加载后会自动检查一次 GitHub 最新 Release，并每 2 分钟自动刷新。</p>
+            <div id="github_ota_progress" class="ota-progress" hidden style="margin-bottom:16px;">
+              <div class="ota-progress-head">
+                <span id="github_ota_progress_label" data-i18n="ota.idleState">等待检查</span>
+                <strong id="github_ota_progress_percent">0%</strong>
+              </div>
+              <div class="ota-progress-track">
+                <div id="github_ota_progress_fill" class="ota-progress-fill"></div>
+              </div>
+            </div>
+            <div class="ota-actions-row">
+              <button id="github_ota_check_btn" class="ghost" onclick="checkGithubRelease()" data-i18n="ota.checkButton">检查更新</button>
+              <button id="github_ota_update_btn" onclick="updateFirmwareFromGithub()" data-i18n="ota.updateButton">直接升级</button>
+            </div>
+          </div>
+
+          <!-- Manual Module -->
+          <div class="ota-module">
+            <div class="ota-module-top">
+              <div class="ota-icon green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              </div>
+              <div>
+                <h3 class="ota-module-title" data-i18n="ota.manualTitle">本地手动上传</h3>
+                <p class="ota-module-desc" data-i18n="ota.manualDesc">上传并校验本地保存的 .bin 固件包</p>
+              </div>
+            </div>
+
+            <input id="firmware" class="file-input" type="file" accept=".bin" />
+            <label for="firmware" class="upload-dropzone">
+              <div class="dropzone-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+              </div>
+              <span id="firmware_name" class="dropzone-text" data-i18n="ota.noFileSelectedAction">点击选取 .bin 固件包</span>
+              <span class="dropzone-hint" data-i18n="ota.dropzoneHint">大小限制视设备分区而定，自动隐式校验</span>
+            </label>
+
+            <div id="ota_progress" class="ota-progress" hidden style="margin-bottom:16px;">
+              <div class="ota-progress-head">
+                <span id="ota_progress_label" data-i18n="ota.waitingUpload">等待上传</span>
+                <strong id="ota_progress_percent">0%</strong>
+              </div>
+              <div class="ota-progress-track">
+                <div id="ota_progress_fill" class="ota-progress-fill"></div>
+              </div>
+            </div>
+
+            <div class="ota-actions-row">
+               <button id="ota_upload_btn" style="background:#10b981; color:white; border:none;" onclick="uploadFirmware()" data-i18n="ota.uploadButton">开始上传并升级</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ota-warning-footer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span data-i18n-html="ota.warningHtml"><strong>OTA 升级须知：</strong>整个校验与写入过程大约需要 30-60 秒，完成后设备将自动重启。<br>升级期间<strong>请勿断开电源或刷新页面</strong>。</span>
+        </div>
+      </div>
+
+      <div class="settings-card" style="border-color: rgba(229, 62, 62, 0.4);">
+        <div class="settings-header">
+          <h2 style="color: var(--color-unhealthy);" data-i18n="danger.title">危险操作区 (Danger Zone)</h2>
+          <p style="color: var(--color-unhealthy); opacity:0.8;" data-i18n="danger.description">请谨慎操作，恢复出厂设置将抹除一切网络配置与补偿信息并重启至配网模式。</p>
+        </div>
+        <div class="settings-footer"
+          style="background: rgba(229, 62, 62, 0.05); border-top: 1px solid rgba(229, 62, 62, 0.2);">
+          <p class="desc" data-i18n="danger.footer">恢复后将清除 Wi-Fi、MQTT 与传感器补偿配置，并回到 BLE 配网模式。</p>
+          <div class="danger-actions">
+            <button onclick="restartDevice()" class="ghost"
+              style="border-color: rgba(229, 62, 62, 0.6); color: var(--color-unhealthy);" data-i18n="danger.restartOnly">仅重新启动</button>
+            <button onclick="factoryReset()" class="danger" data-i18n="danger.factoryReset">恢复出厂设置</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+// AIRMON_INLINE_JS: app.js
+</script>
+</body>
+
+</html>
