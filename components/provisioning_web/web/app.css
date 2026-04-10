@@ -863,7 +863,8 @@
 
     .hint {
       font-size: 0.85rem;
-      color: var(--text-muted);
+      color: var(--color-neutral);
+      font-weight: 500;
       margin-top: -8px;
     }
 
@@ -917,7 +918,9 @@
     }
 
     button.ghost:hover:not(:disabled) {
-      background: rgba(82, 106, 242, 0.1);
+      background: rgba(82, 106, 242, 0.15);
+      border-color: var(--primary-hover);
+      color: var(--primary-hover);
     }
 
     button.danger {
@@ -936,6 +939,12 @@
       background: transparent;
       color: var(--accent);
       border-color: var(--accent);
+    }
+
+    button.ghost.danger:hover:not(:disabled) {
+      background: rgba(255, 107, 107, 0.12);
+      border-color: #ff4b4b;
+      color: #ff4b4b;
     }
 
     /* Toast Notifications */
@@ -1337,7 +1346,8 @@
 
     .settings-footer p.desc {
       margin: 0;
-      color: var(--text-muted);
+      color: var(--color-neutral);
+      font-weight: 500;
       font-size: 0.85rem;
     }
 
@@ -1653,6 +1663,7 @@
       .nav-tabs {
         order: 3;
         width: 100%;
+        flex: 1 1 100%;
         display: flex;
         gap: 8px;
         justify-content: flex-start;
