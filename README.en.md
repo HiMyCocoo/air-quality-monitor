@@ -165,9 +165,11 @@ By default, the firmware exposes these entity categories to `Home Assistant`:
 
 - Environment telemetry: `CO2 / temperature / humidity / VOC / NOx / PM / particle counts / typical particle size`
 - Derived signals: `PM AQI`, composite air quality, particle profile, pressure trend, humidity trend, dew-point spread, and short-term rain outlook
-- Diagnostics: `Wi-Fi RSSI / Uptime / Heap / IP / Device ID / Firmware Version / Last Error`
-- State entities: `Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
+- Diagnostics: `CO2 Compensation Source / SGP41 Stabilization Remaining / Sample Age / Wi-Fi RSSI / Uptime / IP / Firmware Version / Last Error`
+- State entities: `Provisioning Mode / All Sensors Ready`
 - Control entities: `SCD41 ASC / SPS30 Sleep / SPS30 Fan Cleaning / RGB Status LED / Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+
+When `Discovery` is republished, the firmware clears low-value entities from older versions, such as internal keys, `Heap`, `AP SSID`, duplicate connection states, and per-sensor `ready/valid` details.
 
 ## OTA and GitHub Releases
 

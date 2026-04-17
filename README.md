@@ -165,9 +165,11 @@ mqtt://user:password@192.168.1.20:1883
 
 - 环境数据：`CO2 / 温度 / 湿度 / VOC / NOx / PM / 粒子数 / 典型粒径`
 - 派生数据：`PM AQI` 估算、综合空气质量、粒径画像、气压趋势、湿度趋势、露点差、短时降雨可能
-- 诊断数据：`Wi-Fi RSSI / Uptime / Heap / IP / Device ID / Firmware Version / Last Error`
-- 状态实体：`Provisioning Mode / Wi-Fi Connected / MQTT Connected / All Sensors Ready`
+- 诊断数据：`CO2 Compensation Source / SGP41 Stabilization Remaining / Sample Age / Wi-Fi RSSI / Uptime / IP / Firmware Version / Last Error`
+- 状态实体：`Provisioning Mode / All Sensors Ready`
 - 控制实体：`SCD41 ASC / SPS30 Sleep / SPS30 Fan Cleaning / RGB Status LED / Restart / Factory Reset / Republish Discovery / Apply SCD41 FRC`
+
+重新发布 `Discovery` 时，固件会清理旧版中低价值的 `Home Assistant` 实体，例如内部 key、`Heap`、`AP SSID`、重复连接状态，以及各传感器 `ready/valid` 细项。
 
 ## OTA 与 GitHub Release
 

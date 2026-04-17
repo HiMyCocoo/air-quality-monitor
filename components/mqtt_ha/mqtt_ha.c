@@ -39,6 +39,11 @@ typedef struct {
 } binary_sensor_entity_t;
 
 typedef struct {
+    const char *domain;
+    const char *object_id;
+} deprecated_discovery_entity_t;
+
+typedef struct {
     esp_mqtt_client_handle_t client;
     _Atomic bool connected;
     _Atomic bool scd41_asc_enabled;
@@ -155,39 +160,43 @@ static const sensor_entity_t SENSOR_ENTITIES[] = {
     {"particles_10_0um", "Particles <10.0µm", "particles_10_0um", "#/cm³", NULL, "measurement", NULL, false},
     {"typical_particle_size_um", "Typical Particle Size", "typical_particle_size_um", "µm", NULL, "measurement", NULL, false},
     {"sample_age_sec", "Sample Age", "sample_age_sec", "s", "duration", "measurement", "diagnostic", true},
-    {"pressure_trend_span_min", "Pressure Trend History", "pressure_trend_span_min", "min", NULL, "measurement", NULL, false},
-    {"humidity_trend_span_min", "Humidity Trend History", "humidity_trend_span_min", "min", NULL, "measurement", NULL, false},
     {"wifi_rssi", "Wi-Fi RSSI", "wifi_rssi", "dBm", "signal_strength", "measurement", "diagnostic", true},
     {"uptime_sec", "Uptime", "uptime_sec", "s", "duration", "measurement", "diagnostic", true},
-    {"heap_free", "Heap Free", "heap_free", "B", "data_size", "measurement", "diagnostic", true},
     {"ip_addr", "IP Address", "ip_addr", NULL, NULL, NULL, "diagnostic", true},
-    {"ap_ssid", "Provisioning AP SSID", "ap_ssid", NULL, NULL, NULL, "diagnostic", true},
-    {"device_id", "Device ID", "device_id", NULL, NULL, NULL, "diagnostic", true},
     {"firmware_version", "Firmware Version", "firmware_version", NULL, NULL, NULL, "diagnostic", true},
     {"last_error", "Last Error", "last_error", NULL, NULL, NULL, "diagnostic", true},
-    {"us_aqi_level_key", "PM AQI Estimate Level Key", "us_aqi_level_key", NULL, NULL, NULL, "diagnostic", false},
-    {"overall_air_quality_key", "Composite Air Quality Key", "overall_air_quality_key", NULL, NULL, NULL, "diagnostic", false},
-    {"particle_profile_key", "Particle Profile Key", "particle_profile_key", NULL, NULL, NULL, "diagnostic", false},
-    {"particle_situation_key", "Particle Situation Key", "particle_situation_key", NULL, NULL, NULL, "diagnostic", false},
-    };
+};
 
 static const binary_sensor_entity_t BINARY_SENSOR_ENTITIES[] = {
     {"provisioning_mode", "Provisioning Mode", "provisioning_mode", "running", "diagnostic", true},
-    {"wifi_connected", "Wi-Fi Connected", "wifi_connected", "connectivity", "diagnostic", true},
-    {"mqtt_connected", "MQTT Connected", "mqtt_connected", "connectivity", "diagnostic", true},
     {"sensors_ready", "All Sensors Ready", "sensors_ready", NULL, "diagnostic", true},
-    {"scd41_ready", "SCD41 Ready", "scd41_ready", "connectivity", "diagnostic", true},
-    {"sgp41_ready", "SGP41 Ready", "sgp41_ready", "connectivity", "diagnostic", true},
-    {"bmp390_ready", "BMP390 Ready", "bmp390_ready", "connectivity", "diagnostic", true},
-    {"sps30_ready", "SPS30 Ready", "sps30_ready", "connectivity", "diagnostic", true},
-    {"status_led_ready", "Status LED Ready", "status_led_ready", NULL, "diagnostic", true},
-    {"scd41_valid", "SCD41 Sample Valid", "scd41_valid", NULL, "diagnostic", false},
-    {"sgp41_valid", "SGP41 Sample Valid", "sgp41_valid", NULL, "diagnostic", false},
-    {"sgp41_conditioning", "SGP41 Conditioning", "sgp41_conditioning", "running", "diagnostic", false},
-    {"sgp41_voc_valid", "SGP41 VOC Index Valid", "sgp41_voc_valid", NULL, "diagnostic", false},
-    {"sgp41_nox_valid", "SGP41 NOx Index Valid", "sgp41_nox_valid", NULL, "diagnostic", false},
-    {"bmp390_valid", "BMP390 Sample Valid", "bmp390_valid", NULL, "diagnostic", false},
-    {"pm_valid", "Particle Sample Valid", "pm_valid", NULL, "diagnostic", false},
+};
+
+/* Home Assistant keeps retained discovery configs until the config topic is cleared. */
+static const deprecated_discovery_entity_t DEPRECATED_DISCOVERY_ENTITIES[] = {
+    {"sensor", "pressure_trend_span_min"},
+    {"sensor", "humidity_trend_span_min"},
+    {"sensor", "heap_free"},
+    {"sensor", "ap_ssid"},
+    {"sensor", "device_id"},
+    {"sensor", "us_aqi_level_key"},
+    {"sensor", "overall_air_quality_key"},
+    {"sensor", "particle_profile_key"},
+    {"sensor", "particle_situation_key"},
+    {"binary_sensor", "wifi_connected"},
+    {"binary_sensor", "mqtt_connected"},
+    {"binary_sensor", "scd41_ready"},
+    {"binary_sensor", "sgp41_ready"},
+    {"binary_sensor", "bmp390_ready"},
+    {"binary_sensor", "sps30_ready"},
+    {"binary_sensor", "status_led_ready"},
+    {"binary_sensor", "scd41_valid"},
+    {"binary_sensor", "sgp41_valid"},
+    {"binary_sensor", "sgp41_conditioning"},
+    {"binary_sensor", "sgp41_voc_valid"},
+    {"binary_sensor", "sgp41_nox_valid"},
+    {"binary_sensor", "bmp390_valid"},
+    {"binary_sensor", "pm_valid"},
 };
 
 static void build_topic(char *buffer, size_t buffer_len, const char *suffix)
@@ -294,6 +303,16 @@ static esp_err_t publish_binary_sensor_discovery(const binary_sensor_entity_t *e
     esp_err_t err = mqtt_publish_json(topic, root, true);
     cJSON_Delete(root);
     return err;
+}
+
+static esp_err_t clear_discovery_config(const deprecated_discovery_entity_t *entity)
+{
+    char topic[128];
+    snprintf(topic, sizeof(topic), "%s/%s/%s/%s/config",
+             s_ctx.config.discovery_prefix, entity->domain, s_ctx.device_id, entity->object_id);
+
+    int msg_id = esp_mqtt_client_publish(s_ctx.client, topic, "", 0, 1, true);
+    return msg_id >= 0 ? ESP_OK : ESP_FAIL;
 }
 
 static esp_err_t publish_switch_discovery(const char *object_id, const char *name, const char *json_key, const char *command_suffix)
@@ -651,6 +670,11 @@ esp_err_t mqtt_ha_publish_discovery(void)
         return ESP_ERR_INVALID_STATE;
     }
 
+    for (size_t i = 0; i < sizeof(DEPRECATED_DISCOVERY_ENTITIES) / sizeof(DEPRECATED_DISCOVERY_ENTITIES[0]); ++i) {
+        ESP_RETURN_ON_ERROR(clear_discovery_config(&DEPRECATED_DISCOVERY_ENTITIES[i]),
+                            TAG,
+                            "clear deprecated discovery failed");
+    }
     for (size_t i = 0; i < sizeof(SENSOR_ENTITIES) / sizeof(SENSOR_ENTITIES[0]); ++i) {
         ESP_RETURN_ON_ERROR(publish_sensor_discovery(&SENSOR_ENTITIES[i]), TAG, "sensor discovery failed");
     }
