@@ -63,6 +63,42 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
 }
 
+static bool is_hostname_char(char c)
+{
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+}
+
+static void build_hostname(const char *device_name, char *buffer, size_t buffer_len)
+{
+    if (buffer == NULL || buffer_len == 0) {
+        return;
+    }
+
+    size_t out_len = 0;
+    bool last_was_hyphen = true;
+    if (device_name != NULL) {
+        for (size_t i = 0; device_name[i] != '\0' && out_len + 1 < buffer_len; ++i) {
+            char c = device_name[i];
+            if (is_hostname_char(c)) {
+                buffer[out_len++] = c;
+                last_was_hyphen = false;
+            } else if (!last_was_hyphen) {
+                buffer[out_len++] = '-';
+                last_was_hyphen = true;
+            }
+        }
+    }
+
+    while (out_len > 0 && buffer[out_len - 1] == '-') {
+        out_len--;
+    }
+    if (out_len == 0) {
+        strlcpy(buffer, "aq-monitor", buffer_len);
+        return;
+    }
+    buffer[out_len] = '\0';
+}
+
 esp_err_t platform_wifi_init(platform_wifi_event_cb_t cb, void *user_ctx)
 {
     static bool initialized = false;
@@ -179,6 +215,13 @@ esp_err_t platform_wifi_start_sta(const device_config_t *config, int max_retry, 
 
     s_sta_netif = esp_netif_create_default_wifi_sta();
     ESP_RETURN_ON_FALSE(s_sta_netif != NULL, ESP_ERR_NO_MEM, TAG, "create sta netif failed");
+
+    char hostname[DEVICE_NAME_LEN + 1];
+    build_hostname(config->device_name, hostname, sizeof(hostname));
+    esp_err_t hostname_err = esp_netif_set_hostname(s_sta_netif, hostname);
+    if (hostname_err != ESP_OK) {
+        ESP_LOGW(TAG, "set hostname %s failed: %d", hostname, hostname_err);
+    }
 
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, config->wifi_ssid, sizeof(wifi_config.sta.ssid));
